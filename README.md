@@ -1,1 +1,3 @@
 # Infrageometry
+
+![Infrageometry](./infra.png)
