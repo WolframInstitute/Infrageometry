@@ -5,10 +5,13 @@ PackageExport[CanonicalComplex]
 
 PackageExport[SimplexDimension]
 PackageExport[ComplexDimension]
+PackageExport[ComplexDimensions]
+PackageExport[ComplexInductiveDimension]
 PackageExport[SimplexList]
 PackageExport[SimplexCardinalities]
 PackageExport[SimplexStar]
 PackageExport[SimplexCore]
+PackageExport[ComplexUnitSphere]
 PackageExport[SimplexOrder]
 PackageExport[SimplexSign]
 PackageExport[SimplicialMap]
@@ -17,6 +20,7 @@ PackageExport[ComplexEulerCharacteristic]
 PackageExport[ComplexFermiCharacteristic]
 
 PackageExport[GraphComplex]
+PackageExport[SkeletonComplex]
 PackageExport[FaceGraph]
 PackageExport[BarycentricRefinement]
 
@@ -44,11 +48,15 @@ ClearAll["WolframInstitute`Infrageometry`**`*", "WolframInstitute`Infrageometry`
 
 
 
-CanonicalComplex[g : {___List}] := Union[Map[Union, g]]
+CanonicalComplex[g : {___List}] := Union[Catenate[Union @* Rest @* Subsets @* Sort /@ g]]
 
 SimplexDimension[x_List] := Length[x] - 1
 
-ComplexDimension[g : {___List}] := Max[Map[SimplexDimension, g], 0]
+ComplexDimension[g : {___List}] := Max[Map[SimplexDimension, g], -1]
+
+ComplexDimensions[g : {___List}] := 1 + ComplexInductiveDimension[ComplexUnitSphere[g, #]] & /@ SimplexList[g, 0]
+
+ComplexInductiveDimension[g : {___List}] := If[g === {}, -1, Mean[ComplexDimensions[g]]]
 
 SimplexList[g : {___List}, {n_Integer, m_Integer}] := Select[g, Between[SimplexDimension[#], {n, m}] &]
 
@@ -61,6 +69,8 @@ SimplexCardinalities[g : {___List}] := Lookup[#, Range[Max[Keys[#]]], 0] & @ Cou
 SimplexStar[g : {___List}, x_List] := Select[g, SubsetQ[#, x] &]
 
 SimplexCore[g : {___List}, x_List] := Select[g, SubsetQ[x, #] &]
+
+ComplexUnitSphere[g : {___List}, x_List] := Complement[CanonicalComplex[#], #] & @ SimplexStar[g, x]
 
 SimplexOrder[x_List, y_List] := Replace[UniqueElements[{x, y}], {{{c_}, {}} :> Signature[Prepend[y, c]] * Signature[x], _ -> 0}]
 
@@ -84,6 +94,9 @@ GraphComplex[g_ ? GraphQ, k : _Integer | Infinity : Infinity] := GraphComplex[g,
 GraphComplex[g_ ? GraphQ, {n : _Integer | Infinity}] := GraphComplex[g, {n, n}]
 
 GraphComplex[g_ ? GraphQ, {n : _Integer, m : _Integer | Infinity}] := Union @@ (Subsets[#, {n, m}] & /@ FindClique[g, {n, Infinity}, All])
+
+
+SkeletonComplex[g_ ? GraphQ, k : _Integer | Infinity : Infinity] := GraphComplex[g, 2]
 
 
 Options[FaceGraph] = Options[Graph]
