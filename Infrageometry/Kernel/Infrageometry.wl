@@ -120,9 +120,15 @@ ComplexUnitSphere[g : {___List}, x_List] := Complement[ComplexClosure[#], #] & @
 SimplexBoundary[x_List] := Subsets[x, {Length[x] - 1}]
 
 
+SimplexSign[x_] := Signature[x]
+
 SimplexSign[x_List, y_List] := Replace[UniqueElements[{x, y}], {{{c_}, {}} :> Signature[Prepend[y, c]] * Signature[x], _ -> 0}]
 
+
 SimplexWeight[x_List] := - (-1) ^ Length[x]
+
+
+SimplexIndex[x_List] := SimplexWeight[x] * Signature[x]
 
 SimplexIndex[x_List, y_List] := If[Sort[x] === Sort[y], SimplexWeight[x] * Signature[x] * Signature[y], 0]
 
