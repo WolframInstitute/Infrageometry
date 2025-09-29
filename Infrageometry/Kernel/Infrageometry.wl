@@ -11,6 +11,7 @@ PackageExport[ComplexInductiveDimension]
 PackageExport[SimplexList]
 PackageExport[ComplexFacets]
 PackageExport[ComplexVertexList]
+PackageExport[SimplexCardinality]
 PackageExport[SimplexCardinalities]
 PackageExport[SimplexStar]
 PackageExport[SimplexCore]
@@ -54,6 +55,7 @@ PackageExport[DiracBlockMatrix]
 PackageExport[DiracDualBlockMatrix]
 PackageExport[DiracColumns]
 PackageExport[DiracDualColumns]
+PackageExport[HodgeBlock]
 PackageExport[HodgeMatrix]
 PackageExport[HodgeLaplacianMatrix]
 PackageExport[BettiVector]
@@ -73,7 +75,15 @@ ClearAll["WolframInstitute`Infrageometry`**`*", "WolframInstitute`Infrageometry`
 
 
 
-ComplexClosure[g : {___List}] := Union[Catenate[Union @* Rest @* Subsets @* Sort /@ g]]
+ComplexClosure[g : {___List}, {n_Integer, m : _Integer | Infinity}] :=
+    Union[Catenate[Union[Subsets[Sort[#], {n, m}]] & /@ g]]
+
+ComplexClosure[g : {___List}, n : _Integer | Infinity] := ComplexClosure[g, {1, n}]
+
+ComplexClosure[g : {___List}, {n_Integer}] := ComplexClosure[g, {n, n}]
+
+ComplexClosure[g : {___List}] := ComplexClosure[g, {1, Infinity}]
+
 
 CanonicalComplex[g : {___List}] := ComplexClosure[Replace[g, Thread[# -> Range[Length[#]]], {2}] & @ DeleteDuplicates[Catenate[g]]]
 
@@ -85,15 +95,19 @@ ComplexDimensions[g : {___List}] := 1 + ComplexInductiveDimension[ComplexUnitSph
 
 ComplexInductiveDimension[g : {___List}] := If[g === {}, -1, Mean[ComplexDimensions[g]]]
 
-SimplexList[g : {___List}, {n_Integer, m_Integer}] := Select[g, Between[SimplexDimension[#], {n, m}] &]
+SimplexList[g : {___List}, {n_Integer, m : _Integer | Infinity}] := Select[g, Between[SimplexDimension[#], {n, m}] &]
 
-SimplexList[g : {___List}, n_Integer] := SimplexList[g, {0, n}]
+SimplexList[g : {___List}, n : _Integer | Infinity] := SimplexList[g, {0, n}]
 
 SimplexList[g : {___List}, {n_Integer}] := SimplexList[g, {n, n}]
+
+SimplexList[g : {___List}] := SimplexList[g, {2, Infinity}]
 
 ComplexFacets[g : {___List}] := SimplexList[g, {ComplexDimension[g]}]
 
 ComplexVertexList[g : {___List}] := Union[Catenate[g]]
+
+SimplexCardinality[g : {___List}, d_Integer] := Count[g, x_ /; SimplexDimension[x] == d]
 
 SimplexCardinalities[g : {___List}] := Rest[BinCounts[Length /@ g]]
 
@@ -165,7 +179,7 @@ GraphComplex[g_ ? GraphQ, {n : _Integer | Infinity}] := GraphComplex[g, {n, n}]
 GraphComplex[g_ ? GraphQ, {n : _Integer, m : _Integer | Infinity}] := Union @@ (Subsets[#, {n, m}] & /@ FindClique[g, {n, Infinity}, All])
 
 
-SkeletonComplex[g_ ? GraphQ, k : _Integer | Infinity : Infinity] := GraphComplex[g, 2]
+SkeletonComplex[g_ ? GraphQ] := GraphComplex[g, 2]
 
 
 Options[ComplexGraph] = Options[FaceGraph] = Options[Graph]
@@ -239,6 +253,8 @@ DiracColumns[g : {___List}] := MatrixColumns[DiracHodgeMatrix[g], SimplexCardina
 
 DiracDualColumns[g : {___List}] := Transpose /@ DiracColumns[g]
 
+
+HodgeBlock[args___] := Enclose @ With[{d = ConfirmBy[DiracHodgeMatrix[args], SquareMatrixQ]}, d . d]
 
 HodgeMatrix[g : {___List}] := With[{d = DiracHodgeMatrix[g]}, BlockDiagonalMatrix[MatrixBlocks[d . d, SimplexCardinalities[g]]]]
 
