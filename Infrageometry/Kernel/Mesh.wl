@@ -23,16 +23,19 @@ Options[ComplexEmbedding] = {"RepulsiveForcePower" -> 1.*^-2, "Scale" -> 1, "Eps
 
 ComplexEmbedding[g : {___List}, d : 2 | 3 : 3, OptionsPattern[]] := Block[{
 	vs = ComplexVertexList[g], l, x = \[FormalX],
+    edges,
     rep = OptionValue["RepulsiveForcePower"], eps = OptionValue["Epsilon"], scale = OptionValue["Scale"],
     vars, energy, repulsion, constraints, func, sol
 },
+    If[vs === {}, Return[{}]];
 	l = Length[vs];
 	vars = Catenate[Table[x[v, k], {v, vs}, {k, d}]];
+    edges = ComplexClosure[SimplexList[g], {2}];
 	energy = Total @ MapApply[
 		{a, b} |-> With[{r = Table[x[a, k] - x[b, k], {k, d}] },
 			(Sqrt[r . r] - 1) ^ 2
 		],
-		ComplexClosure[SimplexList[g], {2}]
+		edges
 	];
 	repulsion = rep * Total @ MapApply[
 		{as, bs} |-> With[{r = Mean @ Table[x[a, k], {a, as}, {k, d}] - Mean @ Table[x[b, k], {b, bs}, {k, d}]},
@@ -41,7 +44,7 @@ ComplexEmbedding[g : {___List}, d : 2 | 3 : 3, OptionsPattern[]] := Block[{
 		Subsets[g, {2}]
 	];
 	constraints = Append[
-		Table[Sum[x[v, k], {v, vs}] == 0, {k, d}],
+		If[edges === {}, {}, Table[Sum[x[v, k], {v, vs}] == 0, {k, d}]],
 		Sum[Sum[x[v, k] ^ 2, {k, d}], {v, vs}] == scale * l
 	];
 	With[{cf = Compile[Evaluate[{#, _Real} & /@ vars], Evaluate[energy + repulsion], RuntimeOptions -> "Speed"]},
@@ -58,17 +61,22 @@ ComplexEmbedding[g : {___List}, d : 2 | 3 : 3, OptionsPattern[]] := Block[{
 Options[ComplexMesh] = Join[Options[ComplexEmbedding], Options[MeshRegion]]
 
 ComplexMesh[g : {___List}, arg : {Repeated[_ ? NumericQ, {2, 3}] ..} | 2 | 3 : 3, opts : OptionsPattern[]] := Enclose @ Block[{
-    coords = Replace[arg, d_Integer :> ComplexEmbedding[g, d, FilterRules[{opts}, Options[ComplexEmbedding]]]],
+    d = Replace[arg, _List :> Max[Length /@ arg]],
+    coords,
     simplices, faces
 },
+    coords = ComplexEmbedding[g, d, FilterRules[{opts}, Options[ComplexEmbedding]]];
     ConfirmAssert[Length[coords] == SimplexCardinality[g, 0]];
-    simplices = SimplexList[g, {1, Replace[arg, _List :> Max[Length /@ arg]]}];
+    If[coords === {}, Return[Region[EmptyRegion[d]]]];
+    simplices = SimplexList[g, Replace[arg, _List :> Max[Length /@ arg]]];
     faces = ComplexClosure[Cases[simplices, {_, _, _, _}], {3}];
 	MeshRegion[
         coords,
 		Map[
             Switch[
                 Length[#],
+                1,
+                    Style[Point[#], Directive[StandardGreen, PointSize[Large]]],
                 2,
                     Style[Line[#], Directive[StandardGray, Thick]],
                 3,
@@ -79,7 +87,6 @@ ComplexMesh[g : {___List}, arg : {Repeated[_ ? NumericQ, {2, 3}] ..} | 2 | 3 : 3
             simplices
         ],
         FilterRules[{opts}, Options[MeshRegion]],
-		MeshCellStyle -> {0 -> Directive[StandardGreen, PointSize[Large]]},
 		MeshCellLabel -> {0 -> "Index"}
 	]
 ]
