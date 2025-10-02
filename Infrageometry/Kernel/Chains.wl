@@ -1,16 +1,11 @@
 Package["WolframInstitute`Infrageometry`"]
 
 
-PackageExport[SymmetricRelationGraph]
 PackageExport[SpatialReconstruction]
 PackageExport[CausalGraphSimpleChains]
 PackageExport[CoordinatizeCausalGraph]
 PackageExport[CoordinatizedCausalGraph]
 
-
-
-SymmetricRelationGraph[f_, v_Association, opts___] :=
-	Graph[Keys[v], UndirectedEdge @@@ Pick[Subsets[Keys[v], {2}], f @@@ Subsets[Values[v], {2}]], opts]
 
 
 SpatialReconstruction[g_Graph, slice_List, n_Integer : 1, opts___] :=

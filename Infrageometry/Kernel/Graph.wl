@@ -1,6 +1,7 @@
 Package["WolframInstitute`Infrageometry`"]
 
 
+PackageExport[SymmetricRelationGraph]
 PackageExport[GraphEdgeWeights]
 PackageExport[GraphVertexWeights]
 PackageExport[FormanRicciCurvature]
@@ -14,7 +15,13 @@ PackageExport[ToroidalRightMatrix]
 PackageExport[ToroidalLeftMatrix]
 PackageExport[DiracWalk]
 PackageExport[VertexAmplitudes]
+PackageExport[GraphSuspension]
+PackageExport[RandomGraphAutomorphism]
 
+
+
+SymmetricRelationGraph[f_, v_Association, opts___] :=
+	Graph[Keys[v], UndirectedEdge @@@ Pick[Subsets[Keys[v], {2}], f @@@ Subsets[Values[v], {2}]], opts]
 
 
 GraphEdgeWeights[g_Graph] := Replace[
@@ -176,4 +183,18 @@ VertexAmplitudes[g_Graph, edgeWeights_, {m_Integer : 1, n_Integer : 1}] := Map[
 	] &,
 	VertexList[g]
 ]
+
+
+GraphSuspension[g_ ? GraphQ] := With[{v1 = Unique[\[FormalV]], v2 = Unique[\[FormalV]]},
+	Graph3D[EdgeAdd[g, Catenate[{UndirectedEdge[v1, #], UndirectedEdge[#, v2]} & /@ VertexList[g]]]]
+]
+
+
+RandomGraphAutomorphism[g_ ? GraphQ, n : _Integer | Automatic | All : Automatic] :=
+	With[{gr = GraphAutomorphismGroup[g]}, {order = GroupOrder[gr]},
+		GroupElements[gr, RandomSample[;; order, UpTo[Replace[n, {Automatic -> 1, All -> order}]]]] //
+			If[n === Automatic, First, Identity]
+	]
+
+RandomGraphAutomorphism[g : {___List}, args___] := RandomGraphAutomorphism[ComplexGraph[g], args]
 

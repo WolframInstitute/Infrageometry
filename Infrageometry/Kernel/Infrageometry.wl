@@ -66,9 +66,6 @@ PackageExport[SuperTrace]
 PackageExport[PseudoDeterminant]
 PackageExport[SuperDeterminant]
 
-PackageExport[GraphSuspension]
-PackageExport[RandomGraphAutomorphism]
-
 
 
 ClearAll["WolframInstitute`Infrageometry`**`*", "WolframInstitute`Infrageometry`*"]
@@ -294,18 +291,4 @@ SuperDeterminant[vec_ ? VectorQ] := Times @@ (vec ^ ((-1) ^ Range[Length[vec]]))
 SuperDeterminant[mat_BlockDiagonalMatrix] := SuperDeterminant[PseudoDeterminant /@ mat["Blocks"]]
 
 SuperDeterminant[mat_ ? SquareMatrixQ, blocks : {__Integer}] := SuperDeterminant[PseudoDeterminant /@ MatrixBlocks[mat, blocks]]
-
-
-GraphSuspension[g_ ? GraphQ] := With[{v1 = Unique[\[FormalV]], v2 = Unique[\[FormalV]]},
-	Graph3D[EdgeAdd[g, Catenate[{UndirectedEdge[v1, #], UndirectedEdge[#, v2]} & /@ VertexList[g]]]]
-]
-
-
-RandomGraphAutomorphism[g_ ? GraphQ, n : _Integer | Automatic | All : Automatic] :=
-	With[{gr = GraphAutomorphismGroup[g]}, {order = GroupOrder[gr]},
-		GroupElements[gr, RandomSample[;; order, UpTo[Replace[n, {Automatic -> 1, All -> order}]]]] //
-			If[n === Automatic, First, Identity]
-	]
-
-RandomGraphAutomorphism[g : {___List}, args___] := RandomGraphAutomorphism[ComplexGraph[g], args]
 
