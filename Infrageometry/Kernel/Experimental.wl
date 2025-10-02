@@ -18,6 +18,7 @@ PackageExport[FacetGraph]
 PackageExport[BettiAssociation]
 PackageExport[EulerBettiConsistencyQ]
 PackageExport[EnumerateComplexes]
+PackageExport[DiscreteDirichletEnergy]
 
 
 (*** Convenience Vectors ***)
@@ -144,3 +145,27 @@ FacetGraph[g : {___List}, opts : OptionsPattern[Graph]] := Module[{facets = Comp
     pairs = Select[Subsets[Range[Length[facets]], {2}], adjQ[facets[[#[[1]]]], facets[[#[[2]]]]] &];
     Graph[Range[Length[facets]], UndirectedEdge @@@ pairs, opts]
 ]
+
+
+(*** Discrete Energies ***)
+
+(* Discrete Dirichlet energy of a scalar function on vertices: 1/2 Sum_{(u,v) edge} (f[u]-f[v])^2 *)
+DiscreteDirichletEnergy[g : {___List}, f_Association] := Block[{edges = SimplexList[g, {1}]},
+    1 / 2 Total[(f[#1] - f[#2]) ^ 2 & @@@ edges]
+]
+
+DiscreteDirichletEnergy[g : {___List}, vals_List] := Block[{vs = ComplexVertexList[g]},
+    If[Length[vals] =!= Length[vs], Return[$Failed]];
+    DiscreteDirichletEnergy[g, AssociationThread[vs -> vals]]
+]
+
+DiscreteDirichletEnergy[g : {___List}, f_] /; VectorQ[f, NumericQ] := DiscreteDirichletEnergy[g, f]
+
+(* Graph fallback for energy. *)
+DiscreteDirichletEnergy[g_Graph, f_Association] := Block[{edges = EdgeList[g]}, 1 / 2 Total[(f[#1] - f[#2]) ^ 2 & @@@ edges]]
+
+DiscreteDirichletEnergy[g_Graph, vals_List] := Block[{vs = VertexList[g]},
+    If[Length[vals] =!= Length[vs], Return[$Failed]];
+    DiscreteDirichletEnergy[g, AssociationThread[vs -> vals]]
+]
+
