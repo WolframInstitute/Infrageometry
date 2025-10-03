@@ -126,3 +126,15 @@ BettiAssociation::usage = "BettiAssociation[g] gives an association from dimensi
 EulerBettiConsistencyQ::usage = "EulerBettiConsistencyQ[g] checks Euler characteristic equals alternating Betti sum.";
 EnumerateComplexes::usage = "EnumerateComplexes[verts,d] generates all simplicial complexes on given vertex set with maximal dimension d (default Infinity). Use option \"MaxCount\"->n to cap enumeration size.";
 DiscreteDirichletEnergy::usage = "DiscreteDirichletEnergy[g,f] gives 1/2 Sum_{(u,v)} (f[u]-f[v])^2 over edges of the 1-skeleton of complex or graph g; f may be an Association or list aligned to vertex order.";
+
+BettiTable::usage = "BettiTable[data, radii] returns an association with radii, rectangular Betti number matrix and dimensions labels derived from BettiCurves.";
+BettiCurves::usage = "BettiCurves[data, radii] returns an association radius -> Betti vector for the Vietoris–Rips filtration.";
+VietorisRipsFiltration::usage = "VietorisRipsFiltration[data, radii] builds an association radius -> Vietoris–Rips complex (up to MaxDimension).";
+VietorisRipsComplex::usage = "VietorisRipsComplex[data, r, k] returns the k-truncated VR complex at scale r.";
+VietorisRipsThresholdGraph::usage = "VietorisRipsThresholdGraph[data, r] returns the threshold graph connecting points within distance r (metric configurable).";
+
+PersistentHomology::usage = "PersistentHomology[filtration] returns an association dim -> { {birth, death}, ... } of persistence intervals over Z2 (death=Infinity for essential).";
+PersistenceIntervals::usage = "PersistenceIntervals is an internal helper returning the same structure as PersistentHomology.";
+PersistenceDiagram::usage = "PersistenceDiagram[filtration] returns a list of {dim,birth,death} triples for intervals.";
+PopularNetwork::usage = "PopularNetwork[name, what] returns a requested artifact: 'Graph' (default), 'Description', 'Source', or 'All' (association with all fields).";
+PopularNetworkNames::usage = "PopularNetworkNames[] lists available names for PopularNetwork.";
