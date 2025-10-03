@@ -138,3 +138,5 @@ PersistenceIntervals::usage = "PersistenceIntervals is an internal helper return
 PersistenceDiagram::usage = "PersistenceDiagram[filtration] returns a list of {dim,birth,death} triples for intervals.";
 PopularNetwork::usage = "PopularNetwork[name, what] returns a requested artifact: 'Graph' (default), 'Description', 'Source', or 'All' (association with all fields).";
 PopularNetworkNames::usage = "PopularNetworkNames[] lists available names for PopularNetwork.";
+PopularHypergraph::usage = "PopularHypergraph[name, what] returns a hypergraph dataset as list-of-hyperedges ('Hypergraph', default) or derived views: 'IncidenceGraph', '2SectionGraph', 'Description', 'Source', or 'All'.";
+PopularHypergraphNames::usage = "PopularHypergraphNames[] lists available hypergraph dataset names (FIM transaction itemsets etc.).";
