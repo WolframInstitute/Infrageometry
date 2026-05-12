@@ -65,6 +65,8 @@ PackageExport[SignMatrix]
 PackageExport[ComplexIncidenceMatrix]
 PackageExport[ConnectionMatrix]
 PackageExport[GreenFunctionMatrix]
+PackageExport[GreenOperatorMatrix]
+PackageExport[HodgePropagatorMatrix]
 PackageExport[DiracConnectionMatrix]
 PackageExport[DiracHodgeMatrix]
 PackageExport[DiracBlockMatrix]
@@ -309,6 +311,24 @@ HodgeBlock[args___] := Enclose @ With[{d = ConfirmBy[DiracHodgeMatrix[args], Squ
 HodgeMatrix[g : {___List}] := With[{d = DiracHodgeMatrix[g]}, BlockDiagonalMatrix[MatrixBlocks[d . d, SimplexCardinalities[g]]]]
 
 HodgeLaplacianMatrix[g : {___List}] := With[{d = DiracBlockMatrix[g]}, d . d]
+
+
+(* Moore-Penrose pseudoinverse of the (genuine) Hodge Laplacian (d + d^T)^2 = d d^T + d^T d.
+   Block-diagonal by simplex degree; the k-th block is Delta_k^+ on C^k.
+   Distinct from GreenFunctionMatrix, which is Inverse[ConnectionMatrix] (Knill). *)
+
+GreenOperatorMatrix[g : {___List}] :=
+    BlockDiagonalMatrix[PseudoInverse /@ HodgeMatrix[g]["Blocks"]]
+
+
+(* Moore-Penrose pseudoinverse of the boundary operator d_k = ComplexIncidenceMatrix[g, k].
+   Standard identity d^+ = (d^T d)^+ d^T using the up-Laplacian L^up_k = d_k^T d_k. *)
+
+HodgePropagatorMatrix[g : {___List}, k_Integer : 0] :=
+    With[{d = ComplexIncidenceMatrix[g, k]}, PseudoInverse[Transpose[d] . d] . Transpose[d]]
+
+HodgePropagatorMatrix[g : {___List}, All] :=
+    HodgePropagatorMatrix[g, #] & /@ Range[0, ComplexDimension[g] - 1]
 
 
 BettiVector[g : {___List}] := MatrixNullity /@ HodgeMatrix[g]["Blocks"]

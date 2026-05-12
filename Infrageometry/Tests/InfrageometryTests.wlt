@@ -1039,4 +1039,301 @@ VerificationTest[
     TestID -> "IndexCurvature-GaussBonnet-S1"
 ]
 
+
+(* ===== FormanRicciCurvature ===== *)
+
+VerificationTest[
+    Values @ FormanRicciCurvature[CycleGraph[6]],
+    ConstantArray[0, 6],
+    TestID -> "FormanRicciCurvature-CycleGraph6-zero"
+]
+
+VerificationTest[
+    Values @ FormanRicciCurvature[PathGraph[Range[5]]],
+    {1, 0, 0, 1},
+    TestID -> "FormanRicciCurvature-PathGraph5-leaf-one-interior-zero"
+]
+
+VerificationTest[
+    Values @ FormanRicciCurvature[CompleteGraph[4]],
+    ConstantArray[4, 6],
+    TestID -> "FormanRicciCurvature-K4-default-triangles"
+]
+
+VerificationTest[
+    Values @ FormanRicciCurvature[CompleteGraph[4], "MaxCellDimension" -> 1],
+    ConstantArray[-2, 6],
+    TestID -> "FormanRicciCurvature-K4-1skeleton"
+]
+
+VerificationTest[
+    Values @ FormanRicciCurvature[CompleteGraph[4], "OnCells" -> 0],
+    ConstantArray[0, 4],
+    TestID -> "FormanRicciCurvature-K4-vertices-zero"
+]
+
+VerificationTest[
+    Values @ FormanRicciCurvature[CompleteGraph[4], "OnCells" -> 2],
+    ConstantArray[4, 4],
+    TestID -> "FormanRicciCurvature-K4-triangles"
+]
+
+VerificationTest[
+    Values @ FormanRicciCurvature[CompleteGraph[5], "OnCells" -> 2],
+    ConstantArray[5, 10],
+    TestID -> "FormanRicciCurvature-K5-triangles"
+]
+
+VerificationTest[
+    With[{result = FormanRicciCurvature[CompleteGraph[4], "OnCells" -> All]},
+        Keys[result]
+    ],
+    {0, 1, 2, 3},
+    TestID -> "FormanRicciCurvature-K4-all-keys"
+]
+
+VerificationTest[
+    With[{result = FormanRicciCurvature[CompleteGraph[4], "OnCells" -> {1, 2}]},
+        {Keys[result], Length /@ Values[result]}
+    ],
+    {{1, 2}, {6, 4}},
+    TestID -> "FormanRicciCurvature-K4-list-output-shape"
+]
+
+VerificationTest[
+    Keys @ FormanRicciCurvature[CycleGraph[6]],
+    EdgeList[CycleGraph[6]],
+    TestID -> "FormanRicciCurvature-edge-keying-undirected-edges"
+]
+
+
+(* ===== OllivierRicciCurvature ===== *)
+
+VerificationTest[
+    Values @ OllivierRicciCurvature[CompleteGraph[4]],
+    ConstantArray[2 / 3, 6],
+    SameTest -> (Max @ Abs[#1 - #2] < 10^-8 &),
+    TestID -> "OllivierRicciCurvature-K4"
+]
+
+VerificationTest[
+    Values @ OllivierRicciCurvature[PathGraph[Range[5]]],
+    ConstantArray[0, 4],
+    SameTest -> (Max @ Abs[#1 - #2] < 10^-8 &),
+    TestID -> "OllivierRicciCurvature-P5-zero"
+]
+
+VerificationTest[
+    Values @ OllivierRicciCurvature[CycleGraph[6]],
+    ConstantArray[0, 6],
+    SameTest -> (Max @ Abs[#1 - #2] < 10^-8 &),
+    TestID -> "OllivierRicciCurvature-C6-zero"
+]
+
+
+(* ===== WolframRicciCurvature ===== *)
+
+VerificationTest[
+    WolframRicciCurvature[CycleGraph[12], {1, 3}, "Dimension" -> 1][1],
+    Mean[{-9., -1.125, -1./3}],
+    SameTest -> (Abs[#1 - #2] < 10^-8 &),
+    TestID -> "WolframRicciCurvature-C12-d1-window-mean"
+]
+
+VerificationTest[
+    WolframRicciCurvature[CycleGraph[12], 2, "Dimension" -> 1][1],
+    -1.125,
+    SameTest -> (Abs[#1 - #2] < 10^-8 &),
+    TestID -> "WolframRicciCurvature-C12-d1-single-radius"
+]
+
+VerificationTest[
+    AssociationQ @ WolframRicciCurvature[GridGraph[{5, 5}]],
+    True,
+    TestID -> "WolframRicciCurvature-Grid5x5-default-association"
+]
+
+VerificationTest[
+    Length @ WolframRicciCurvature[GridGraph[{5, 5}]],
+    25,
+    TestID -> "WolframRicciCurvature-Grid5x5-keys-all-vertices"
+]
+
+VerificationTest[
+    KeyExistsQ[WolframRicciCurvature[PathGraph[Range[7]]], 1],
+    True,
+    TestID -> "WolframRicciCurvature-P7-keys-by-vertex"
+]
+
+VerificationTest[
+    WolframRicciCurvature[HypercubeGraph[3], {5, 7}, "Dimension" -> 3][1],
+    Indeterminate,
+    TestID -> "WolframRicciCurvature-Q3-empty-window-indeterminate"
+]
+
+
+(* ===== GreenOperatorMatrix: Moore-Penrose pseudoinverse of the Hodge Laplacian ===== *)
+
+VerificationTest[
+    With[{g = ComplexClosure[{{1, 2, 3}, {3, 4}}]},
+        With[{h = Normal @ HodgeBlock[g], gp = Normal @ GreenOperatorMatrix[g]},
+            Max[Abs[h . gp . h - h]] < 10^-9 &&
+            Max[Abs[gp . h . gp - gp]] < 10^-9 &&
+            Max[Abs[h . gp - Transpose[h . gp]]] < 10^-9 &&
+            Max[Abs[gp . h - Transpose[gp . h]]] < 10^-9
+        ]
+    ],
+    True,
+    TestID -> "GreenOperatorMatrix-MP-identities"
+]
+
+VerificationTest[
+    With[{gr = CycleGraph[6]},
+        With[{
+            block0 = Normal @ GreenOperatorMatrix[GraphComplex[gr]][[;; VertexCount[gr], ;; VertexCount[gr]]],
+            kp = PseudoInverse[N @ Normal @ KirchhoffMatrix[gr]]
+        },
+            Max[Abs[block0 - kp]] < 10^-9
+        ]
+    ],
+    True,
+    TestID -> "GreenOperatorMatrix-graph-0-block-equals-Kirchhoff-pseudoinverse"
+]
+
+
+(* ===== HodgePropagatorMatrix: Moore-Penrose pseudoinverse of d_k ===== *)
+
+VerificationTest[
+    With[{g = ComplexClosure[{{1, 2, 3}, {3, 4}}]},
+        With[{
+            d = Normal @ ComplexIncidenceMatrix[g, 0],
+            p = Normal @ HodgePropagatorMatrix[g, 0]
+        },
+            Max[Abs[d . p . d - d]] < 10^-9 && Max[Abs[p . d . p - p]] < 10^-9
+        ]
+    ],
+    True,
+    TestID -> "HodgePropagatorMatrix-MP-d0"
+]
+
+VerificationTest[
+    With[{g = ComplexClosure[{{1, 2, 3}, {3, 4}}]},
+        With[{
+            d = Normal @ ComplexIncidenceMatrix[g, 1],
+            p = Normal @ HodgePropagatorMatrix[g, 1]
+        },
+            Max[Abs[d . p . d - d]] < 10^-9 && Max[Abs[p . d . p - p]] < 10^-9
+        ]
+    ],
+    True,
+    TestID -> "HodgePropagatorMatrix-MP-d1"
+]
+
+VerificationTest[
+    Length @ HodgePropagatorMatrix[ComplexClosure[{{1, 2, 3}, {3, 4}}], All],
+    ComplexDimension[ComplexClosure[{{1, 2, 3}, {3, 4}}]],
+    TestID -> "HodgePropagatorMatrix-All-length"
+]
+
+
+(* ===== EffectiveResistance: closed-form values ===== *)
+
+VerificationTest[
+    Chop[EffectiveResistance[PathGraph[Range[6]], 1, 6] - 5, 10^-10] == 0,
+    True,
+    TestID -> "EffectiveResistance-Path-endpoints"
+]
+
+VerificationTest[
+    Chop[EffectiveResistance[PathGraph[Range[5]], 2, 4] - 2, 10^-10] == 0,
+    True,
+    TestID -> "EffectiveResistance-Path-interior"
+]
+
+VerificationTest[
+    With[{r = EffectiveResistance[CompleteGraph[5]]},
+        Max[Abs[(r + DiagonalMatrix[ConstantArray[2/5, 5]]) - ConstantArray[2/5, {5, 5}]]] < 10^-10
+    ],
+    True,
+    TestID -> "EffectiveResistance-K5-uniform"
+]
+
+VerificationTest[
+    Chop[EffectiveResistance[CycleGraph[6], 1, 4] - 6/4, 10^-10] == 0,
+    True,
+    TestID -> "EffectiveResistance-C6-antipodal"
+]
+
+VerificationTest[
+    With[{tree = Graph[{1 <-> 2, 2 <-> 3, 3 <-> 4, 2 <-> 5}]},
+        Max[Abs[EffectiveResistance[tree] - GraphDistanceMatrix[tree]]] < 10^-10
+    ],
+    True,
+    TestID -> "EffectiveResistance-tree-equals-distance"
+]
+
+VerificationTest[
+    With[{r = EffectiveResistance[PetersenGraph[]]},
+        Max[Abs[r - Transpose[r]]] < 10^-10 && Max[Abs @ Diagonal[r]] < 10^-10
+    ],
+    True,
+    TestID -> "EffectiveResistance-symmetry"
+]
+
+(* Foster's theorem: sum over edges = n - 1 *)
+VerificationTest[
+    With[{g = PetersenGraph[]},
+        Chop[Total[EffectiveResistance[g, #1, #2] & @@@ (List @@@ EdgeList[g])] - (VertexCount[g] - 1), 10^-9] == 0
+    ],
+    True,
+    TestID -> "Foster-Petersen"
+]
+
+VerificationTest[
+    With[{g = GridGraph[{3, 3}]},
+        Chop[Total[EffectiveResistance[g, #1, #2] & @@@ (List @@@ EdgeList[g])] - (VertexCount[g] - 1), 10^-9] == 0
+    ],
+    True,
+    TestID -> "Foster-Grid3x3"
+]
+
+(* Triangle inequality for sqrt(R) *)
+VerificationTest[
+    With[{g = PetersenGraph[], n = 10},
+        With[{r = Sqrt @ EffectiveResistance[g]},
+            Max[Flatten @ Table[r[[i, k]] - r[[i, j]] - r[[j, k]], {i, n}, {j, n}, {k, n}]] < 10^-9
+        ]
+    ],
+    True,
+    TestID -> "ResistanceMetric-triangle-Petersen"
+]
+
+VerificationTest[
+    Dimensions @ EffectiveResistance[PetersenGraph[], {1, 3, 5}],
+    {3, 3},
+    TestID -> "EffectiveResistance-submatrix-shape"
+]
+
+
+(* ===== ResistanceQ ===== *)
+
+VerificationTest[
+    ResistanceQ @ EffectiveResistance @ PetersenGraph[],
+    True,
+    TestID -> "ResistanceQ-Petersen"
+]
+
+VerificationTest[
+    ResistanceQ[{{0, 1, 5}, {1, 0, 1}, {5, 1, 0}}],
+    False,
+    TestID -> "ResistanceQ-violates-negative-type"
+]
+
+VerificationTest[
+    ResistanceQ["nonsense"],
+    False,
+    TestID -> "ResistanceQ-non-matrix"
+]
+
+
 EndTestSection[]
