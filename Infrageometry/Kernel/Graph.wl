@@ -85,7 +85,7 @@ Options[FormanRicciCurvature] = {"OnCells" -> 1, "MaxCellDimension" -> Automatic
 
 FormanRicciCurvature[g_Graph, OptionsPattern[]] := Module[{
 	onCells, dMax, complex, byDim, vw, ew, weightAt, formanAt,
-	outputDims, dimResult
+	outputDims, dimResult, upMap
 },
 	onCells = OptionValue["OnCells"];
 	dMax = Replace[OptionValue["MaxCellDimension"],
@@ -102,6 +102,20 @@ FormanRicciCurvature[g_Graph, OptionsPattern[]] := Module[{
 	complex = GraphComplex[g, dMax + 1];
 	byDim = AssociationMap[SimplexList[complex, {#}] &, Range[0, dMax]];
 
+	(* upMap[q][gamma] = list of (q+1)-cells containing gamma; one pass over (q+1)-cells.
+	   Replaces O(|cells_p|^2) Subset-scans inside formanAt. *)
+	upMap = AssociationMap[
+		q |-> Module[{acc = <||>},
+			Do[
+				(acc[#] = If[KeyExistsQ[acc, #], Append[acc[#], beta], {beta}]) & /@
+					Subsets[beta, {q + 1}],
+				{beta, byDim[q + 1]}
+			];
+			acc
+		],
+		Range[0, dMax - 1]
+	];
+
 	vw = AssociationThread[VertexList[g] -> GraphVertexWeights[g]];
 	ew = AssociationThread[Sort /@ List @@@ EdgeList[g] -> GraphEdgeWeights[g]];
 
@@ -113,7 +127,7 @@ FormanRicciCurvature[g_Graph, OptionsPattern[]] := Module[{
 
 	formanAt[alpha_List] := With[{p = Length[alpha] - 1, wA = weightAt[alpha]},
 		With[{
-			cofaces = If[p + 1 <= dMax, Select[Lookup[byDim, p + 1, {}], SubsetQ[#, alpha] &], {}],
+			cofaces = If[p + 1 <= dMax, Lookup[upMap[p], Key @ alpha, {}], {}],
 			subfaces = If[p >= 1, SimplexBoundary[alpha], {}]
 		},
 			With[{
@@ -122,7 +136,7 @@ FormanRicciCurvature[g_Graph, OptionsPattern[]] := Module[{
 				],
 				subfShared = If[subfaces === {}, {},
 					DeleteCases[
-						Union @@ Map[gamma |-> Select[byDim[p], SubsetQ[#, gamma] &], subfaces],
+						Union @@ Map[gamma |-> Lookup[upMap[p - 1], Key @ gamma, {}], subfaces],
 						alpha
 					]
 				]
