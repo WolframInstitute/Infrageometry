@@ -208,6 +208,41 @@ VerificationTest[
     TestID -> "ContractibleQ-Empty"
 ]
 
+(* ===== 5a. Mesh Tests ===== *)
+
+VerificationTest[
+    With[{g = InteriorMeshGraph @ MeshRegion[
+        {{0}, {1}, {2}, {3}},
+        Line /@ {{1, 2}, {2, 3}, {3, 4}}
+    ]},
+        Sort[VertexList[g]] == {1, 2, 3, 4} && Sort[List @@@ EdgeList[g]] == {{1, 2}, {2, 3}, {3, 4}}
+    ],
+    True,
+    TestID -> "InteriorMeshGraph-Path"
+]
+
+VerificationTest[
+    With[{g = InteriorMeshGraph @ MeshRegion[
+        {{0, 0}, {1, 0}, {1, 1}, {0, 1}, {1/2, 1/2}},
+        Triangle /@ {{1, 2, 5}, {2, 3, 5}, {3, 4, 5}, {4, 1, 5}}
+    ]},
+        Sort[VertexList[g]] == {1, 2, 3, 4, 5} && Sort[Sort /@ (List @@@ EdgeList[g])] == {{1, 5}, {2, 5}, {3, 5}, {4, 5}}
+    ],
+    True,
+    TestID -> "InteriorMeshGraph-Disk"
+]
+
+VerificationTest[
+    With[{g = InteriorMeshGraph @ MeshRegion[
+        {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}},
+        Triangle /@ {{1, 2, 3}, {1, 2, 4}, {1, 3, 4}, {2, 3, 4}}
+    ]},
+        Sort[VertexList[g]] == {1, 2, 3, 4} && Length[EdgeList[g]] == 6
+    ],
+    True,
+    TestID -> "InteriorMeshGraph-ClosedSurface"
+]
+
 VerificationTest[
     (* Boundary of a triangle (3 edges, no face) is S^1 = sphere *)
     ComplexSphereQ[ComplexClosure[{{1, 2}, {2, 3}, {1, 3}}]],

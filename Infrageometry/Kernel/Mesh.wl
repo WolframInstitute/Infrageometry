@@ -5,6 +5,7 @@ PackageExport[ComplexEmbedding]
 PackageExport[ComplexMesh]
 PackageExport[HighlightComplex]
 PackageExport[GraphMesh]
+PackageExport[InteriorMeshGraph]
 PackageExport[MeshComplex]
 
 PackageExport[MeshIncidenceMatrix]
@@ -107,6 +108,36 @@ HighlightComplex[g : {___List}, h : {(_List | Style[_List, ___]) ...}, opts : Op
 GraphMesh[g_ ? GraphQ] := MeshRegion[
 	GraphEmbedding[g],
 	Join[Line /@ List @@@ EdgeList[g], Triangle /@ FindClique[g, {3}, All], Tetrahedron /@ FindClique[g, {4}, All]]
+]
+
+
+InteriorMeshGraph[mr_MeshRegion] := With[{
+	coords = MeshCoordinates[mr],
+	edges = First /@ MeshCells[mr, 1],
+	d = RegionDimension[mr]
+},
+	With[{
+		boundaryEdges = If[d <= 1,
+			{},
+			Sort /@ First /@ MeshCells[
+				MeshRegion[
+					coords,
+					Pick[
+						MeshCells[mr, d - 1],
+						Normal @ Total[Abs @ MeshIncidenceMatrix[mr, d], {2}],
+						1
+					],
+					Method -> {"EliminateUnusedCoordinates" -> False}
+				],
+				1
+			]
+		]
+	},
+		EdgeDelete[
+			Graph[Range[Length[coords]], UndirectedEdge @@@ edges, VertexCoordinates -> coords],
+			UndirectedEdge @@@ boundaryEdges
+		]
+	]
 ]
 
 
