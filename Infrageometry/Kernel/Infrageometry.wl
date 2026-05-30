@@ -2,25 +2,40 @@ Package["WolframInstitute`Infrageometry`"]
 
 
 PackageExport[ComplexClosure]
-PackageExport[CanonicalComplex]
+PackageExport[IndexHypergraph]
+PackageExport[IndexComplex]
 
 PackageExport[SimplexDimension]
 PackageExport[ComplexDimension]
 PackageExport[ComplexDimensions]
 PackageExport[ComplexInductiveDimension]
 PackageExport[SimplexList]
+PackageExport[ComplexBones]
+PackageExport[ComplexWalls]
 PackageExport[ComplexFacets]
+PackageExport[ComplexFrames]
+PackageExport[ComplexHypergraph]
 PackageExport[ComplexVertexList]
 PackageExport[SimplexCardinality]
 PackageExport[SimplexCardinalities]
+
 PackageExport[SimplexStar]
 PackageExport[SimplexCore]
-PackageExport[ComplexUnitSphere]
+PackageExport[SimplexStarSphere]
+PackageExport[SimplexCoreSphere]
+PackageExport[SimplexUnitSphere]
+PackageExport[SimplexMirror]
+
+PackageExport[ContractibleQ]
+PackageExport[ComplexSphereQ]
+PackageExport[ComplexManifoldQ]
+
 PackageExport[SimplexBoundary]
+PackageExport[ComplexDual]
+
 PackageExport[SimplexIndex]
 PackageExport[SimplexSign]
 PackageExport[SimplexWeight]
-PackageExport[ContractibleQ]
 PackageExport[SimplicialMap]
 
 PackageExport[ComplexJoin]
@@ -42,6 +57,7 @@ PackageExport[ComplexGraph]
 PackageExport[FaceGraph]
 PackageExport[BarycentricRefinement]
 
+PackageExport[AlexandrovTopology]
 PackageExport[GraphTopology]
 
 PackageExport[FaceMatrix]
@@ -50,6 +66,8 @@ PackageExport[SignMatrix]
 PackageExport[ComplexIncidenceMatrix]
 PackageExport[ConnectionMatrix]
 PackageExport[GreenFunctionMatrix]
+PackageExport[GreenOperatorMatrix]
+PackageExport[HodgePropagatorMatrix]
 PackageExport[DiracConnectionMatrix]
 PackageExport[DiracHodgeMatrix]
 PackageExport[DiracBlockMatrix]
@@ -67,6 +85,10 @@ PackageExport[SuperTrace]
 PackageExport[PseudoDeterminant]
 PackageExport[SuperDeterminant]
 
+PackageExport[ComplexGeodesicFlow]
+PackageExport[SimplexOrbit]
+PackageExport[ComplexGeodesics]
+
 
 
 ClearAll["WolframInstitute`Infrageometry`**`*", "WolframInstitute`Infrageometry`*"]
@@ -83,13 +105,15 @@ ComplexClosure[g : {___List}, {n_Integer}] := ComplexClosure[g, {n, n}]
 ComplexClosure[g : {___List}] := ComplexClosure[g, {1, Infinity}]
 
 
-CanonicalComplex[g : {___List}] := ComplexClosure[Replace[g, Thread[# -> Range[Length[#]]], {2}] & @ DeleteDuplicates[Catenate[g]]]
+IndexHypergraph[g : {___List}] := Replace[g, Thread[# -> Range[Length[#]]], {2}] & @ DeleteDuplicates[Catenate[g]]
+
+IndexComplex[g : {___List}] := ComplexClosure[IndexHypergraph[g]]
 
 SimplexDimension[x_List] := Length[x] - 1
 
 ComplexDimension[g : {___List}] := Max[Map[SimplexDimension, g], -1]
 
-ComplexDimensions[g : {___List}] := 1 + ComplexInductiveDimension[ComplexUnitSphere[g, #]] & /@ SimplexList[g, 0]
+ComplexDimensions[g : {___List}] := 1 + ComplexInductiveDimension[SimplexUnitSphere[g, #]] & /@ SimplexList[g, 0]
 
 ComplexInductiveDimension[g : {___List}] := If[g === {}, -1, Mean[ComplexDimensions[g]]]
 
@@ -101,7 +125,16 @@ SimplexList[g : {___List}, {n_Integer}] := SimplexList[g, {n, n}]
 
 SimplexList[g : {___List}] := SimplexList[g, {2, Infinity}]
 
+ComplexBones[g : {___List}] := SimplexList[g, {ComplexDimension[g] - 2}]
+
+ComplexWalls[g : {___List}] := SimplexList[g, {ComplexDimension[g] - 1}]
+
 ComplexFacets[g : {___List}] := SimplexList[g, {ComplexDimension[g]}]
+
+ComplexFrames[g : {___List}] := Catenate[Permutations /@ ComplexFacets[g]]
+
+ComplexHypergraph[g : {___List}] :=
+    Catenate @ FoldPairList[With[{facets = SimplexList[#1, {#2}]}, {facets, Complement[#1, Catenate[Subsets /@ facets]]}] &, g, Range[ComplexDimension[g], 0, -1]]
 
 ComplexVertexList[g : {___List}] := Union[Catenate[g]]
 
@@ -111,11 +144,27 @@ SimplexCardinalities[g : {___List}] := Rest[BinCounts[Length /@ g]]
 
 SimplexStar[g : {___List}, x_List] := Select[g, SubsetQ[#, x] &]
 
+SimplexStarSphere[g : {___List}, x_List] := Complement[SimplexStar[g, x], {x}]
+
 SimplexCore[g : {___List}, x_List] := Select[g, SubsetQ[x, #] &]
 
-ComplexUnitSphere[g : {___List}, x_List] := Complement[ComplexClosure[#], #] & @ SimplexStar[g, x]
+SimplexCoreSphere[x_List] := Complement[ComplexClosure[{x}], {x}]
+
+SimplexMirror[g : {___List}, x_List] := First[Complement[#, x]] & /@ SimplexStarSphere[g, x]
+
+
+SimplexUnitSphere[g : {___List}, x_List] := Complement[ComplexClosure[#], #] & @ SimplexStar[g, x]
+
+ContractibleQ[g : {___List}] := MatchQ[g, {} | {{_}}] || AnyTrue[g, With[{s = SimplexStar[g, #]}, ContractibleQ[Complement[ComplexClosure[s], s]] && ContractibleQ[Complement[g, s]]] &]
+
+ComplexSphereQ[g : {___List}] := g === {} || ComplexManifoldQ[g] && AnyTrue[g, ContractibleQ[Complement[g, SimplexStar[g, #]]] &]
+
+ComplexManifoldQ[g : {___List}] := AllTrue[g, ComplexSphereQ[SimplexUnitSphere[g, #]] &]
+
 
 SimplexBoundary[x_List] := Subsets[x, {Length[x] - 1}]
+
+ComplexDual[g : {___List}] := Intersection @@@ Map[SimplexUnitSphere[g, {#}] &, g, {2}]
 
 
 SimplexSign[x_] := Signature[x]
@@ -130,8 +179,6 @@ SimplexIndex[x_List] := SimplexWeight[x] * Signature[x]
 
 SimplexIndex[x_List, y_List] := If[Sort[x] === Sort[y], SimplexWeight[x] * Signature[x] * Signature[y], 0]
 
-
-ContractibleQ[g : {___List}] := MatchQ[g, {{_}}] || AnyTrue[g, With[{s = SimplexStar[g, #]}, ContractibleQ[Complement[ComplexClosure[s], s]] && ContractibleQ[Complement[g, s]]] &]
 
 SimplicialMap[g : {___List}, perm_Cycles] :=
 	With[{vs = Catenate[SimplexList[g, 0]]}, {rules = Thread[vs -> Permute[vs, perm]]},
@@ -171,7 +218,7 @@ PoincarePolynomial[g : {___List}, t_ : \[FormalT]] := 1 + # . t ^ Range[Length[#
 
 ComplexCurvature[g : {___List}, t_ : \[FormalT]] := Integrate[ComplexPolynomial[g], {\[FormalT], 0, t}]
 
-ComplexCurvatures[g : {___List}, t_ : \[FormalT]] := If[SimplexDimension[#] == 0, 0, ComplexCurvature[ComplexUnitSphere[g, #], t]] & /@ g
+ComplexCurvatures[g : {___List}, t_ : \[FormalT]] := If[SimplexDimension[#] == 0, 0, ComplexCurvature[SimplexUnitSphere[g, #], t]] & /@ g
 
 DehnSommervilleQ[g : {___List}] := With[{f = ComplexPolynomial[g]}, TrueQ[Expand[f == (f /. \[FormalT] -> - 1 - \[FormalT])]]]
 
@@ -205,7 +252,9 @@ BarycentricRefinement[g_ ? GraphQ, opts : OptionsPattern[]] := FaceGraph[GraphCo
 BarycentricRefinement[x_, n_Integer, opts : OptionsPattern[]] := Nest[BarycentricRefinement[#, opts] &, x, n]
 
 
-GraphTopology[g_ ? GraphQ] := With[{c = GraphComplex[g]}, SimplexStar[c, #] & /@ c]
+AlexandrovTopology[g : {___List}] := SimplexStar[g, #] & /@ g
+
+GraphTopology[g_ ? GraphQ] := AlexandrovTopology[GraphComplex[g]]
 
 
 FaceQ /: FaceQ[i_Integer][x_List, y_List] := Length[x] === Length[y] - 1 && 0 <= i < Length[y] && Delete[y, i + 1] === x;
@@ -214,7 +263,8 @@ FaceMatrix /: FaceMatrix[i_Integer][args___] := FaceMatrix[args][i]
 
 FaceMatrix[_, x : {___List}, y : {___List}] := Outer[Boole @* FaceQ[#], x, y, 1] &
 
-IndexMatrix[_, x : {___List}, y : {___List}] := Outer[SimplexIndex &, x, y, 1]
+IndexMatrix[_, x : {___List}, y : {___List}] := Outer[SimplexIndex, x, y, 1]
+
 
 SignMatrix[_, x : {___List}, y : {___List}] := Outer[SimplexSign, x, y, 1]
 
@@ -271,6 +321,24 @@ HodgeMatrix[g : {___List}] := With[{d = DiracHodgeMatrix[g]}, BlockDiagonalMatri
 HodgeLaplacianMatrix[g : {___List}] := With[{d = DiracBlockMatrix[g]}, d . d]
 
 
+(* Moore-Penrose pseudoinverse of the (genuine) Hodge Laplacian (d + d^T)^2 = d d^T + d^T d.
+   Block-diagonal by simplex degree; the k-th block is Delta_k^+ on C^k.
+   Distinct from GreenFunctionMatrix, which is Inverse[ConnectionMatrix] (Knill). *)
+
+GreenOperatorMatrix[g : {___List}] :=
+    BlockDiagonalMatrix[PseudoInverse /@ HodgeMatrix[g]["Blocks"]]
+
+
+(* Moore-Penrose pseudoinverse of the boundary operator d_k = ComplexIncidenceMatrix[g, k].
+   Standard identity d^+ = (d^T d)^+ d^T using the up-Laplacian L^up_k = d_k^T d_k. *)
+
+HodgePropagatorMatrix[g : {___List}, k_Integer : 0] :=
+    With[{d = ComplexIncidenceMatrix[g, k]}, PseudoInverse[Transpose[d] . d] . Transpose[d]]
+
+HodgePropagatorMatrix[g : {___List}, All] :=
+    HodgePropagatorMatrix[g, #] & /@ Range[0, ComplexDimension[g] - 1]
+
+
 BettiVector[g : {___List}] := MatrixNullity /@ HodgeMatrix[g]["Blocks"]
 
 
@@ -298,4 +366,13 @@ SuperDeterminant[vec_ ? VectorQ] := Times @@ (vec ^ ((-1) ^ Range[Length[vec]]))
 SuperDeterminant[mat_BlockDiagonalMatrix] := SuperDeterminant[PseudoDeterminant /@ mat["Blocks"]]
 
 SuperDeterminant[mat_ ? SquareMatrixQ, blocks : {__Integer}] := SuperDeterminant[PseudoDeterminant /@ MatrixBlocks[mat, blocks]]
+
+
+(* Geodesics *)
+
+ComplexGeodesicFlow[g : {___List}, x : {x1_, xs___}] := Append[{xs}, First[Append[Complement[SimplexMirror[g, Sort[{xs}]], {x1}], x1]]]
+
+SimplexOrbit[g : {___List}, x_List, n : _Integer | Infinity : Infinity] := NestWhile[Append[#, ComplexGeodesicFlow[g, #[[-1]]]] &, {x}, ! MemberQ[Most[#], #[[-1]]] &, 1, n]
+
+ComplexGeodesics[g : {___List}] := NestWhilePairList[With[{o = SimplexOrbit[g, First[#]]}, {o, Complement[#, o]}] &, ComplexFrames[g], Length[#] > 0 &]
 

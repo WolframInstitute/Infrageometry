@@ -10,10 +10,10 @@
 NotebookFileLineBreakTest
 NotebookFileLineBreakTest
 NotebookDataPosition[       154,          7]
-NotebookDataLength[    171743,       3131]
-NotebookOptionsPosition[    165076,       2986]
-NotebookOutlinePosition[    170524,       3110]
-CellTagsIndexPosition[    170481,       3107]
+NotebookDataLength[    173321,       3179]
+NotebookOptionsPosition[    166428,       3030]
+NotebookOutlinePosition[    171874,       3154]
+CellTagsIndexPosition[    171831,       3151]
 WindowFrame->Normal*)
 
 (* Beginning of Notebook Content *)
@@ -2981,11 +2981,55 @@ Cell[BoxData[
    3.967668674284354*^9, 3.9676687443418713`*^9, 3.9676688435021677`*^9},
  CellLabel->
   "Out[200]=",ExpressionUUID->"8ed2721f-fe4f-4dc5-afff-800c2173a5c5"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{
+   RowBox[{"{", " ", 
+    RowBox[{
+     RowBox[{"SimplicialComplexQ", "[", "#", "]"}], ",", 
+     RowBox[{"DeltaComplexQ", "[", "#", "]"}], ",", 
+     RowBox[{"SimplicialSetQ", "[", "#", "]"}]}], "}"}], "&"}], "/@", 
+  RowBox[{"{", 
+   RowBox[{
+    RowBox[{"SimplicialSet", "[", 
+     RowBox[{"{", 
+      RowBox[{"{", 
+       RowBox[{"a", ",", "b", ",", "c"}], "}"}], "}"}], "]"}], ",", 
+    RowBox[{"SimplicialSet", "[", 
+     RowBox[{"{", 
+      RowBox[{"{", 
+       RowBox[{"a", ",", "a", ",", "c"}], "}"}], "}"}], "]"}], ",", 
+    RowBox[{"SimplicialSet", "[", 
+     RowBox[{
+      RowBox[{"{", 
+       RowBox[{"{", 
+        RowBox[{"a", ",", "a", ",", "c"}], "}"}], "}"}], ",", 
+      RowBox[{"\"\<IncludeDegeneracies\>\"", "->", "False"}]}], "]"}]}], 
+   "}"}]}]], "Input",
+ CellLabel->
+  "In[810]:=",ExpressionUUID->"0a6cb1e9-4437-400f-a5c4-046bc8f8eba9"],
+
+Cell[BoxData[
+ RowBox[{"{", 
+  RowBox[{
+   RowBox[{"{", 
+    RowBox[{"True", ",", "True", ",", "True"}], "}"}], ",", 
+   RowBox[{"{", 
+    RowBox[{"False", ",", "False", ",", "True"}], "}"}], ",", 
+   RowBox[{"{", 
+    RowBox[{"False", ",", "True", ",", "True"}], "}"}]}], "}"}]], "Output",
+ CellChangeTimes->{3.970164730821759*^9},
+ CellLabel->
+  "Out[810]=",ExpressionUUID->"46bd78c4-dfea-452e-8eb0-8980bc81b418"]
 }, Open  ]]
 }, Open  ]]
 },
-WindowSize->{808, 911},
-WindowMargins->{{38, Automatic}, {Automatic, 30}},
+WindowSize->{900, 871},
+WindowMargins->{{Automatic, 4}, {4, Automatic}},
 DockedCells->{
   Cell[
    BoxData[
@@ -3126,11 +3170,15 @@ Cell[3119, 87, 150979, 2618, 383, "Output",ExpressionUUID->"50436a85-65fb-4eb3-a
 Cell[CellGroupData[{
 Cell[154135, 2710, 494, 12, 49, "Input",ExpressionUUID->"56fa9c0c-74c1-460c-8cfa-535e25677aa3"],
 Cell[154632, 2724, 1733, 35, 264, "Output",ExpressionUUID->"f9b9a865-55c5-4cb6-b850-dc7f208a38ea"],
-Cell[156368, 2761, 2190, 68, 94, "Output",ExpressionUUID->"76d50edc-f286-425b-a641-fba3ce4b36bd"]
+Cell[156368, 2761, 2190, 68, 74, "Output",ExpressionUUID->"76d50edc-f286-425b-a641-fba3ce4b36bd"]
 }, Open  ]],
 Cell[CellGroupData[{
 Cell[158595, 2834, 1733, 43, 172, "Input",ExpressionUUID->"9d7f82d0-21f9-4de3-9f58-4e70adb4e8b8"],
 Cell[160331, 2879, 4717, 103, 339, "Output",ExpressionUUID->"8ed2721f-fe4f-4dc5-afff-800c2173a5c5"]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[165085, 2987, 897, 26, 70, "Input",ExpressionUUID->"0a6cb1e9-4437-400f-a5c4-046bc8f8eba9"],
+Cell[165985, 3015, 415, 11, 77, "Output",ExpressionUUID->"46bd78c4-dfea-452e-8eb0-8980bc81b418"]
 }, Open  ]]
 }, Open  ]]
 }
