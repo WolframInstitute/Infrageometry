@@ -1,0 +1,35 @@
+#!/bin/sh
+# commit-msg — enforce Conventional Commits on the subject line.
+#
+# Canonical copy lives in the ComputationalResearch plugin scripts/.
+# Scaffolds drop a copy into <Project>/.githooks/ and activate it with:
+#     git config core.hooksPath .githooks
+#
+# Runs on every `git commit`, so it backstops both humans and the LLM:
+# a rejected message comes back as the commit's stderr, and the agent
+# rewrites it to match before retrying.
+
+msg_file="$1"
+subject=$(grep -v '^#' "$msg_file" | sed '/^[[:space:]]*$/d' | head -n1)
+
+# Let merge / revert / fixup / squash commits through untouched.
+case "$subject" in
+  "Merge "*|"Revert "*|"fixup!"*|"squash!"*|"amend!"*) exit 0 ;;
+esac
+
+pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9._/-]+\))?!?: .+'
+
+if printf '%s' "$subject" | grep -Eq "$pattern"; then
+  len=$(printf '%s' "$subject" | wc -c | tr -d ' ')
+  [ "$len" -le 72 ] && exit 0
+  echo "✗ Commit subject exceeds 72 characters ($len)." >&2
+else
+  echo "✗ Commit subject must follow Conventional Commits." >&2
+fi
+
+cat >&2 <<'EOF'
+  Format:  type(scope): subject        (scope optional, ! marks breaking)
+  Types:   feat fix docs style refactor perf test build ci chore revert
+  Example: fix(cr3bp): correct docs typos and guard failures
+EOF
+exit 1
