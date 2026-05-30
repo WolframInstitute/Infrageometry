@@ -60,6 +60,7 @@ PackageExport[BarycentricRefinement]
 PackageExport[AlexandrovTopology]
 PackageExport[GraphTopology]
 
+PackageExport[FaceMatrix]
 PackageExport[IndexMatrix]
 PackageExport[SignMatrix]
 PackageExport[ComplexIncidenceMatrix]
@@ -256,7 +257,14 @@ AlexandrovTopology[g : {___List}] := SimplexStar[g, #] & /@ g
 GraphTopology[g_ ? GraphQ] := AlexandrovTopology[GraphComplex[g]]
 
 
+FaceQ /: FaceQ[i_Integer][x_List, y_List] := Length[x] === Length[y] - 1 && 0 <= i < Length[y] && Delete[y, i + 1] === x;
+
+FaceMatrix /: FaceMatrix[i_Integer][args___] := FaceMatrix[args][i]
+
+FaceMatrix[_, x : {___List}, y : {___List}] := Outer[Boole @* FaceQ[#], x, y, 1] &
+
 IndexMatrix[_, x : {___List}, y : {___List}] := Outer[SimplexIndex, x, y, 1]
+
 
 SignMatrix[_, x : {___List}, y : {___List}] := Outer[SimplexSign, x, y, 1]
 
@@ -285,7 +293,7 @@ Scan[f |-> (
     f[g : {___List}, args___] := f[g, g, args];
 )
     ,
-    {IndexMatrix, SignMatrix, ConnectionMatrix, GreenFunctionMatrix}
+    {FaceMatrix, IndexMatrix, SignMatrix, ConnectionMatrix, GreenFunctionMatrix}
 ]
 
 DiracHodgeMatrix[args___] := Enclose @ With[{d = ConfirmBy[SignMatrix[args], SquareMatrixQ]},
