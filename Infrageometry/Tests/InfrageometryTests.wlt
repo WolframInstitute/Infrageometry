@@ -1432,4 +1432,181 @@ VerificationTest[
 ]
 
 
+(* ===== GraphBoundary & GraphInterior ===== *)
+
+(* Worked example: path 1-2-3-4-5, S = {2,3,4} -> boundary {2,4}, interior {3} *)
+VerificationTest[
+    With[{g = PathGraph[Range[5]]},
+        {GraphBoundary[g, {2, 3, 4}], GraphInterior[g, {2, 3, 4}]}
+    ],
+    {{2, 4}, {3}},
+    TestID -> "GraphBoundary-path-arc"
+]
+
+(* Partition: boundary and interior are disjoint and union to S *)
+VerificationTest[
+    With[{g = GridGraph[{4, 4}], s = {1, 2, 3, 6, 7, 11}},
+        {Sort @ Union[GraphBoundary[g, s], GraphInterior[g, s]],
+         Intersection[GraphBoundary[g, s], GraphInterior[g, s]]}
+    ],
+    {{1, 2, 3, 6, 7, 11}, {}},
+    TestID -> "GraphBoundary-partition"
+]
+
+(* Interior characterization: every interior vertex has all neighbors inside S *)
+VerificationTest[
+    With[{g = GridGraph[{4, 4}], s = {1, 2, 3, 6, 7, 11}},
+        AllTrue[GraphInterior[g, s], SubsetQ[s, AdjacencyList[g, #]] &]
+    ],
+    True,
+    TestID -> "GraphInterior-characterization"
+]
+
+(* Boundary characterization: every boundary vertex has a neighbor outside S *)
+VerificationTest[
+    With[{g = GridGraph[{4, 4}], s = {1, 2, 3, 6, 7, 11}},
+        AllTrue[GraphBoundary[g, s], IntersectingQ[AdjacencyList[g, #], Complement[VertexList[g], s]] &]
+    ],
+    True,
+    TestID -> "GraphBoundary-characterization"
+]
+
+(* Full vertex set: boundary empty, interior is everything *)
+VerificationTest[
+    With[{g = GridGraph[{3, 3}], v = VertexList @ GridGraph[{3, 3}]},
+        {GraphBoundary[g, v], Sort @ GraphInterior[g, v]}
+    ],
+    {{}, Sort @ VertexList @ GridGraph[{3, 3}]},
+    TestID -> "GraphBoundary-full-set"
+]
+
+(* Grid plus-shape: center is interior, the four arms are boundary *)
+VerificationTest[
+    With[{g = GridGraph[{3, 3}]},
+        {Sort @ GraphBoundary[g, {2, 4, 5, 6, 8}], GraphInterior[g, {2, 4, 5, 6, 8}]}
+    ],
+    {{2, 4, 6, 8}, {5}},
+    TestID -> "GraphBoundary-grid-plus"
+]
+
+(* Cycle arc: the two ends are boundary, the middle is interior *)
+VerificationTest[
+    With[{g = CycleGraph[6]},
+        {Sort @ GraphBoundary[g, {1, 2, 3}], GraphInterior[g, {1, 2, 3}]}
+    ],
+    {{1, 3}, {2}},
+    TestID -> "GraphBoundary-cycle-arc"
+]
+
+(* Subgraph form agrees with the vertex-list form *)
+VerificationTest[
+    With[{g = GridGraph[{4, 4}], s = {1, 2, 3, 6, 7, 11}},
+        GraphBoundary[g, Subgraph[g, s]] === GraphBoundary[g, s] &&
+        GraphInterior[g, Subgraph[g, s]] === GraphInterior[g, s]
+    ],
+    True,
+    TestID -> "GraphBoundary-subgraph-form"
+]
+
+(* Empty subset; isolated vertex is interior *)
+VerificationTest[
+    With[{g = Graph[{1, 2, 3, 4}, {1 <-> 2, 2 <-> 3}]},
+        {GraphBoundary[g, {}], GraphInterior[g, {}],
+         GraphBoundary[g, {1, 4}], GraphInterior[g, {1, 4}]}
+    ],
+    {{}, {}, {1}, {4}},
+    TestID -> "GraphBoundary-empty-isolated"
+]
+
+(* Complement identity: outer boundary of S = inner boundary of V\S *)
+VerificationTest[
+    With[{g = PathGraph[Range[5]], s = {2, 3, 4}},
+        With[{outer = GraphBoundary[g, Complement[VertexList[g], s]]},
+            outer === {1, 5} &&
+            AllTrue[outer, ! MemberQ[s, #] && IntersectingQ[AdjacencyList[g, #], s] &]
+        ]
+    ],
+    True,
+    TestID -> "GraphBoundary-complement-identity"
+]
+
+
+(* ===== Alexandrov topology: BallTopology / Topological* / ContinuousMapQ ===== *)
+
+(* Carrier set is recoverable from the preorder digraph alone, incl. isolated vertices *)
+VerificationTest[
+    With[{g = Graph[{1, 2, 3, 4, 5}, {1 <-> 2, 2 <-> 3, 3 <-> 4}]},
+        Sort @ VertexList @ BallTopology[g, 1] === Sort @ VertexList[g]
+    ],
+    True,
+    TestID -> "BallTopology-carrier"
+]
+
+(* int(S) subset S subset cl(S) *)
+VerificationTest[
+    With[{topo = BallTopology[GridGraph[{4, 4}], 1], s = {1, 2, 3, 6, 7}},
+        SubsetQ[s, TopologicalInterior[topo, s]] && SubsetQ[TopologicalClosure[topo, s], s]
+    ],
+    True,
+    TestID -> "Topological-sandwich"
+]
+
+(* Duality: cl(V\S) == V \ int(S) *)
+VerificationTest[
+    With[{topo = BallTopology[CycleGraph[8], 1], s = {1, 2, 3}},
+        With[{v = VertexList[topo]},
+            Sort @ TopologicalClosure[topo, Complement[v, s]] === Sort @ Complement[v, TopologicalInterior[topo, s]]
+        ]
+    ],
+    True,
+    TestID -> "Topological-duality"
+]
+
+(* Boundary is two-sided: bd(S) = cl(S)\int(S) and bd(S) = bd(V\S) *)
+VerificationTest[
+    With[{topo = BallTopology[GridGraph[{4, 4}], 1], s = {1, 2, 3, 6, 7}},
+        With[{v = VertexList[topo]},
+            Sort @ TopologicalBoundary[topo, s] === Sort @ Complement[TopologicalClosure[topo, s], TopologicalInterior[topo, s]] &&
+            Sort @ TopologicalBoundary[topo, s] === Sort @ TopologicalBoundary[topo, Complement[v, s]]
+        ]
+    ],
+    True,
+    TestID -> "Topological-boundary-two-sided"
+]
+
+(* Alexandrov idempotence: cl(cl(S)) = cl(S), int(int(S)) = int(S) *)
+VerificationTest[
+    With[{topo = BallTopology[GridGraph[{4, 4}], 2], s = {1, 2, 3, 6, 7}},
+        With[{cl = TopologicalClosure[topo, s], int = TopologicalInterior[topo, s]},
+            Sort @ TopologicalClosure[topo, cl] === Sort @ cl &&
+            Sort @ TopologicalInterior[topo, int] === Sort @ int
+        ]
+    ],
+    True,
+    TestID -> "Topological-idempotence"
+]
+
+(* Minimal open neighborhood is the up-set; contains S and is open (= its own interior) *)
+VerificationTest[
+    With[{topo = BallTopology[CycleGraph[8], 1], s = {1, 4}},
+        With[{nb = TopologicalNeighborhood[topo, s]},
+            SubsetQ[nb, s] && Sort @ TopologicalInterior[topo, nb] === Sort @ nb
+        ]
+    ],
+    True,
+    TestID -> "Topological-neighborhood-open"
+]
+
+(* ContinuousMapQ: identity is continuous topo->topo, but not topo->dual (edges reversed) *)
+VerificationTest[
+    With[{topo = BallTopology[PathGraph[Range[5]], 1], dual = BallTopology[PathGraph[Range[5]], 1, "Dual" -> True]},
+        With[{id = AssociationMap[Identity, VertexList[topo]]},
+            {ContinuousMapQ[id, topo, topo], ContinuousMapQ[id, topo, dual]}
+        ]
+    ],
+    {True, False},
+    TestID -> "ContinuousMapQ-identity-vs-dual"
+]
+
+
 EndTestSection[]

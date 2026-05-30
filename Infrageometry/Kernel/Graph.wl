@@ -4,6 +4,8 @@ Package["WolframInstitute`Infrageometry`"]
 PackageExport[SymmetricRelationGraph]
 PackageExport[GraphEdgeWeights]
 PackageExport[GraphVertexWeights]
+PackageExport[GraphBoundary]
+PackageExport[GraphInterior]
 
 PackageExport[FormanRicciCurvature]
 PackageExport[OllivierRicciCurvature]
@@ -50,6 +52,24 @@ GraphVertexWeights[g_Graph] := Replace[
 	Automatic -> 1,
 	1
 ]
+
+(* ===================== Inner vertex boundary / interior ===================== *)
+
+(* GraphBoundary[g, S]: inner vertex boundary {v in S : v has a neighbor outside S}. *)
+GraphBoundary[g_Graph, subgraph_Graph] :=
+	GraphBoundary[g, VertexList[subgraph]]
+
+GraphBoundary[g_Graph, subset_List] :=
+	With[{outside = Complement[VertexList[g], subset]},
+		Select[subset, IntersectingQ[AdjacencyList[g, #], outside] &]
+	]
+
+(* GraphInterior[g, S]: {v in S : all neighbors of v lie in S} = S \ GraphBoundary[g, S]. *)
+GraphInterior[g_Graph, subgraph_Graph] :=
+	GraphInterior[g, VertexList[subgraph]]
+
+GraphInterior[g_Graph, subset_List] :=
+	Complement[subset, GraphBoundary[g, subset]]
 
 (* ===================== Forman-Ricci curvature ===================== *)
 

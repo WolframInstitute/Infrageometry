@@ -84,6 +84,8 @@ RandomGraphAutomorphism::usage = "RandomGraphAutomorphism[g, n] samples n automo
 (* Graph.wl *)
 GraphEdgeWeights::usage = "GraphEdgeWeights[g] gives edge weights (default 1) for graph g.";
 GraphVertexWeights::usage = "GraphVertexWeights[g] gives vertex weights (default 1) for graph g.";
+GraphBoundary::usage = "GraphBoundary[g, S] gives the inner vertex boundary of vertex subset S in g: the vertices of S adjacent to some vertex outside S. S may be a vertex list or a subgraph.";
+GraphInterior::usage = "GraphInterior[g, S] gives the interior of vertex subset S in g: the vertices of S all of whose neighbors lie in S (= S minus GraphBoundary[g, S]). S may be a vertex list or a subgraph.";
 FormanRicciCurvature::usage = "FormanRicciCurvature[g] returns Association[edge -> kappa] with Forman's combinatorial Ricci curvature on the clique complex of g. Options: \"OnCells\" (Integer | All | {dims}; output cell dimension(s), default 1) and \"MaxCellDimension\" (Automatic (default) | Integer; clique-complex truncation, Automatic = Max[OnCells] + 1).";
 OllivierRicciCurvature::usage = "OllivierRicciCurvature[g] returns Association[edge -> kappa] with the Ollivier-Ricci curvature kappa(u, v) = 1 - W_1(mu_u, mu_v) / d(u, v), where mu_x is uniform on N(x) and W_1 is the Wasserstein-1 distance under graph distance (alpha = 0).";
 WolframRicciCurvature::usage = "WolframRicciCurvature[g] returns Association[v -> mean_r R(v, r)] with the volume-comparison Ricci scalar averaged over the per-vertex valid radius range. WolframRicciCurvature[g, r] gives a single radius; WolframRicciCurvature[g, {rmin, rmax}] gives a window. Option: \"Dimension\" (Automatic (default) | Integer).";
@@ -100,6 +102,15 @@ ToroidalRightMatrix::usage = "ToroidalRightMatrix[g] returns right-walk transiti
 ToroidalLeftMatrix::usage = "ToroidalLeftMatrix[g] returns left-walk transition matrix with wrap-around edges.";
 DiracWalk::usage = "DiracWalk[g,p] returns coined quantum walk transition matrix (mix of kick/persist).";
 VertexAmplitudes::usage = "VertexAmplitudes[g, edgeWeights,{m,n}] returns complex amplitude per vertex from adjacent weighted edges.";
+
+(* Topology.wl *)
+BallTopology::usage = "BallTopology[g, r] returns the Hasse diagram of the r-ball specialization preorder on V(g): directed edge q -> p iff the closed r-ball at p is contained in the one at q, transitive edges removed. This digraph is the topology object consumed by the Topological* operators. Option \"Dual\" (False default; True gives the ReverseGraph).";
+TopologicalClosure::usage = "TopologicalClosure[topo, verts] gives the closure of vertex list verts in the specialization-preorder digraph topo: the union of the in-components (down-sets) of the vertices.";
+TopologicalInterior::usage = "TopologicalInterior[topo, verts] gives the interior int(S) = V \\ cl(V\\S) of vertex list verts in the digraph topo, with carrier V = VertexList[topo].";
+TopologicalBoundary::usage = "TopologicalBoundary[topo, verts] gives the (two-sided) boundary cl(S) \\ int(S) of vertex list verts in the digraph topo.";
+TopologicalNeighborhood::usage = "TopologicalNeighborhood[topo, verts] gives the unique minimal open neighborhood of vertex list verts in the digraph topo: the union of the out-components (up-sets) of the vertices.";
+ContinuousMapQ::usage = "ContinuousMapQ[f, topo1, topo2] tests whether the vertex map f is continuous from preorder digraph topo1 to topo2, i.e. every Hasse edge q -> p of topo1 maps to a pair reachable in the transitive closure of topo2. f: Association, list of Rule, or callable.";
+TopologyGraph::usage = "TopologyGraph[g, topo] draws the graph g overlaid with the Hasse arrows of the specialization-preorder digraph topo.";
 
 (* Mesh.wl *)
 ComplexEmbedding::usage = "ComplexEmbedding[g,d] numerically embeds complex g in R^d via energy minimization (d=2 or 3).";
