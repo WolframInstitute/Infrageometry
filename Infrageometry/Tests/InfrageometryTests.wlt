@@ -244,6 +244,18 @@ VerificationTest[
 ]
 
 VerificationTest[
+    (* solid tetrahedron split into 4 sub-tets around interior vertex 5: only the 4 spokes survive *)
+    With[{g = InteriorMeshGraph @ MeshRegion[
+        {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {1/4, 1/4, 1/4}},
+        Tetrahedron /@ {{1, 2, 3, 5}, {1, 2, 4, 5}, {1, 3, 4, 5}, {2, 3, 4, 5}}
+    ]},
+        Sort[VertexList[g]] == {1, 2, 3, 4, 5} && Sort[Sort /@ (List @@@ EdgeList[g])] == {{1, 5}, {2, 5}, {3, 5}, {4, 5}}
+    ],
+    True,
+    TestID -> "InteriorMeshGraph-SolidVolume"
+]
+
+VerificationTest[
     (* Boundary of a triangle (3 edges, no face) is S^1 = sphere *)
     ComplexSphereQ[ComplexClosure[{{1, 2}, {2, 3}, {1, 3}}]],
     True,

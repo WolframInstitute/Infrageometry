@@ -125,31 +125,18 @@ GraphMesh[g_ ? GraphQ] := MeshRegion[
 ]
 
 
-InteriorMeshGraph[mr_MeshRegion] := With[{
-	coords = MeshCoordinates[mr],
-	edges = First /@ MeshCells[mr, 1],
-	d = RegionDimension[mr]
-},
-	With[{
-		boundaryEdges = If[d <= 1,
+(* boundary faces are the (d-1)-subsets of top simplices occurring in exactly one top cell; their edges are the wall edges *)
+InteriorMeshGraph[mr_MeshRegion] := With[
+	{coords = MeshCoordinates[mr], d = RegionDimension[mr]},
+	With[{topFaces = Sort /@ Catenate[Subsets[First[#], {d}] & /@ MeshCells[mr, d]]},
+		With[{boundaryEdges = If[d <= 1,
 			{},
-			Sort /@ First /@ MeshCells[
-				MeshRegion[
-					coords,
-					Pick[
-						MeshCells[mr, d - 1],
-						Normal @ Total[Abs @ MeshIncidenceMatrix[mr, d], {2}],
-						1
-					],
-					Method -> {"EliminateUnusedCoordinates" -> False}
-				],
-				1
+			Union[Sort /@ Catenate[Subsets[#, {2}] & /@ Keys[Select[Counts[topFaces], # == 1 &]]]]
+		]},
+			EdgeDelete[
+				Graph[Range[Length[coords]], UndirectedEdge @@@ (First /@ MeshCells[mr, 1]), VertexCoordinates -> coords],
+				UndirectedEdge @@@ boundaryEdges
 			]
-		]
-	},
-		EdgeDelete[
-			Graph[Range[Length[coords]], UndirectedEdge @@@ edges, VertexCoordinates -> coords],
-			UndirectedEdge @@@ boundaryEdges
 		]
 	]
 ]
