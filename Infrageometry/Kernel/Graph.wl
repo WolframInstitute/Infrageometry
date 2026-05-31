@@ -10,7 +10,7 @@ PackageExport[GraphInterior]
 PackageExport[FormanRicciCurvature]
 PackageExport[OllivierRicciCurvature]
 PackageExport[WolframRicciCurvature]
-PackageExport[WolframDimension]
+PackageExport[WolframHausdorffDimension]
 PackageExport[SectionalCurvatures]
 PackageScope[wasserstein1]
 
@@ -306,17 +306,17 @@ wolframRicciAtVertex[g_Graph, v_, range_, dim_] := Module[{vols, top, rs},
    WolframRicciCurvature[..., "Dimension" -> Automatic], exposed on its own
    with the matching calling convention.
 
-   WolframDimension[g]               -> Association[v -> mean_r d(v, r)] over r = 1..ecc(v) - 1
-   WolframDimension[g, {rmin, rmax}] -> averages over [rmin, rmax] cap valid range
-   WolframDimension[g, r_Integer]    -> Association[v -> d(v, r)], no averaging.
+   WolframHausdorffDimension[g]               -> Association[v -> mean_r d(v, r)] over r = 1..ecc(v) - 1
+   WolframHausdorffDimension[g, {rmin, rmax}] -> averages over [rmin, rmax] cap valid range
+   WolframHausdorffDimension[g, r_Integer]    -> Association[v -> d(v, r)], no averaging.
    Vertices whose valid range is empty -> Indeterminate. *)
 
-WolframDimension[g_Graph,
+WolframHausdorffDimension[g_Graph,
 	range : (_Integer | {_Integer, _Integer} | All) : All
-] := AssociationMap[v |-> wolframDimensionAtVertex[g, v, range], VertexList[g]]
+] := AssociationMap[v |-> wolframHausdorffDimensionAtVertex[g, v, range], VertexList[g]]
 
 
-wolframDimensionAtVertex[g_Graph, v_, range_] := Module[{vols, top, rs},
+wolframHausdorffDimensionAtVertex[g_Graph, v_, range_] := Module[{vols, top, rs},
 	vols = With[{c = KeySort @ Counts @ DeleteCases[GraphDistance[g, v], Infinity]},
 		AssociationThread[Keys[c] -> Accumulate[Values[c]]]
 	];
