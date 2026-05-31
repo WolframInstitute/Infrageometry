@@ -125,18 +125,16 @@ GraphMesh[g_ ? GraphQ] := MeshRegion[
 ]
 
 
-(* surface vertices lie on a boundary face (a (d-1)-subset of a top simplex occurring in exactly one top cell); keep every edge with at least one interior endpoint *)
+(* surface vertices lie on a boundary face (a (d-1)-subset of a top simplex occurring in exactly one top cell); keep every edge with at least one interior endpoint, dropping surface vertices left with none (so components match the region's) *)
 InteriorMeshGraph[mr_MeshRegion] := With[
 	{coords = MeshCoordinates[mr], d = RegionDimension[mr], edges = UndirectedEdge @@@ (First /@ MeshCells[mr, 1])},
-	With[{surface = If[d <= 1,
+	{surface = If[d <= 1,
 		{},
 		Union @@ Keys @ Select[Counts[Sort /@ Catenate[Subsets[First[#], {d}] & /@ MeshCells[mr, d]]], # == 1 &]
 	]},
-		EdgeDelete[
-			Graph[Range[Length[coords]], edges, VertexCoordinates -> coords],
-			Select[edges, SubsetQ[surface, List @@ #] &]
-		]
-	]
+	{kept = Select[edges, ! SubsetQ[surface, List @@ #] &]},
+	{vertices = Union @@ (List @@@ kept)},
+	Graph[vertices, kept, VertexCoordinates -> coords[[vertices]]]
 ]
 
 
