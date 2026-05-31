@@ -10,6 +10,7 @@ PackageExport[GraphInterior]
 PackageExport[FormanRicciCurvature]
 PackageExport[OllivierRicciCurvature]
 PackageExport[WolframRicciCurvature]
+PackageExport[WolframDimension]
 PackageExport[SectionalCurvatures]
 PackageScope[wasserstein1]
 
@@ -295,6 +296,39 @@ wolframRicciAtVertex[g_Graph, v_, range_, dim_] := Module[{vols, top, rs},
 			},
 			N[6 (dr + 2) / r^2 (1 - vr Gamma[dr / 2 + 1] / (Pi^(dr / 2) r^dr))]
 		]) /@ rs]
+	]
+]
+
+
+(* Volume-growth local dimension at vertex v and integer radius r:
+       d(v, r) = (Log V(r+1) - Log V(r)) / (Log(r+1) - Log r),
+   with V(r) = |B_r(v)|.  The same estimate used internally by
+   WolframRicciCurvature[..., "Dimension" -> Automatic], exposed on its own
+   with the matching calling convention.
+
+   WolframDimension[g]               -> Association[v -> mean_r d(v, r)] over r = 1..ecc(v) - 1
+   WolframDimension[g, {rmin, rmax}] -> averages over [rmin, rmax] cap valid range
+   WolframDimension[g, r_Integer]    -> Association[v -> d(v, r)], no averaging.
+   Vertices whose valid range is empty -> Indeterminate. *)
+
+WolframDimension[g_Graph,
+	range : (_Integer | {_Integer, _Integer} | All) : All
+] := AssociationMap[v |-> wolframDimensionAtVertex[g, v, range], VertexList[g]]
+
+
+wolframDimensionAtVertex[g_Graph, v_, range_] := Module[{vols, top, rs},
+	vols = With[{c = KeySort @ Counts @ DeleteCases[GraphDistance[g, v], Infinity]},
+		AssociationThread[Keys[c] -> Accumulate[Values[c]]]
+	];
+	top = Max[Keys[vols]] - 1;
+	rs = Switch[range,
+		All,                  Range[1, top],
+		_Integer,             If[1 <= range <= top, {range}, {}],
+		{_Integer, _Integer}, Range[Max[1, range[[1]]], Min[top, range[[2]]]]
+	];
+	If[rs === {},
+		Indeterminate,
+		Mean[(r |-> N[(Log[vols[r + 1]] - Log[vols[r]]) / (Log[r + 1] - Log[r])]) /@ rs]
 	]
 ]
 

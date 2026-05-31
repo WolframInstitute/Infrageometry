@@ -1207,6 +1207,42 @@ VerificationTest[
 ]
 
 
+(* ===== WolframDimension ===== *)
+
+VerificationTest[
+    AssociationQ @ WolframDimension[GridGraph[{5, 5}]],
+    True,
+    TestID -> "WolframDimension-Grid5x5-association"
+]
+
+VerificationTest[
+    Length @ WolframDimension[GridGraph[{5, 5}]],
+    25,
+    TestID -> "WolframDimension-Grid5x5-keys-all-vertices"
+]
+
+(* d(v, r) = (Log V(r+1) - Log V(r)) / (Log(r+1) - Log r); on a cycle V(r) = 2r+1 *)
+VerificationTest[
+    WolframDimension[CycleGraph[40], 10][1],
+    N[(Log[23] - Log[21]) / (Log[11] - Log[10])],
+    TestID -> "WolframDimension-C40-single-radius-formula"
+]
+
+(* a long cycle is 1-dimensional: volume-growth dimension -> 1 as r grows *)
+VerificationTest[
+    Abs[WolframDimension[CycleGraph[60], 15][1] - 1] < 0.1,
+    True,
+    TestID -> "WolframDimension-C60-approaches-one"
+]
+
+(* window past ecc(v) - 1 has no valid radii *)
+VerificationTest[
+    WolframDimension[HypercubeGraph[3], {5, 7}][1],
+    Indeterminate,
+    TestID -> "WolframDimension-Q3-empty-window-indeterminate"
+]
+
+
 (* ===== GreenOperatorMatrix: Moore-Penrose pseudoinverse of the Hodge Laplacian ===== *)
 
 VerificationTest[
