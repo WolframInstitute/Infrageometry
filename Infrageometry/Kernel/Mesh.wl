@@ -125,18 +125,16 @@ GraphMesh[g_ ? GraphQ] := MeshRegion[
 ]
 
 
-(* boundary faces are the (d-1)-subsets of top simplices occurring in exactly one top cell; their edges are the wall edges *)
+(* surface vertices lie on a boundary face (a (d-1)-subset of a top simplex occurring in exactly one top cell); keep every edge with at least one interior endpoint *)
 InteriorMeshGraph[mr_MeshRegion] := With[
-	{coords = MeshCoordinates[mr], d = RegionDimension[mr]},
-	With[{topFaces = Sort /@ Catenate[Subsets[First[#], {d}] & /@ MeshCells[mr, d]]},
-		With[{boundaryEdges = If[d <= 1,
-			{},
-			Union[Sort /@ Catenate[Subsets[#, {2}] & /@ Keys[Select[Counts[topFaces], # == 1 &]]]]
-		]},
-			EdgeDelete[
-				Graph[Range[Length[coords]], UndirectedEdge @@@ (First /@ MeshCells[mr, 1]), VertexCoordinates -> coords],
-				UndirectedEdge @@@ boundaryEdges
-			]
+	{coords = MeshCoordinates[mr], d = RegionDimension[mr], edges = UndirectedEdge @@@ (First /@ MeshCells[mr, 1])},
+	With[{surface = If[d <= 1,
+		{},
+		Union @@ Keys @ Select[Counts[Sort /@ Catenate[Subsets[First[#], {d}] & /@ MeshCells[mr, d]]], # == 1 &]
+	]},
+		EdgeDelete[
+			Graph[Range[Length[coords]], edges, VertexCoordinates -> coords],
+			Select[edges, SubsetQ[surface, List @@ #] &]
 		]
 	]
 ]
