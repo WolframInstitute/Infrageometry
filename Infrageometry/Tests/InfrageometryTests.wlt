@@ -1781,5 +1781,81 @@ VerificationTest[
     TestID -> "PersistenceIntervals-circle-one-H1"
 ]
 
+(* ===== Coordinatization: resolving sets, radar / resistance coords, ball covers ===== *)
+
+VerificationTest[
+    ResolvingSetQ[PathGraph[Range[5]], {1}],
+    True,
+    TestID -> "ResolvingSetQ-path-endpoint-resolves"
+]
+
+VerificationTest[
+    ResolvingSetQ[CycleGraph[6], {1}],
+    False,
+    TestID -> "ResolvingSetQ-cycle-single-fails"
+]
+
+VerificationTest[
+    ResolvingSetQ[CycleGraph[6], {1, 2}],
+    True,
+    TestID -> "ResolvingSetQ-cycle-two-resolves"
+]
+
+VerificationTest[
+    MetricDimension[PathGraph[Range[5]]],
+    1,
+    TestID -> "MetricDimension-path"
+]
+
+VerificationTest[
+    MetricDimension[CycleGraph[6]],
+    2,
+    TestID -> "MetricDimension-cycle"
+]
+
+VerificationTest[
+    MetricDimension[PetersenGraph[]],
+    3,
+    TestID -> "MetricDimension-Petersen"
+]
+
+VerificationTest[
+    RadarCoordinates[PathGraph[Range[5]], {1, 5}, 3],
+    {2, 2},
+    TestID -> "RadarCoordinates-path-vertex"
+]
+
+VerificationTest[
+    With[{c = ResistanceCoordinates[PathGraph[Range[4]]]},
+        Chop[Total[(c[1] - c[4])^2] - EffectiveResistance[PathGraph[Range[4]], 1, 4]]
+    ],
+    0,
+    TestID -> "ResistanceCoordinates-matching-identity"
+]
+
+VerificationTest[
+    DominationNumber[CycleGraph[7], 2],
+    2,
+    TestID -> "DominationNumber-C7-r2"
+]
+
+VerificationTest[
+    DominationNumber[PetersenGraph[], 1],
+    3,
+    TestID -> "DominationNumber-Petersen-r1"
+]
+
+VerificationTest[
+    BallCoverQ[CycleGraph[7], 2, FindBallCover[CycleGraph[7], 2]],
+    True,
+    TestID -> "FindBallCover-covers-C7"
+]
+
+VerificationTest[
+    BallCoverQ[CycleGraph[7], 1, {1}],
+    False,
+    TestID -> "BallCoverQ-single-ball-too-small"
+]
+
 
 EndTestSection[]
