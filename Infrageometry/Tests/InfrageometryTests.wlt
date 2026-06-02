@@ -1657,4 +1657,102 @@ VerificationTest[
 ]
 
 
+(* ===== Ball-intersection complexes (Vietoris-Rips <-> Cech) ===== *)
+
+(* equilateral triangle side 1: miniball radius = circumradius = 1/Sqrt[3] *)
+VerificationTest[
+    MiniballRadius[N @ {{0, 0}, {1, 0}, {1/2, Sqrt[3]/2}}],
+    1/Sqrt[3.],
+    SameTest -> (Abs[#1 - #2] < 10.^-9 &),
+    TestID -> "MiniballRadius-equilateral-circumradius"
+]
+
+(* at 1/2 < r < 1/Sqrt[3] the triangle is a Rips simplex but not a Cech simplex *)
+VerificationTest[
+    With[{tri = N @ {{0, 0}, {1, 0}, {1/2, Sqrt[3]/2}}},
+        {MemberQ[BallIntersectionComplex[tri, 0.55, 2], {1, 2, 3}],
+         MemberQ[BallIntersectionComplex[tri, 0.55, Infinity], {1, 2, 3}]}
+    ],
+    {True, False},
+    TestID -> "BallIntersectionComplex-triangle-discriminator"
+]
+
+(* order 2 reproduces Vietoris-Rips at scale 2 r (closed balls meet iff d <= 2 r) *)
+VerificationTest[
+    With[{pts = N @ CirclePoints[8]},
+        Sort[BallIntersectionComplex[pts, 0.45, 2]] === Sort[VietorisRipsComplex[pts, 0.9]]
+    ],
+    True,
+    TestID -> "BallIntersectionComplex-order2-equals-rips-at-2r"
+]
+
+(* every Cech simplex has a genuine common point: miniball <= r *)
+VerificationTest[
+    With[{pts = N @ {{0, 0}, {1, 0}, {1, 1}, {0, 1}, {1/2, 1/2}}},
+        AllTrue[CechComplex[pts, 0.7], MiniballRadius[pts[[#]]] <= 0.7 + 10.^-9 &]
+    ],
+    True,
+    TestID -> "CechComplex-every-simplex-has-common-point"
+]
+
+(* Helly ladder: C^(2) contains C^(3) and saturates to Cech at k = d + 1 = 3 in R^2 *)
+VerificationTest[
+    With[{pts = N @ CirclePoints[6], r = 0.65},
+        With[{lad = Sort[BallIntersectionComplex[pts, r, #]] & /@ {2, 3, Infinity}},
+            {SubsetQ[lad[[1]], lad[[2]]], lad[[2]] === lad[[3]]}
+        ]
+    ],
+    {True, True},
+    TestID -> "BallIntersectionComplex-helly-ladder-saturation-R2"
+]
+
+(* filtration value is monotone under faces, the legitimacy condition *)
+VerificationTest[
+    With[{sq = N @ {{0, 0}, {1, 0}, {1, 1}, {0, 1}, {1/2, 1/2}}},
+        With[{fk = BallIntersectionFiltrationValue[sq, #, 2] &},
+            fk[{1, 2}] <= fk[{1, 2, 3}] + 10.^-12
+        ]
+    ],
+    True,
+    TestID -> "BallIntersectionFiltrationValue-monotone-under-faces"
+]
+
+(* order-2 persistence equals Rips persistence; ball is keyed by r and Rips by 2 r,
+   so diagrams coincide after scaling births/deaths by 2 *)
+VerificationTest[
+    With[{pts = N @ CirclePoints[8], radii = Range[0.1, 0.7, 0.1]},
+        With[{b = Sort[PersistenceDiagram[BallIntersectionFiltration[pts, radii, 2]] /. x_Real :> 2 x],
+              v = Sort[PersistenceDiagram[VietorisRipsFiltration[pts, 2 * radii]]]},
+            Length[b] === Length[v] && Max[Abs[Cases[b - v, _ ? NumericQ, Infinity]]] < 10.^-9
+        ]
+    ],
+    True,
+    TestID -> "BallIntersectionFiltration-order2-persistence-matches-rips"
+]
+
+(* intrinsic graph-metric oracle: on C6 (non-convex balls) Helly does not collapse *)
+VerificationTest[
+    With[{m = GraphDistanceMatrix[CycleGraph[6]], v = Range[6]},
+        With[{rips = Sort[BallIntersectionComplex[v, 2, 2, "Metric" -> m]],
+              cech = Sort[BallIntersectionComplex[v, 2, Infinity, "Metric" -> m]]},
+            SubsetQ[rips, cech] && rips =!= cech
+        ]
+    ],
+    True,
+    TestID -> "BallIntersectionComplex-metric-oracle-no-collapse"
+]
+
+(* quality knob: a measure threshold on the common region refines Cech *)
+VerificationTest[
+    With[{sq = N @ {{0, 0}, {1, 0}, {1, 1}, {0, 1}, {1/2, 1/2}}, r = 0.72},
+        SubsetQ[
+            Sort[CechComplex[sq, r]],
+            Sort[BallIntersectionComplex[sq, r, Infinity, "IntersectionTest" -> (RegionMeasure[#] >= 0.05 &)]]
+        ]
+    ],
+    True,
+    TestID -> "BallIntersectionComplex-quality-measure-refines-cech"
+]
+
+
 EndTestSection[]
