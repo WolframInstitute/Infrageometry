@@ -30,12 +30,20 @@ VietorisRipsThresholdGraph[data : {__List}, r_ ? NumericQ, OptionsPattern[]] := 
     ]
 ]
 
+(* Graph form: the metric is the graph (shortest-path) distance, so the radius-r threshold graph is the r-th power G^r (weighted graphs use their edge weights). *)
+VietorisRipsThresholdGraph[g_ ? GraphQ, r_ ? NumericQ] :=
+    AdjacencyGraph[VertexList[g], Map[Boole[0 < # <= r] &, GraphDistanceMatrix[g], {2}]]
+
 
 (* Vietoris–Rips complex via clique complex of threshold graph; optional dimension cap. *)
 VietorisRipsComplex[data_List, r_ ? NumericQ, k : (_Integer | Infinity) : Infinity] := Block[{g},
     g = VietorisRipsThresholdGraph[data, r];
     GraphComplex[g, k]
 ]
+
+(* Graph form: Vietoris–Rips complex of a graph at scale r = clique complex of its r-th power; at r = 1 this is GraphComplex[g]. *)
+VietorisRipsComplex[g_ ? GraphQ, r_ ? NumericQ, k : (_Integer | Infinity) : Infinity] :=
+    GraphComplex[VietorisRipsThresholdGraph[g, r], k]
 
 (* Filtration: association radius -> complex. Radii will be sorted unless already monotone. *)
 Options[VietorisRipsFiltration] = {"MaxDimension" -> Infinity, "Sort" -> True};
