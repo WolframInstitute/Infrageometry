@@ -174,45 +174,50 @@ BallIntersectionFiltration[data_Association, radii_List, k : (_Integer | Infinit
 
 Options[PersistentHomology] = {"MaxDimension" -> Automatic};
 
-(* Core reduction over GF(2) returning pairings for one dimension step. *)
+(* Standard persistence: one global GF(2) column reduction over all simplices
+   ordered by (birth, dim, simplex). A column reducing to empty marks its simplex
+   POSITIVE (creates a class); a non-empty column marks it NEGATIVE (its pivot is
+   the positive simplex it kills, a finite bar). Positive simplices never killed
+   give infinite bars in their own dimension — including the top dimension.
+   Zero-persistence bars (birth == death) are dropped. *)
 Clear[PersistenceIntervals]
 PersistenceIntervals[filtration_Association, OptionsPattern[PersistentHomology]] := Block[
-    {maxDim, radii, birthTime, simplicesByDim, result = <||>, allSimplices, dims, orderKey, reduceDimension},
-    radii = Keys[filtration];
+    {maxDim, birthTime, dimOf, topDim, simplices, ordered, index, boundary, xor,
+     reduced = <||>, low = <||>, killed, result = <||>},
     maxDim = OptionValue["MaxDimension"] /. Automatic :> Infinity;
-    birthTime = Association[];
-    Do[Scan[(If[! KeyExistsQ[birthTime, #], birthTime[#] = r]) &, filtration[r]], {r, radii}];
-    allSimplices = Keys[birthTime];
-    simplicesByDim = GroupBy[allSimplices, Length[#] - 1 &];
-    dims = Sort[Keys[simplicesByDim]];
-    orderKey[s_] := {birthTime[s], Length[s], s};
-    reduceDimension[d_] := Block[{rows, cols, rowIndex, low = <||>, intervals = {}, colFaces, col, pivot},
-        If[d == 0, Return[Null]];
-        rows = SortBy[Lookup[simplicesByDim, d - 1, {}], orderKey];
-        cols = SortBy[Lookup[simplicesByDim, d, {}], orderKey];
-        rowIndex = AssociationThread[rows -> Range[Length[rows]]];
-        colFaces[s_] := Sort @ Map[rowIndex, Select[Subsets[s, {Length[s] - 1}], KeyExistsQ[rowIndex, #] &]];
-        Do[
-            col = colFaces[c];
-            While[col =!= {} && KeyExistsQ[low, Last[col]],
-                col = Sort @ Complement[Union[col, low[Last[col]]], Intersection[col, low[Last[col]]]];
-            ];
-            If[col =!= {},
-                pivot = Last[col];
-                AppendTo[intervals, {birthTime[rows[[pivot]]], birthTime[c]}];
-                low[pivot] = col;
-            ];
-            , {c, cols}];
-        If[rows =!= {},
-            If[! KeyExistsQ[result, d - 1], result[d - 1] = {}];
-            With[{pairedRows = Keys[low]},
-                Do[If[! MemberQ[pairedRows, i], AppendTo[result[d - 1], {birthTime[rows[[i]]], Infinity}]], {i, Length[rows]}]
-            ]
-        ];
-        If[intervals =!= {}, result[d - 1] = Join[Lookup[result, d - 1, {}], intervals]];
+    birthTime = <||>;
+    Do[Scan[If[! KeyExistsQ[birthTime, #], birthTime[#] = r] &, filtration[r]], {r, Keys[filtration]}];
+    dimOf[s_] := Length[s] - 1;
+    topDim = Max[dimOf /@ Keys[birthTime], 0];
+    simplices = Select[Keys[birthTime], dimOf[#] <= Min[maxDim + 1, topDim] &];
+    ordered = SortBy[simplices, {birthTime[#], Length[#], #} &];
+    index = AssociationThread[ordered -> Range[Length[ordered]]];
+    boundary[s_] := Sort @ Lookup[index, Select[Subsets[s, {Length[s] - 1}], KeyExistsQ[index, #] &]];
+    xor[a_, b_] := Sort @ Complement[Union[a, b], Intersection[a, b]];
+    Do[
+        With[{j = index[s]},
+            reduced[j] = boundary[s];
+            While[reduced[j] =!= {} && KeyExistsQ[low, Last[reduced[j]]], reduced[j] = xor[reduced[j], reduced[low[Last[reduced[j]]]]]];
+            If[reduced[j] =!= {}, low[Last[reduced[j]]] = j]
+        ],
+        {s, ordered}
     ];
-    Scan[If[maxDim =!= Infinity && # > maxDim + 1, Nothing, reduceDimension[#]] &, dims];
-    Do[If[! KeyExistsQ[result, d], result[d] = {}], {d, 0, Min[maxDim /. Infinity -> 0, Max[Append[dims, 0]]]}];
+    killed = AssociationThread[Keys[low] -> True];
+    Do[result[d] = {}, {d, 0, Min[maxDim /. Infinity -> topDim, topDim]}];
+    Scan[
+        With[{j = index[#], d = dimOf[#]},
+            Which[
+                reduced[j] === {} && ! KeyExistsQ[killed, j] && d <= maxDim,
+                    result[d] = Append[result[d], {birthTime[#], Infinity}],
+                reduced[j] =!= {},
+                    With[{pivot = ordered[[Last[reduced[j]]]]},
+                        If[birthTime[pivot] =!= birthTime[#] && dimOf[pivot] <= maxDim,
+                            result[dimOf[pivot]] = Append[result[dimOf[pivot]], {birthTime[pivot], birthTime[#]}]]
+                    ]
+            ]
+        ] &,
+        ordered
+    ];
     KeySort[result]
 ];
 

@@ -1755,4 +1755,31 @@ VerificationTest[
 ]
 
 
+(* ===== Persistent homology correctness (vs BettiVector oracle) ===== *)
+
+(* infinite bars of a one-step filtration = Betti numbers; must agree with
+   BettiVector, including the TOP dimension (H2 of a sphere) and with no
+   over-counting of destroyer simplices in dimensions >= 1 *)
+VerificationTest[
+    Module[{betti = Values[Count[#, {_, Infinity}] &
+        /@ PersistenceIntervals[<|0. -> #|>]] &},
+        {betti[GraphComplex[CycleGraph[6]]],
+         betti[ComplexClosure[{{1, 2, 3}}]],
+         betti[ComplexClosure[{{1, 3, 5}, {1, 3, 6}, {1, 4, 5}, {1, 4, 6}, {2, 3, 5}, {2, 3, 6}, {2, 4, 5}, {2, 4, 6}}]],
+         betti[ComplexClosure[{{1, 2, 3}, {4, 5, 6}}]]}
+    ],
+    {{1, 1}, {1, 0, 0}, {1, 0, 1}, {2, 0, 0}},
+    TestID -> "PersistenceIntervals-betti-matches-BettiVector"
+]
+
+(* a clean VR circle has exactly one persistent H1 generator (no spurious bars) *)
+VerificationTest[
+    With[{circ = Table[{Cos[t], Sin[t]}, {t, 0., 2 Pi - 0.01, 2 Pi/12}]},
+        Length[PersistenceIntervals[VietorisRipsFiltration[circ, Range[0.2, 2.2, 0.2]]][1]]
+    ],
+    1,
+    TestID -> "PersistenceIntervals-circle-one-H1"
+]
+
+
 EndTestSection[]
