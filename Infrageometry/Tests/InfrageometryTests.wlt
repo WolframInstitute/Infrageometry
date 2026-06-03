@@ -1857,5 +1857,22 @@ VerificationTest[
     TestID -> "BallCoverQ-single-ball-too-small"
 ]
 
+(* a cover of a vertex subset covers its targets and can be smaller than a full cover *)
+VerificationTest[
+    With[{g = PathGraph[Range[7]]},
+        {BallCoverQ[g, 1, FindBallCover[g, 1, {1, 7}], {1, 7}], DominationNumber[g, 1, {1, 7}] < DominationNumber[g, 1]}
+    ],
+    {True, True},
+    TestID -> "FindBallCover-subset-covers-targets"
+]
+
+(* nerve of chosen graph-metric centres: B(2),B(4),B(6) at r=1 on the path meet
+   consecutively (shared vertices 3, 5) but the ends miss, giving the path complex *)
+VerificationTest[
+    Sort @ BallIntersectionComplex[{2, 4, 6}, 1, Infinity, "Metric" -> PathGraph[Range[7]]],
+    {{1}, {2}, {3}, {1, 2}, {2, 3}},
+    TestID -> "BallIntersectionComplex-graph-chosen-centres"
+]
+
 
 EndTestSection[]
