@@ -255,19 +255,34 @@ wasserstein1[mu_List, nu_List, costs_List] := Module[{m = Length[mu], n = Length
    when "Dimension" -> Automatic (default; caps the per-vertex valid radius
    range at eccentricity(v) - 1 since V(r+1) must exist).
 
-   WolframRicciCurvature[g]                  -> Association[v -> mean_r R(v, r)] over r = 1..ecc(v)
-   WolframRicciCurvature[g, {rmin, rmax}]    -> averages over [rmin, rmax] cap valid range
-   WolframRicciCurvature[g, r_Integer]       -> Association[v -> R(v, r)], no averaging.
+   Vertex slot 2, radius slot 3 (default All); a single vertex gives a scalar,
+   a vertex list or All gives a list (VertexList order for All):
+   WolframRicciCurvature[g, v, {rmin, rmax}]  -> mean_r R(v, r) over [rmin, rmax], scalar
+   WolframRicciCurvature[g, v, r_Integer]     -> R(v, r), scalar
+   WolframRicciCurvature[g, v]                -> mean over r = 1..ecc(v), scalar
+   WolframRicciCurvature[g, {v1, ...}, range] -> list, one entry per vertex
+   WolframRicciCurvature[g, All, range]       -> list over VertexList[g]
+   WolframRicciCurvature[g]                    -> list over VertexList[g], all radii.
    Vertices whose valid range is empty -> Indeterminate. *)
 
 Options[WolframRicciCurvature] = {"Dimension" -> Automatic};
 
+WolframRicciCurvature[g_Graph, opts : OptionsPattern[]] :=
+	WolframRicciCurvature[g, All, All, opts]
+
 WolframRicciCurvature[g_Graph,
+	vertices : (_List | All),
 	range : (_Integer | {_Integer, _Integer} | All) : All,
 	OptionsPattern[]
 ] := With[{dim = OptionValue["Dimension"]},
-	AssociationMap[v |-> wolframRicciAtVertex[g, v, range, dim], VertexList[g]]
+	wolframRicciAtVertex[g, #, range, dim] & /@ If[vertices === All, VertexList[g], vertices]
 ]
+
+WolframRicciCurvature[g_Graph,
+	vertex : Except[_List | All | _Rule | _RuleDelayed],
+	range : (_Integer | {_Integer, _Integer} | All) : All,
+	OptionsPattern[]
+] := wolframRicciAtVertex[g, vertex, range, OptionValue["Dimension"]]
 
 
 (* Per-vertex helper: builds V(r) by accumulating distance counts, picks the
@@ -306,14 +321,27 @@ wolframRicciAtVertex[g_Graph, v_, range_, dim_] := Module[{vols, top, rs},
    WolframRicciCurvature[..., "Dimension" -> Automatic], exposed on its own
    with the matching calling convention.
 
-   WolframHausdorffDimension[g]               -> Association[v -> mean_r d(v, r)] over r = 1..ecc(v) - 1
-   WolframHausdorffDimension[g, {rmin, rmax}] -> averages over [rmin, rmax] cap valid range
-   WolframHausdorffDimension[g, r_Integer]    -> Association[v -> d(v, r)], no averaging.
+   Vertex slot 2, radius slot 3 (default All); a single vertex gives a scalar,
+   a vertex list or All gives a list (VertexList order for All):
+   WolframHausdorffDimension[g, v, {rmin, rmax}]  -> mean over [rmin, rmax], scalar
+   WolframHausdorffDimension[g, v, r_Integer]     -> d(v, r), scalar
+   WolframHausdorffDimension[g, v]                -> mean over r = 1..ecc(v) - 1, scalar
+   WolframHausdorffDimension[g, {v1, ...}, range] -> list, one entry per vertex
+   WolframHausdorffDimension[g, All, range]       -> list over VertexList[g]
+   WolframHausdorffDimension[g]                    -> list over VertexList[g], all radii.
    Vertices whose valid range is empty -> Indeterminate. *)
 
+WolframHausdorffDimension[g_Graph] := WolframHausdorffDimension[g, All, All]
+
 WolframHausdorffDimension[g_Graph,
+	vertices : (_List | All),
 	range : (_Integer | {_Integer, _Integer} | All) : All
-] := AssociationMap[v |-> wolframHausdorffDimensionAtVertex[g, v, range], VertexList[g]]
+] := wolframHausdorffDimensionAtVertex[g, #, range] & /@ If[vertices === All, VertexList[g], vertices]
+
+WolframHausdorffDimension[g_Graph,
+	vertex : Except[_List | All],
+	range : (_Integer | {_Integer, _Integer} | All) : All
+] := wolframHausdorffDimensionAtVertex[g, vertex, range]
 
 
 wolframHausdorffDimensionAtVertex[g_Graph, v_, range_] := Module[{vols, top, rs},

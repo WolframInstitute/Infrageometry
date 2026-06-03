@@ -1180,40 +1180,50 @@ VerificationTest[
 
 (* ===== WolframRicciCurvature ===== *)
 
+(* vertex slot 2, radius slot 3; a single vertex gives a scalar *)
 VerificationTest[
-    WolframRicciCurvature[CycleGraph[12], {1, 3}, "Dimension" -> 1][1],
+    WolframRicciCurvature[CycleGraph[12], 1, {1, 3}, "Dimension" -> 1],
     Mean[{-9., -1.125, -1./3}],
     SameTest -> (Abs[#1 - #2] < 10^-8 &),
     TestID -> "WolframRicciCurvature-C12-d1-window-mean"
 ]
 
 VerificationTest[
-    WolframRicciCurvature[CycleGraph[12], 2, "Dimension" -> 1][1],
+    WolframRicciCurvature[CycleGraph[12], 1, 2, "Dimension" -> 1],
     -1.125,
     SameTest -> (Abs[#1 - #2] < 10^-8 &),
     TestID -> "WolframRicciCurvature-C12-d1-single-radius"
 ]
 
+(* All / no vertex arg gives a list over VertexList[g] *)
 VerificationTest[
-    AssociationQ @ WolframRicciCurvature[GridGraph[{5, 5}]],
+    ListQ @ WolframRicciCurvature[GridGraph[{5, 5}]],
     True,
-    TestID -> "WolframRicciCurvature-Grid5x5-default-association"
+    TestID -> "WolframRicciCurvature-Grid5x5-default-list"
 ]
 
 VerificationTest[
     Length @ WolframRicciCurvature[GridGraph[{5, 5}]],
     25,
-    TestID -> "WolframRicciCurvature-Grid5x5-keys-all-vertices"
+    TestID -> "WolframRicciCurvature-Grid5x5-all-vertices"
+]
+
+(* the All-form is the single-vertex scalar form mapped over VertexList[g] *)
+VerificationTest[
+    WolframRicciCurvature[PathGraph[Range[7]]],
+    WolframRicciCurvature[PathGraph[Range[7]], #] & /@ Range[7],
+    TestID -> "WolframRicciCurvature-P7-all-equals-per-vertex"
+]
+
+(* a vertex list gives a list of matching length *)
+VerificationTest[
+    Length @ WolframRicciCurvature[GridGraph[{5, 5}], {1, 2, 3}],
+    3,
+    TestID -> "WolframRicciCurvature-Grid5x5-vertex-list"
 ]
 
 VerificationTest[
-    KeyExistsQ[WolframRicciCurvature[PathGraph[Range[7]]], 1],
-    True,
-    TestID -> "WolframRicciCurvature-P7-keys-by-vertex"
-]
-
-VerificationTest[
-    WolframRicciCurvature[HypercubeGraph[3], {5, 7}, "Dimension" -> 3][1],
+    WolframRicciCurvature[HypercubeGraph[3], 1, {5, 7}, "Dimension" -> 3],
     Indeterminate,
     TestID -> "WolframRicciCurvature-Q3-empty-window-indeterminate"
 ]
@@ -1222,34 +1232,40 @@ VerificationTest[
 (* ===== WolframHausdorffDimension ===== *)
 
 VerificationTest[
-    AssociationQ @ WolframHausdorffDimension[GridGraph[{5, 5}]],
+    ListQ @ WolframHausdorffDimension[GridGraph[{5, 5}]],
     True,
-    TestID -> "WolframHausdorffDimension-Grid5x5-association"
+    TestID -> "WolframHausdorffDimension-Grid5x5-list"
 ]
 
 VerificationTest[
     Length @ WolframHausdorffDimension[GridGraph[{5, 5}]],
     25,
-    TestID -> "WolframHausdorffDimension-Grid5x5-keys-all-vertices"
+    TestID -> "WolframHausdorffDimension-Grid5x5-all-vertices"
+]
+
+VerificationTest[
+    WolframHausdorffDimension[PathGraph[Range[7]]],
+    WolframHausdorffDimension[PathGraph[Range[7]], #] & /@ Range[7],
+    TestID -> "WolframHausdorffDimension-P7-all-equals-per-vertex"
 ]
 
 (* d(v, r) = (Log V(r+1) - Log V(r)) / (Log(r+1) - Log r); on a cycle V(r) = 2r+1 *)
 VerificationTest[
-    WolframHausdorffDimension[CycleGraph[40], 10][1],
+    WolframHausdorffDimension[CycleGraph[40], 1, 10],
     N[(Log[23] - Log[21]) / (Log[11] - Log[10])],
     TestID -> "WolframHausdorffDimension-C40-single-radius-formula"
 ]
 
 (* a long cycle is 1-dimensional: volume-growth dimension -> 1 as r grows *)
 VerificationTest[
-    Abs[WolframHausdorffDimension[CycleGraph[60], 15][1] - 1] < 0.1,
+    Abs[WolframHausdorffDimension[CycleGraph[60], 1, 15] - 1] < 0.1,
     True,
     TestID -> "WolframHausdorffDimension-C60-approaches-one"
 ]
 
 (* window past ecc(v) - 1 has no valid radii *)
 VerificationTest[
-    WolframHausdorffDimension[HypercubeGraph[3], {5, 7}][1],
+    WolframHausdorffDimension[HypercubeGraph[3], 1, {5, 7}],
     Indeterminate,
     TestID -> "WolframHausdorffDimension-Q3-empty-window-indeterminate"
 ]
