@@ -137,6 +137,11 @@ CechComplex[data_List, r_ ? NumericQ, opts : OptionsPattern[BallIntersectionComp
    centres (Euclidean) or, over a finite metric, the smallest r for which some
    sample point lies within r of every centre (intrinsic intersection oracle). *)
 commonRadiusFn[data_, EuclideanDistance] := s |-> MiniballRadius[data[[s]]]
+(* graph metric: data are centre vertices (any subset of V); a common point may be
+   ANY vertex, so candidates range over all of V while columns track the centres. *)
+commonRadiusFn[data_, g_ ? GraphQ] :=
+    With[{rows = GraphDistanceMatrix[g][[ Flatten[FirstPosition[VertexList[g], #] & /@ data] ]]},
+        s |-> Min[Max /@ Transpose[rows[[s]]]]]
 commonRadiusFn[data_, metric_] := With[{mat = metricMatrix[data, metric]}, s |-> Min[Max /@ mat[[All, s]]]]
 
 metricMatrix[data_, m_ ? MatrixQ] := m

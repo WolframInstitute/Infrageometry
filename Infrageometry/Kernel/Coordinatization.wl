@@ -94,20 +94,24 @@ resistanceEmbeddingMatrix[g_Graph, rescaling_, dimSpec_] :=
 
 (* ===================== Ball covers & domination ===================== *)
 
-(* a minimum r-ball cover: a smallest centre set whose radius-r balls cover every
-   vertex (= a minimum r-dominating set), as a set-cover integer program. *)
-FindBallCover[g_Graph, r_ : 1] :=
-    With[{vs = VertexList[g], cover = Map[Boole[# <= r] &, GraphDistanceMatrix[g], {2}]},
-        With[{x = Array[\[FormalX], Length[vs]]},
-            vs[[ Flatten @ Position[x /. Last @ Minimize[{Total[x], And @@ Thread[cover . x >= 1], And @@ Thread[0 <= x <= 1]}, x, Integers], 1] ]]
-        ]
+(* a minimum r-ball cover: a smallest centre set (chosen from all of V) whose radius-r
+   balls cover the targets (every vertex by default, or a given subset) as a set-cover
+   integer program. targets restricts the covered rows; centres range over all of V. *)
+FindBallCover[g_Graph, r_ : 1, targets : (_List | All) : All] :=
+    With[
+        {vs = VertexList[g]},
+        {rows = If[targets === All, Range[Length[vs]], Flatten[FirstPosition[vs, #] & /@ targets]]},
+        {cover = Map[Boole[# <= r] &, GraphDistanceMatrix[g][[rows]], {2}], x = Array[\[FormalX], Length[vs]]},
+        vs[[ Flatten @ Position[x /. Last @ Minimize[{Total[x], And @@ Thread[cover . x >= 1], And @@ Thread[0 <= x <= 1]}, x, Integers], 1] ]]
     ]
 
-(* do the radius-r balls around the centres s cover every vertex of g? *)
-BallCoverQ[g_Graph, r_, s_List] :=
-    With[{dm = GraphDistanceMatrix[g], pos = Flatten[FirstPosition[VertexList[g], #] & /@ s]},
-        AllTrue[dm, row |-> AnyTrue[pos, j |-> row[[j]] <= r]]
+(* do the radius-r balls around the centres s cover the targets (all of V by default)? *)
+BallCoverQ[g_Graph, r_, s_List, targets : (_List | All) : All] :=
+    With[
+        {vs = VertexList[g], dm = GraphDistanceMatrix[g]},
+        {pos = Flatten[FirstPosition[vs, #] & /@ s], rows = If[targets === All, dm, dm[[Flatten[FirstPosition[vs, #] & /@ targets]]]]},
+        AllTrue[rows, row |-> AnyTrue[pos, j |-> row[[j]] <= r]]
     ]
 
-(* r-domination number: size of a minimum r-ball cover *)
-DominationNumber[g_Graph, r_ : 1] := Length @ FindBallCover[g, r]
+(* r-domination number: size of a minimum r-ball cover (of the targets) *)
+DominationNumber[g_Graph, r_ : 1, targets : (_List | All) : All] := Length @ FindBallCover[g, r, targets]
