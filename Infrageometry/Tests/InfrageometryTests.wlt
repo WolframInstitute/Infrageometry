@@ -1595,6 +1595,50 @@ VerificationTest[
 ]
 
 
+(* ===== BallHull ===== *)
+
+(* Defining property: w is in BallHull[g, S] iff d(c, w) <= max_{s in S} d(c, s)
+   for every center c -- the intersection of every smallest enclosing ball. *)
+VerificationTest[
+    With[{g = GridGraph[{6, 4}], s = {1, 6, 22}},
+        BallHull[g, s] === Fold[Intersection, VertexList[g],
+            Table[With[{r = Max[GraphDistance[g, c, #] & /@ s]},
+                Select[VertexList[g], GraphDistance[g, c, #] <= r &]], {c, VertexList[g]}]]
+    ],
+    True,
+    TestID -> "BallHull-equals-ball-intersection"
+]
+
+(* Closure operator: extensive (contains S) and idempotent. *)
+VerificationTest[
+    With[{g = GridGraph[{6, 4}], s = {1, 6, 22}},
+        {SubsetQ[BallHull[g, s], s], BallHull[g, BallHull[g, s]] === BallHull[g, s]}
+    ],
+    {True, True},
+    TestID -> "BallHull-extensive-idempotent"
+]
+
+(* A singleton and a closed ball are ball-convex (equal to their own hull). *)
+VerificationTest[
+    With[{g = GridGraph[{5, 5}]},
+        {BallHull[g, {13}] === {13},
+         With[{ball = Sort @ Select[VertexList[g], GraphDistance[g, 13, #] <= 2 &]},
+            Sort @ BallHull[g, ball] === ball]}
+    ],
+    {True, True},
+    TestID -> "BallHull-singleton-and-ball-fixed"
+]
+
+(* Subgraph form agrees with the vertex-list form. *)
+VerificationTest[
+    With[{g = GridGraph[{6, 4}], s = {1, 6, 22}},
+        BallHull[g, Subgraph[g, s]] === BallHull[g, s]
+    ],
+    True,
+    TestID -> "BallHull-subgraph-form"
+]
+
+
 (* ===== Alexandrov topology: BallTopology / Topological* / ContinuousMapQ ===== *)
 
 (* Carrier set is recoverable from the preorder digraph alone, incl. isolated vertices *)

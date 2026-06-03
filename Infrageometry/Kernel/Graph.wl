@@ -6,6 +6,7 @@ PackageExport[GraphEdgeWeights]
 PackageExport[GraphVertexWeights]
 PackageExport[GraphBoundary]
 PackageExport[GraphInterior]
+PackageExport[BallHull]
 
 PackageExport[FormanRicciCurvature]
 PackageExport[OllivierRicciCurvature]
@@ -71,6 +72,23 @@ GraphInterior[g_Graph, subgraph_Graph] :=
 
 GraphInterior[g_Graph, subset_List] :=
 	Complement[subset, GraphBoundary[g, subset]]
+
+(* ===================== Ball hull ===================== *)
+
+(* BallHull[g, S]: intersection of all closed metric balls containing S, the
+   smallest ball-convex (Mazur) superset of S.  For each center c the smallest
+   enclosing radius is r_c = max_{s in S} d(c, s); v lies in the hull iff
+   d(c, v) <= r_c for every c.  Read straight off the distance matrix. *)
+
+BallHull[g_Graph, subgraph_Graph] :=
+	BallHull[g, VertexList[subgraph]]
+
+BallHull[g_Graph, S_List] :=
+	With[{dist = GraphDistanceMatrix[g], idx = VertexIndex[g, #] & /@ S},
+		With[{radii = Max /@ dist[[All, idx]]},
+			Pick[VertexList[g], AllTrue[NonNegative] /@ Transpose[radii - dist], True]
+		]
+	]
 
 (* ===================== Forman-Ricci curvature ===================== *)
 
