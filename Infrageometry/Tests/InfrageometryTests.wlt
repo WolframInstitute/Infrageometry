@@ -1935,4 +1935,139 @@ VerificationTest[
 ]
 
 
+(* ===================== Tessellations, regular & uniform maps ===================== *)
+
+(* --- ExampleGraphs: flat-torus tessellations + hole punching --- *)
+
+VerificationTest[
+  { Union @ VertexDegree @ TorusTessellation[ { 5, 5 }, "Triangular" ],
+    Union @ VertexDegree @ TorusTessellation[ { 5, 5 }, "Square" ],
+    Union @ VertexDegree @ TorusTessellation[ { 5, 5 }, "Hexagonal" ] },
+  { { 6 }, { 4 }, { 3 } },
+  TestID -> "Torus-degrees-by-shape"
+]
+
+VerificationTest[
+  VertexTransitiveGraphQ @ TorusTessellation[ { 5, 5 } ],
+  True,
+  TestID -> "Torus-default-triangular-vertex-transitive"
+]
+
+VerificationTest[
+  With[ { g = GridGraph[ { 5, 5 } ] }, VertexCount @ PunchHole[ g, 1 -> 1 ] < VertexCount @ g ],
+  True,
+  TestID -> "PunchHole-removes-a-ball"
+]
+
+(* --- RegularMaps: spherical Platonic graphs --- *)
+
+VerificationTest[ IsomorphicGraphQ[ SchlafliTessellation[ { 3, 3 } ], GraphData[ "TetrahedralGraph" ] ], True, TestID -> "Schlafli-33-is-tetrahedron" ]
+VerificationTest[ IsomorphicGraphQ[ SchlafliTessellation[ { 4, 3 } ], GraphData[ "CubicalGraph" ] ], True, TestID -> "Schlafli-43-is-cube" ]
+VerificationTest[ IsomorphicGraphQ[ SchlafliTessellation[ { 3, 4 } ], GraphData[ "OctahedralGraph" ] ], True, TestID -> "Schlafli-34-is-octahedron" ]
+VerificationTest[ IsomorphicGraphQ[ SchlafliTessellation[ { 5, 3 } ], GraphData[ "DodecahedralGraph" ] ], True, TestID -> "Schlafli-53-is-dodecahedron" ]
+VerificationTest[ IsomorphicGraphQ[ SchlafliTessellation[ { 3, 5 } ], GraphData[ "IcosahedralGraph" ] ], True, TestID -> "Schlafli-35-is-icosahedron" ]
+
+VerificationTest[ Union @ VertexDegree @ SchlafliTessellation[ { 3, 5 } ], { 5 }, TestID -> "Schlafli-is-q-regular" ]
+
+VerificationTest[
+  { Length @ FindCycle[ SchlafliTessellation[ { 4, 3 } ], { 4 }, All ], Length @ FindCycle[ SchlafliTessellation[ { 5, 3 } ], { 5 }, All ] },
+  { 6, 12 },
+  TestID -> "Schlafli-p-cycle-count-equals-faces"
+]
+
+VerificationTest[
+  With[ { g = SchlafliTessellation[ { 3, 5 } ] },
+    Length @ DeleteDuplicates[ CanonicalGraph[ NeighborhoodGraph[ g, #, 1 ] ] & /@ VertexList[ g ], IsomorphicGraphQ ] ],
+  1,
+  TestID -> "Schlafli-locally-isomorphic"
+]
+
+VerificationTest[ IsomorphicGraphQ[ SchlafliTessellation[ { 4, 4 }, 5 ], TorusTessellation[ { 5, 5 }, "Square" ] ], True, TestID -> "Schlafli-44-is-torus" ]
+VerificationTest[ IsomorphicGraphQ[ SchlafliTessellation[ { 6, 3 }, 4 ], TorusTessellation[ { 4, 4 }, "Hexagonal" ] ], True, TestID -> "Schlafli-63-is-hexagonal-torus" ]
+
+VerificationTest[
+  With[ { g = SchlafliTessellation[ { 3, 7 } ] }, { VertexCount @ g, EdgeCount @ g, Union @ VertexDegree @ g, VertexTransitiveGraphQ @ g } ],
+  { 24, 84, { 7 }, True },
+  TestID -> "Schlafli-37-Klein-quartic-skeleton"
+]
+
+VerificationTest[
+  With[ { g = SchlafliTessellation[ { 3, 7 } ] }, With[ { v = VertexCount @ g, e = EdgeCount @ g, f = Length @ FindCycle[ g, { 3 }, All ] }, 1 - ( v - e + f )/2 ] ],
+  3,
+  TestID -> "Schlafli-37-genus-3"
+]
+
+VerificationTest[
+  { RegularMapGenus[ { 3, 5 }, SchlafliTessellation[ { 3, 5 } ] ], RegularMapGenus[ { 4, 4 }, SchlafliTessellation[ { 4, 4 }, 5 ] ], RegularMapGenus[ { 3, 7 }, SchlafliTessellation[ { 3, 7 } ] ] },
+  { 0, 1, 3 },
+  TestID -> "RegularMapGenus-sphere-torus-Klein"
+]
+
+VerificationTest[
+  { RegularMapGenus[ SchlafliTessellation[ { 3, 5 } ] ], RegularMapGenus[ SchlafliTessellation[ { 4, 4 }, 5 ] ], RegularMapGenus[ SchlafliTessellation[ { 3, 7 } ] ] },
+  { 0, 1, 3 },
+  TestID -> "RegularMapGenus-from-graph-alone"
+]
+
+VerificationTest[ Head @ RegularMapsAt[ { 3, 7 }, 20 ], RegularMapsAt, TestID -> "RegularMapsAt-nonprime-level-inert" ]
+VerificationTest[ Length @ RegularMapsAt[ { 3, 7 }, 7 ], 1, TestID -> "RegularMapsAt-Klein-unique-at-7" ]
+VerificationTest[ SchlafliTessellation[ { 3, 7 }, 99 ], $Failed, TestID -> "Schlafli-hyperbolic-unreachable-is-Failed" ]
+VerificationTest[ IsomorphicGraphQ[ RegularMap[ { 4, 3 }, SymmetricGroup[ 4 ] ], GraphData[ "CubicalGraph" ] ], True, TestID -> "RegularMap-explicit-group-cube" ]
+
+(* --- UniformMaps: Archimedean tessellations (public API) --- *)
+
+VerificationTest[ IsomorphicGraphQ[ ArchimedeanTessellation[ { 3, 4, 3, 4 } ], PolyhedronData[ "Cuboctahedron", "SkeletonGraph" ] ], True, TestID -> "Archimedean-3434-is-cuboctahedron" ]
+VerificationTest[ IsomorphicGraphQ[ ArchimedeanTessellation[ { 4, 6, 8 } ], PolyhedronData[ "GreatRhombicuboctahedron", "SkeletonGraph" ] ], True, TestID -> "Archimedean-468-is-great-rhombicuboctahedron" ]
+VerificationTest[ IsomorphicGraphQ[ ArchimedeanTessellation[ { 3, 3, 3, 3, 4 } ], PolyhedronData[ "SnubCube", "SkeletonGraph" ] ], True, TestID -> "Archimedean-snub-cube" ]
+
+VerificationTest[
+  { VertexCount @ #, Union @ VertexDegree @ #, VertexTransitiveGraphQ @ # } &@ ArchimedeanTessellation[ { 4, 4, 5 } ],
+  { 10, { 3 }, True },
+  TestID -> "Archimedean-pentagonal-prism"
+]
+
+VerificationTest[ IsomorphicGraphQ[ ArchimedeanTessellation[ { 3, 3, 3, 5 } ], PolyhedronData[ { "Antiprism", 5 }, "SkeletonGraph" ] ], True, TestID -> "Archimedean-pentagonal-antiprism" ]
+VerificationTest[ IsomorphicGraphQ[ ArchimedeanTessellation[ { 4, 4, 4 } ], GraphData[ "CubicalGraph" ] ], True, TestID -> "Archimedean-444-forwards-to-cube" ]
+
+VerificationTest[
+  With[ { g = ArchimedeanTessellation[ { 3, 6, 3, 6 }, 4 ] }, { Union @ VertexDegree @ g, VertexTransitiveGraphQ @ g, MapGenus[ { 3, 6, 3, 6 }, g ] } ],
+  { { 4 }, True, 1 },
+  TestID -> "Archimedean-trihexagonal-torus"
+]
+
+VerificationTest[
+  With[ { g = ArchimedeanTessellation[ { 4, 8, 8 }, 4 ] }, { Union @ VertexDegree @ g, VertexTransitiveGraphQ @ g, MapGenus[ { 4, 8, 8 }, g ] } ],
+  { { 3 }, True, 1 },
+  TestID -> "Archimedean-truncated-square-torus"
+]
+
+VerificationTest[
+  With[ { g = ArchimedeanTessellation[ { 3, 12, 12 }, 4 ] }, { Union @ VertexDegree @ g, VertexTransitiveGraphQ @ g, MapGenus[ { 3, 12, 12 }, g ] } ],
+  { { 3 }, True, 1 },
+  TestID -> "Archimedean-truncated-hexagonal-torus"
+]
+
+VerificationTest[
+  With[ { g = ArchimedeanTessellation[ { 3, 4, 6, 4 }, 4 ] }, { Union @ VertexDegree @ g, VertexTransitiveGraphQ @ g, MapGenus[ { 3, 4, 6, 4 }, g ] } ],
+  { { 4 }, True, 1 },
+  TestID -> "Archimedean-rhombitrihexagonal-torus"
+]
+
+VerificationTest[
+  With[ { g = ArchimedeanTessellation[ { 4, 6, 12 }, 4 ] }, { Union @ VertexDegree @ g, VertexTransitiveGraphQ @ g, MapGenus[ { 4, 6, 12 }, g ] } ],
+  { { 3 }, True, 1 },
+  TestID -> "Archimedean-truncated-trihexagonal-torus"
+]
+
+VerificationTest[
+  { MapGenus[ { 3, 4, 3, 4 }, PolyhedronData[ "Cuboctahedron", "SkeletonGraph" ] ], MapGenus[ { 3, 6, 3, 6 }, ArchimedeanTessellation[ { 3, 6, 3, 6 }, 5 ] ] },
+  { 0, 1 },
+  TestID -> "MapGenus-sphere-and-torus"
+]
+
+VerificationTest[ { UniformMapQ @ PolyhedronData[ "Cuboctahedron", "SkeletonGraph" ], UniformMapQ @ PathGraph[ Range[ 4 ] ] }, { True, False }, TestID -> "UniformMapQ-cuboctahedron-yes-path-no" ]
+
+VerificationTest[ ArchimedeanTessellation[ { 3, 3, 3, 3, 6 }, 4 ], $Failed, { ArchimedeanTessellation::deferred }, TestID -> "Archimedean-euclidean-snub-deferred" ]
+
+
 EndTestSection[]
