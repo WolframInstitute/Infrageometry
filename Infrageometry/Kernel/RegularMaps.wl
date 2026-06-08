@@ -1,9 +1,8 @@
 Package["WolframInstitute`Infrageometry`"]
 
-PackageExport[RegularMap]
-PackageExport[SchlafliTessellation]
-PackageExport[RegularMapsAt]
-PackageExport[RegularMapGenus]
+PackageScope[RegularMap]
+PackageScope[SchlafliTessellation]
+PackageScope[RegularMapsAt]
 
 PackageScope[findGenerators]
 PackageScope[sphericalGroup]
@@ -60,17 +59,6 @@ SchlafliTessellation[{p_, q_}, n_: 1] :=
       c < 4,  RegularMap[{p, q}, sphericalGroup[{p, q}]],
       c == 4, TorusTessellation[{n, n}, shapeName[{p, q}]],
       True,   hyperbolicMap[{p, q}, n]]];
-
-(* orientable genus of a type-{p, q} regular map from its edge count: 1 - E (1/p + 1/q - 1/2)
-   (= 0 spherical, 1 Euclidean/torus, >= 2 hyperbolic) *)
-RegularMapGenus[{p_, q_}, g_Graph] := 1 - EdgeCount[g] (1/p + 1/q - 1/2);
-
-(* same genus read off the graph alone: a regular map is q-regular with girth p *)
-RegularMapGenus[g_Graph] :=
-  With[
-    {q = First @ Union @ VertexDegree[g],
-     p = SelectFirst[Range[3, EdgeCount[g]], FindCycle[g, {#}, 1] =!= {} &]},
-    RegularMapGenus[{p, q}, g]];
 
 
 (* ===================== Sourcing the group (r, s) ===================== *)

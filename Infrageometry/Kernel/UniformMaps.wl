@@ -1,9 +1,8 @@
 Package["WolframInstitute`Infrageometry`"]
 
-PackageExport[ArchimedeanTessellation]
-PackageExport[MapGenus]
-PackageExport[UniformMapQ]
+PackageExport[TessellationGraph]
 
+PackageScope[ArchimedeanTessellation]
 PackageScope[mapFaces]
 PackageScope[rectifyMapData]
 PackageScope[truncateMapData]
@@ -40,6 +39,23 @@ expandMap[g_] := First @ rectifyMapData @ rectifyMapData @ mapData @ g;
 bevelMap[g_] := First @ truncateMapData @ rectifyMapData @ mapData @ g;
 
 
+(* ===================== The unified tessellation generator ===================== *)
+
+(* TessellationGraph is the single public entry point for every map family below.
+   {p, q} (a 2-integer Schlafli symbol) gives a regular map; a longer vertex
+   configuration gives a uniform / Archimedean map. The second argument selects the
+   realisation: an integer sizes it (n x n flat torus / n-th hyperbolic quotient),
+   an integer pair {m, n} gives a rectangular flat torus, and a finite group or an
+   explicit (r, s) generation carries the coset graph directly. *)
+TessellationGraph[{p_Integer, q_Integer}, n_Integer : 1] := SchlafliTessellation[{p, q}, n];
+TessellationGraph[{p_Integer, q_Integer}, {m_Integer, n_Integer}] := TorusTessellation[{m, n}, shapeName[{p, q}]];
+TessellationGraph[{p_Integer, q_Integer}, grp_ /; ! MatchQ[grp, _Integer | {_Integer, _Integer}]] := RegularMap[{p, q}, grp];
+TessellationGraph[config_List /; Length[config] >= 3, n_Integer : 1] := ArchimedeanTessellation[config, n];
+
+TessellationGraph::deferred =
+  "The uniform map `1` is not built by this constructor (hyperbolic, snub, or elongated families are not yet supported).";
+
+
 (* ===================== Archimedean tessellations ===================== *)
 
 (* the uniform map of vertex configuration config, sized n; curvature dispatch on the
@@ -51,10 +67,7 @@ ArchimedeanTessellation[config_List, n_ : 1] :=
     Equal @@ config, SchlafliTessellation[{First @ config, Length @ config}, n],
     uniformDefect[config] > 0, sphericalUniform[config],
     uniformDefect[config] == 0, euclideanUniform[canonicalConfiguration @ config, n],
-    True, Message[ArchimedeanTessellation::deferred, config]; $Failed];
-
-ArchimedeanTessellation::deferred =
-  "The uniform map `1` is not built by this constructor (hyperbolic, snub, or elongated families are not yet supported).";
+    True, Message[TessellationGraph::deferred, config]; $Failed];
 
 uniformDefect[c_] := Total[1/c] - (Length[c] - 2)/2;
 
@@ -64,7 +77,7 @@ sphericalUniform[config_] :=
       KeyExistsQ[archimedeanSolidName, key], PolyhedronData[archimedeanSolidName[key], "SkeletonGraph"],
       Count[config, 4] == 2 && Length[config] == 3, prismGraph[First @ DeleteCases[config, 4]],
       Count[config, 3] == 3 && Length[config] == 4, antiprismGraph[First @ DeleteCases[config, 3]],
-      True, Message[ArchimedeanTessellation::deferred, config]; $Failed]];
+      True, Message[TessellationGraph::deferred,config]; $Failed]];
 
 (* the seed torus is taken at size >= 5 so wraparound loops exceed the girth and the
    girth-cycle face recovery returns the true faces, not non-contractible cycles *)
@@ -76,7 +89,7 @@ euclideanUniform[key_, n_] :=
       {4, 6, 12}, bevelMap @ TorusTessellation[{m, m}, "Triangular"],
       {4, 8, 8}, truncateMap @ TorusTessellation[{m, m}, "Square"],
       {3, 12, 12}, truncateMap @ TorusTessellation[{m, m}, "Hexagonal"],
-      _, Message[ArchimedeanTessellation::deferred, key]; $Failed]];
+      _, Message[TessellationGraph::deferred,key]; $Failed]];
 
 (* n-gonal prism: two n-cycles joined by rungs, vertex configuration (4.4.n) *)
 prismGraph[n_] := Graph @ Join[
@@ -90,18 +103,6 @@ antiprismGraph[n_] := Graph @ Join[
    Table[UndirectedEdge[{2, i}, {2, Mod[i, n] + 1}], {i, n}],
    Table[UndirectedEdge[{1, i}, {2, i}], {i, n}],
    Table[UndirectedEdge[{1, i}, {2, Mod[i, n] + 1}], {i, n}]];
-
-
-(* ===================== Genus and recognition ===================== *)
-
-(* orientable genus of a uniform map of vertex configuration config from its vertex count:
-   E = V k/2, F = V Sum 1/f_i, g = 1 - (V - E + F)/2 *)
-MapGenus[config_List, g_Graph] :=
-  1 - VertexCount[g] (1 - Length[config]/2 + Total[1/config])/2;
-
-(* vertex-transitive connected simple graph -- the necessary 1-skeleton condition for a
-   uniform map (regular-polygon faces is the embedding datum, supplied by construction) *)
-UniformMapQ[g_Graph] := SimpleGraphQ[g] && ConnectedGraphQ[g] && VertexTransitiveGraphQ[g];
 
 
 (* ===================== Map data: graph + face cycles ===================== *)

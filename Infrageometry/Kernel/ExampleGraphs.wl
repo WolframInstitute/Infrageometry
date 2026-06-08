@@ -1,7 +1,7 @@
 Package["WolframInstitute`Infrageometry`"]
 
 PackageExport[PunchHole]
-PackageExport[TorusTessellation]
+PackageScope[TorusTessellation]
 
 
 (* ===================== Hole punching ===================== *)
