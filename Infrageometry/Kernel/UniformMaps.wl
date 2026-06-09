@@ -53,7 +53,7 @@ TessellationGraph[{p_Integer, q_Integer}, grp_ /; ! MatchQ[grp, _Integer | {_Int
 TessellationGraph[config_List /; Length[config] >= 3, n_Integer : 1] := ArchimedeanTessellation[config, n];
 
 TessellationGraph::deferred =
-  "The uniform map `1` is not built by this constructor (hyperbolic, snub, or elongated families are not yet supported).";
+  "The uniform map `1` is not built by this constructor (snub, elongated, and other non-Conway families are not yet supported).";
 
 
 (* ===================== Archimedean tessellations ===================== *)
@@ -67,7 +67,7 @@ ArchimedeanTessellation[config_List, n_ : 1] :=
     Equal @@ config, SchlafliTessellation[{First @ config, Length @ config}, n],
     uniformDefect[config] > 0, sphericalUniform[config],
     uniformDefect[config] == 0, euclideanUniform[canonicalConfiguration @ config, n],
-    True, Message[TessellationGraph::deferred, config]; $Failed];
+    True, hyperbolicUniform[config, n]];
 
 uniformDefect[c_] := Total[1/c] - (Length[c] - 2)/2;
 
@@ -90,6 +90,26 @@ euclideanUniform[key_, n_] :=
       {4, 8, 8}, truncateMap @ TorusTessellation[{m, m}, "Square"],
       {3, 12, 12}, truncateMap @ TorusTessellation[{m, m}, "Hexagonal"],
       _, Message[TessellationGraph::deferred,key]; $Failed]];
+
+(* hyperbolic uniform maps: the same Conway operators, now applied to a hyperbolic
+   regular seed SchlafliTessellation[{p, q}, n] instead of a flat torus. The vertex
+   configuration is inverted to its generating (operator, seed {p, q}); snub / elongated
+   families are not Conway images of a regular map and stay deferred. *)
+hyperbolicUniform[config_, n_] :=
+  With[{seed = conwaySeed @ canonicalConfiguration @ config},
+    If[seed === $Failed,
+      Message[TessellationGraph::deferred, config]; $Failed,
+      First[seed] @ SchlafliTessellation[Last[seed], n]]];
+
+(* invert the Conway formulas: rectify {p,q}=(p.q.p.q), truncate {p,q}=(q.2p.2p),
+   expand {p,q}=(p.4.q.4), bevel {p,q}=(4.2p.2q) *)
+conwaySeed[c_] := Which[
+  Length[c] == 4 && c[[1]] == c[[3]] && c[[2]] == c[[4]], {rectifyMap, {c[[1]], c[[2]]}},
+  Length[c] == 4 && c[[2]] == 4 && c[[4]] == 4, {expandMap, {c[[1]], c[[3]]}},
+  Length[c] == 3 && MemberQ[c, 4], {bevelMap, DeleteCases[c, 4]/2},
+  Length[c] == 3 && Length[Union @ c] == 2,
+    {truncateMap, {First[Select[c, Count[c, #] == 2 &]]/2, First[Select[c, Count[c, #] == 1 &]]}},
+  True, $Failed];
 
 (* n-gonal prism: two n-cycles joined by rungs, vertex configuration (4.4.n) *)
 prismGraph[n_] := Graph @ Join[
