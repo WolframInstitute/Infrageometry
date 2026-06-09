@@ -330,7 +330,7 @@ cylinderVolume[dm_, pi_, qi_, s_] :=
    a vertex list or All gives a list (VertexList order for All):
    WolframRicciCurvature[g, v, {rmin, rmax}]  -> mean_r R(v, r) over [rmin, rmax], scalar
    WolframRicciCurvature[g, v, r_Integer]     -> R(v, r), scalar
-   WolframRicciCurvature[g, v]                -> mean over r = 1..ecc(v), scalar
+   WolframRicciCurvature[g, v]                -> mean over r = 1..ecc(v) - 1 (Automatic dim; ecc(v) with explicit "Dimension"), scalar
    WolframRicciCurvature[g, {v1, ...}, range] -> list, one entry per vertex
    WolframRicciCurvature[g, All, range]       -> list over VertexList[g]
    WolframRicciCurvature[g]                    -> list over VertexList[g], all radii.
@@ -345,12 +345,14 @@ WolframRicciCurvature[g_Graph,
 	vertices : (_List | All),
 	range : (_Integer | {_Integer, _Integer} | All) : All,
 	OptionsPattern[]
-] := With[{dim = OptionValue["Dimension"]},
+] /; vertices === All || ! MemberQ[VertexList[g], vertices] := With[{dim = OptionValue["Dimension"]},
 	wolframRicciAtVertex[g, #, range, dim] & /@ If[vertices === All, VertexList[g], vertices]
 ]
 
+(* Except[All | _Rule | _RuleDelayed] (not also _List) so a single list-valued
+   vertex lands here while option rules still defer to the OptionsPattern form *)
 WolframRicciCurvature[g_Graph,
-	vertex : Except[_List | All | _Rule | _RuleDelayed],
+	vertex : Except[All | _Rule | _RuleDelayed],
 	range : (_Integer | {_Integer, _Integer} | All) : All,
 	OptionsPattern[]
 ] := wolframRicciAtVertex[g, vertex, range, OptionValue["Dimension"]]
@@ -405,10 +407,13 @@ WolframHausdorffDimension[g_Graph] := WolframHausdorffDimension[g, All, All]
 WolframHausdorffDimension[g_Graph,
 	vertices : (_List | All),
 	range : (_Integer | {_Integer, _Integer} | All) : All
-] := wolframHausdorffDimensionAtVertex[g, #, range] & /@ If[vertices === All, VertexList[g], vertices]
+] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
+	wolframHausdorffDimensionAtVertex[g, #, range] & /@ If[vertices === All, VertexList[g], vertices]
 
+(* Except[All] (not Except[_List | All]) so a single list-valued vertex
+   (e.g. MeshConnectivityGraph cell labels {i, j}) lands here, not the list branch *)
 WolframHausdorffDimension[g_Graph,
-	vertex : Except[_List | All],
+	vertex : Except[All],
 	range : (_Integer | {_Integer, _Integer} | All) : All
 ] := wolframHausdorffDimensionAtVertex[g, vertex, range]
 
