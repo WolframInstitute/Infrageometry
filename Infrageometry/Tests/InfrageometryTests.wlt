@@ -1180,12 +1180,19 @@ VerificationTest[
 
 (* ===== WolframRicciCurvature ===== *)
 
-(* vertex slot 2, radius slot 3; a single vertex gives a scalar *)
+(* radius slot is a selector: integer -> scalar, span -> list of R(v, r) over the window *)
 VerificationTest[
     WolframRicciCurvature[CycleGraph[12], 1, {1, 3}, "Dimension" -> 1],
-    Mean[{-9., -1.125, -1./3}],
-    SameTest -> (Abs[#1 - #2] < 10^-8 &),
-    TestID -> "WolframRicciCurvature-C12-d1-window-mean"
+    {-9., -1.125, -1./3},
+    SameTest -> (Max[Abs[#1 - #2]] < 10^-8 &),
+    TestID -> "WolframRicciCurvature-C12-d1-window-list"
+]
+
+(* the integer radius is the matching element of the span / All profile *)
+VerificationTest[
+    WolframRicciCurvature[CycleGraph[12], 1, 2, "Dimension" -> 1] === Last @ WolframRicciCurvature[CycleGraph[12], 1, {1, 2}, "Dimension" -> 1],
+    True,
+    TestID -> "WolframRicciCurvature-C12-selector-consistency"
 ]
 
 VerificationTest[
@@ -1222,10 +1229,11 @@ VerificationTest[
     TestID -> "WolframRicciCurvature-Grid5x5-vertex-list"
 ]
 
+(* a span past ecc(v) - 1 selects no radii -> empty list *)
 VerificationTest[
     WolframRicciCurvature[HypercubeGraph[3], 1, {5, 7}, "Dimension" -> 3],
-    Indeterminate,
-    TestID -> "WolframRicciCurvature-Q3-empty-window-indeterminate"
+    {},
+    TestID -> "WolframRicciCurvature-Q3-empty-window-empty"
 ]
 
 
@@ -1263,11 +1271,18 @@ VerificationTest[
     TestID -> "WolframHausdorffDimension-C60-approaches-one"
 ]
 
-(* window past ecc(v) - 1 has no valid radii *)
+(* radius slot is a selector: the integer radius is the matching element of the All profile *)
+VerificationTest[
+    WolframHausdorffDimension[CycleGraph[40], 1, 10] === WolframHausdorffDimension[CycleGraph[40], 1, All][[10]],
+    True,
+    TestID -> "WolframHausdorffDimension-C40-selector-consistency"
+]
+
+(* a span past ecc(v) - 1 selects no radii -> empty list *)
 VerificationTest[
     WolframHausdorffDimension[HypercubeGraph[3], 1, {5, 7}],
-    Indeterminate,
-    TestID -> "WolframHausdorffDimension-Q3-empty-window-indeterminate"
+    {},
+    TestID -> "WolframHausdorffDimension-Q3-empty-window-empty"
 ]
 
 

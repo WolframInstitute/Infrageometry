@@ -8,8 +8,10 @@ PackageExport[GraphBoundary]
 PackageExport[GraphInterior]
 PackageExport[BallHull]
 PackageExport[BallVolumeProfile]
+PackageExport[CoordinationSequence]
 PackageExport[CylinderVolumes]
 PackageScope[ballVolumeProfileAt]
+PackageScope[coordinationSequenceAt]
 PackageScope[cylinderVolume]
 
 PackageExport[FormanRicciCurvature]
@@ -269,24 +271,65 @@ wasserstein1[mu_List, nu_List, costs_List] := Module[{m = Length[mu], n = Length
 
 (* ===================== Ball-volume growth profile ===================== *)
 
-(* V(r) = |B_r(v)| as an Association r -> V(r) over r = 0 .. eccentricity(v):
-   the cumulative number of vertices within each radius.  The growth profile
-   feeding WolframHausdorffDimension and WolframRicciCurvature.  A vertex list
-   or All (= BallVolumeProfile[g]) returns one Association per vertex. *)
+(* V(r) = |B_r(v)| as the List {V(0), V(1), ..., V(ecc(v))} (position i is radius
+   i - 1): the cumulative vertex count within each radius.  Distances from v in a
+   connected component are the contiguous run 0..ecc, so the radius labels are
+   positional and a List, not an Association, is the honest type.  The growth
+   profile feeding WolframHausdorffDimension and WolframRicciCurvature.  Same
+   calling convention as WolframHausdorffDimension: vertex slot 2 (single vertex,
+   list, or All), radius slot 3 (default All -> full profile; r_Integer -> the
+   scalar V(r), saturating at the reachable-vertex count past eccentricity;
+   {rmin, rmax} -> the sub-profile over that radius window). *)
 
-BallVolumeProfile[g_Graph] := BallVolumeProfile[g, All]
+BallVolumeProfile[g_Graph] := BallVolumeProfile[g, All, All]
 
-BallVolumeProfile[g_Graph, All] := ballVolumeProfileAt[g, #] & /@ VertexList[g]
+BallVolumeProfile[g_Graph,
+	vertices : (_List | All),
+	range : (_Integer | {_Integer, _Integer} | All) : All
+] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
+	ballVolumeProfileAt[g, #, range] & /@ If[vertices === All, VertexList[g], vertices]
 
-BallVolumeProfile[g_Graph, vertices_List] /; ! MemberQ[VertexList[g], vertices] :=
-	ballVolumeProfileAt[g, #] & /@ vertices
+BallVolumeProfile[g_Graph,
+	vertex : Except[All | _Rule | _RuleDelayed],
+	range : (_Integer | {_Integer, _Integer} | All) : All
+] := ballVolumeProfileAt[g, vertex, range]
 
-BallVolumeProfile[g_Graph, vertex_] := ballVolumeProfileAt[g, vertex]
+(* full profile {V(0), ..., V(ecc)} = running totals of the sphere sizes; the form consumed internally by WolframHausdorffDimension / WolframRicciCurvature *)
+ballVolumeProfileAt[g_Graph, v_] := Accumulate @ coordinationSequenceAt[g, v]
 
-ballVolumeProfileAt[g_Graph, v_] :=
-	With[{c = KeySort @ Counts @ DeleteCases[GraphDistance[g, v], Infinity]},
-		AssociationThread[Keys[c] -> Accumulate[Values[c]]]
-	]
+ballVolumeProfileAt[g_Graph, v_, All] := ballVolumeProfileAt[g, v]
+ballVolumeProfileAt[g_Graph, v_, r_Integer] := With[{p = ballVolumeProfileAt[g, v]}, If[0 <= r < Length[p], p[[r + 1]], Last[p]]]
+ballVolumeProfileAt[g_Graph, v_, {a_, b_}] := With[{p = ballVolumeProfileAt[g, v]}, p[[Max[1, a + 1] ;; Min[Length[p], b + 1]]]]
+
+
+(* ===================== Coordination sequence ===================== *)
+
+(* S(r) = |S_r(v)| = #{ w : d(v, w) == r } as the List {S(0), S(1), ..., S(ecc(v))}
+   (position i is radius i - 1): the sphere sizes, i.e. the discrete derivative of
+   BallVolumeProfile (BallVolumeProfile = Accumulate of CoordinationSequence; the
+   crystallography / OEIS coordination sequence, S(1) = the coordination number).
+   Same calling convention as WolframHausdorffDimension / BallVolumeProfile:
+   radius slot 3 default All -> full sequence; r_Integer -> the scalar S(r)
+   (0 past eccentricity); {rmin, rmax} -> the sub-sequence over that radius window. *)
+
+CoordinationSequence[g_Graph] := CoordinationSequence[g, All, All]
+
+CoordinationSequence[g_Graph,
+	vertices : (_List | All),
+	range : (_Integer | {_Integer, _Integer} | All) : All
+] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
+	coordinationSequenceAt[g, #, range] & /@ If[vertices === All, VertexList[g], vertices]
+
+CoordinationSequence[g_Graph,
+	vertex : Except[All | _Rule | _RuleDelayed],
+	range : (_Integer | {_Integer, _Integer} | All) : All
+] := coordinationSequenceAt[g, vertex, range]
+
+coordinationSequenceAt[g_Graph, v_] := Values @ KeySort @ Counts @ DeleteCases[GraphDistance[g, v], Infinity]
+
+coordinationSequenceAt[g_Graph, v_, All] := coordinationSequenceAt[g, v]
+coordinationSequenceAt[g_Graph, v_, r_Integer] := With[{s = coordinationSequenceAt[g, v]}, If[0 <= r < Length[s], s[[r + 1]], 0]]
+coordinationSequenceAt[g_Graph, v_, {a_, b_}] := With[{s = coordinationSequenceAt[g, v]}, s[[Max[1, a + 1] ;; Min[Length[s], b + 1]]]]
 
 
 (* ===================== Cylinder volumes ===================== *)
@@ -326,15 +369,19 @@ cylinderVolume[dm_, pi_, qi_, s_] :=
    when "Dimension" -> Automatic (default; caps the per-vertex valid radius
    range at eccentricity(v) - 1 since V(r+1) must exist).
 
-   Vertex slot 2, radius slot 3 (default All); a single vertex gives a scalar,
-   a vertex list or All gives a list (VertexList order for All):
-   WolframRicciCurvature[g, v, {rmin, rmax}]  -> mean_r R(v, r) over [rmin, rmax], scalar
+   The radius slot is a pure selector (matches BallVolumeProfile /
+   CoordinationSequence): r_Integer -> the scalar R(v, r), a span or All ->
+   the list of R(v, r) over that radius window.  Aggregate yourself, e.g.
+   Mean @ WolframRicciCurvature[g, v, All], for a single representative scalar.
+
+   Vertex slot 2, radius slot 3 (default All):
    WolframRicciCurvature[g, v, r_Integer]     -> R(v, r), scalar
-   WolframRicciCurvature[g, v]                -> mean over r = 1..ecc(v) - 1 (Automatic dim; ecc(v) with explicit "Dimension"), scalar
+   WolframRicciCurvature[g, v, {rmin, rmax}]  -> { R(v, r) } over [rmin, rmax], list
+   WolframRicciCurvature[g, v] / [g, v, All]  -> { R(v, r) } over r = 1..ecc(v) - 1 (Automatic dim; ecc(v) with explicit "Dimension"), list
    WolframRicciCurvature[g, {v1, ...}, range] -> list, one entry per vertex
    WolframRicciCurvature[g, All, range]       -> list over VertexList[g]
-   WolframRicciCurvature[g]                    -> list over VertexList[g], all radii.
-   Vertices whose valid range is empty -> Indeterminate. *)
+   WolframRicciCurvature[g]                    -> list over VertexList[g], each a full profile.
+   An integer r outside a vertex's valid range -> Indeterminate; an empty span -> {}. *)
 
 Options[WolframRicciCurvature] = {"Dimension" -> Automatic};
 
@@ -358,30 +405,27 @@ WolframRicciCurvature[g_Graph,
 ] := wolframRicciAtVertex[g, vertex, range, OptionValue["Dimension"]]
 
 
-(* Per-vertex helper: builds V(r) by accumulating distance counts, picks the
-   valid radius window (capped at ecc(v), or ecc(v) - 1 in Automatic dim mode),
-   and returns Mean over that window of the volume-comparison scalar.  Empty
-   window -> Indeterminate. *)
+(* Per-vertex helper: builds V(r) by accumulating distance counts, then selects
+   R(v, r) over the requested radii (window capped at ecc(v), or ecc(v) - 1 in
+   Automatic dim mode).  Integer r -> scalar (Indeterminate if out of range);
+   span / All -> list (possibly empty). *)
 
-wolframRicciAtVertex[g_Graph, v_, range_, dim_] := Module[{vols, top, rs},
+wolframRicciAtVertex[g_Graph, v_, range_, dim_] := Module[{vols, top, ricci},
 	vols = ballVolumeProfileAt[g, v];
-	top = Max[Keys[vols]] - Boole[dim === Automatic];
-	rs = Switch[range,
-		All,                  Range[1, top],
-		_Integer,             If[1 <= range <= top, {range}, {}],
-		{_Integer, _Integer}, Range[Max[1, range[[1]]], Min[top, range[[2]]]]
+	top = (Length[vols] - 1) - Boole[dim === Automatic];
+	ricci = r |-> With[{
+			dr = If[dim === Automatic,
+				N[(Log[vols[[r + 2]]] - Log[vols[[r + 1]]]) / (Log[r + 1] - Log[r])],
+				dim
+			],
+			vr = vols[[r + 1]]
+		},
+		N[6 (dr + 2) / r^2 (1 - vr Gamma[dr / 2 + 1] / (Pi^(dr / 2) r^dr))]
 	];
-	If[rs === {},
-		Indeterminate,
-		Mean[(r |-> With[{
-				dr = If[dim === Automatic,
-					N[(Log[vols[r + 1]] - Log[vols[r]]) / (Log[r + 1] - Log[r])],
-					dim
-				],
-				vr = vols[r]
-			},
-			N[6 (dr + 2) / r^2 (1 - vr Gamma[dr / 2 + 1] / (Pi^(dr / 2) r^dr))]
-		]) /@ rs]
+	Switch[range,
+		All,                  ricci /@ Range[1, top],
+		_Integer,             If[1 <= range <= top, ricci[range], Indeterminate],
+		{_Integer, _Integer}, ricci /@ Range[Max[1, range[[1]]], Min[top, range[[2]]]]
 	]
 ]
 
@@ -392,15 +436,19 @@ wolframRicciAtVertex[g_Graph, v_, range_, dim_] := Module[{vols, top, rs},
    WolframRicciCurvature[..., "Dimension" -> Automatic], exposed on its own
    with the matching calling convention.
 
-   Vertex slot 2, radius slot 3 (default All); a single vertex gives a scalar,
-   a vertex list or All gives a list (VertexList order for All):
-   WolframHausdorffDimension[g, v, {rmin, rmax}]  -> mean over [rmin, rmax], scalar
+   The radius slot is a pure selector (matches BallVolumeProfile /
+   CoordinationSequence): r_Integer -> the scalar d(v, r), a span or All ->
+   the list of d(v, r) over that radius window.  Aggregate yourself, e.g.
+   Mean @ WolframHausdorffDimension[g, v, All], for a single representative scalar.
+
+   Vertex slot 2, radius slot 3 (default All):
    WolframHausdorffDimension[g, v, r_Integer]     -> d(v, r), scalar
-   WolframHausdorffDimension[g, v]                -> mean over r = 1..ecc(v) - 1, scalar
+   WolframHausdorffDimension[g, v, {rmin, rmax}]  -> { d(v, r) } over [rmin, rmax], list
+   WolframHausdorffDimension[g, v] / [g, v, All]  -> { d(v, r) } over r = 1..ecc(v) - 1, list
    WolframHausdorffDimension[g, {v1, ...}, range] -> list, one entry per vertex
    WolframHausdorffDimension[g, All, range]       -> list over VertexList[g]
-   WolframHausdorffDimension[g]                    -> list over VertexList[g], all radii.
-   Vertices whose valid range is empty -> Indeterminate. *)
+   WolframHausdorffDimension[g]                    -> list over VertexList[g], each a full profile.
+   An integer r outside a vertex's valid range -> Indeterminate; an empty span -> {}. *)
 
 WolframHausdorffDimension[g_Graph] := WolframHausdorffDimension[g, All, All]
 
@@ -418,17 +466,14 @@ WolframHausdorffDimension[g_Graph,
 ] := wolframHausdorffDimensionAtVertex[g, vertex, range]
 
 
-wolframHausdorffDimensionAtVertex[g_Graph, v_, range_] := Module[{vols, top, rs},
+wolframHausdorffDimensionAtVertex[g_Graph, v_, range_] := Module[{vols, top, d},
 	vols = ballVolumeProfileAt[g, v];
-	top = Max[Keys[vols]] - 1;
-	rs = Switch[range,
-		All,                  Range[1, top],
-		_Integer,             If[1 <= range <= top, {range}, {}],
-		{_Integer, _Integer}, Range[Max[1, range[[1]]], Min[top, range[[2]]]]
-	];
-	If[rs === {},
-		Indeterminate,
-		Mean[(r |-> N[(Log[vols[r + 1]] - Log[vols[r]]) / (Log[r + 1] - Log[r])]) /@ rs]
+	top = (Length[vols] - 1) - 1;
+	d = r |-> N[(Log[vols[[r + 2]]] - Log[vols[[r + 1]]]) / (Log[r + 1] - Log[r])];
+	Switch[range,
+		All,                  d /@ Range[1, top],
+		_Integer,             If[1 <= range <= top, d[range], Indeterminate],
+		{_Integer, _Integer}, d /@ Range[Max[1, range[[1]]], Min[top, range[[2]]]]
 	]
 ]
 
