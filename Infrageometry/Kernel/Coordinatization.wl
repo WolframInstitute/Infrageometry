@@ -102,7 +102,7 @@ FindBallCover[g_Graph, r_ : 1, targets : (_List | All) : All] :=
         {vs = VertexList[g]},
         {rows = If[targets === All, Range[Length[vs]], Flatten[FirstPosition[vs, #] & /@ targets]]},
         {cover = Map[Boole[# <= r] &, GraphDistanceMatrix[g][[rows]], {2}], x = Array[\[FormalX], Length[vs]]},
-        vs[[ Flatten @ Position[x /. Last @ Minimize[{Total[x], And @@ Thread[cover . x >= 1], And @@ Thread[0 <= x <= 1]}, x, Integers], 1] ]]
+        vs[[ Flatten @ Position[Round[x /. LinearOptimization[Total[x], Join[Thread[cover . x >= 1], Thread[0 <= x <= 1]], x \[Element] Vectors[Length[vs], Integers]]], 1] ]]
     ]
 
 (* do the radius-r balls around the centres s cover the targets (all of V by default)? *)

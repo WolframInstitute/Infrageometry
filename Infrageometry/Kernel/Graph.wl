@@ -7,6 +7,10 @@ PackageExport[GraphVertexWeights]
 PackageExport[GraphBoundary]
 PackageExport[GraphInterior]
 PackageExport[BallHull]
+PackageExport[BallVolumeProfile]
+PackageExport[CylinderVolumes]
+PackageScope[ballVolumeProfileAt]
+PackageScope[cylinderVolume]
 
 PackageExport[FormanRicciCurvature]
 PackageExport[OllivierRicciCurvature]
@@ -263,6 +267,55 @@ wasserstein1[mu_List, nu_List, costs_List] := Module[{m = Length[mu], n = Length
 ]
 
 
+(* ===================== Ball-volume growth profile ===================== *)
+
+(* V(r) = |B_r(v)| as an Association r -> V(r) over r = 0 .. eccentricity(v):
+   the cumulative number of vertices within each radius.  The growth profile
+   feeding WolframHausdorffDimension and WolframRicciCurvature.  A vertex list
+   or All (= BallVolumeProfile[g]) returns one Association per vertex. *)
+
+BallVolumeProfile[g_Graph] := BallVolumeProfile[g, All]
+
+BallVolumeProfile[g_Graph, All] := ballVolumeProfileAt[g, #] & /@ VertexList[g]
+
+BallVolumeProfile[g_Graph, vertices_List] /; ! MemberQ[VertexList[g], vertices] :=
+	ballVolumeProfileAt[g, #] & /@ vertices
+
+BallVolumeProfile[g_Graph, vertex_] := ballVolumeProfileAt[g, vertex]
+
+ballVolumeProfileAt[g_Graph, v_] :=
+	With[{c = KeySort @ Counts @ DeleteCases[GraphDistance[g, v], Infinity]},
+		AssociationThread[Keys[c] -> Accumulate[Values[c]]]
+	]
+
+
+(* ===================== Cylinder volumes ===================== *)
+
+(* CylinderVolumes[g, sources, targets, s] gives the matrix of cylinder volumes
+   between every source-target pair: the cylinder from p to q is the metric
+   interval I(p, q) = { w : d(p, w) + d(w, q) == d(p, q) } (the union of all
+   p-q geodesics) thickened to its closed s-neighborhood, and its volume is the
+   vertex count.  s defaults to 0 (the bare interval).  A scalar source gives a
+   flat list ordered as targets (e.g. center -> shell -> anisotropy profile). *)
+
+CylinderVolumes[g_Graph, source : Except[_List | _Rule | _RuleDelayed], targets_List, s_Integer : 0] :=
+	First @ CylinderVolumes[g, {source}, targets, s]
+
+CylinderVolumes[g_Graph, sources_List, targets_List, s_Integer : 0] :=
+	With[{dm = GraphDistanceMatrix[g], pos = PositionIndex @ VertexList[g]},
+		Outer[cylinderVolume[dm, pos[#1][[1]], pos[#2][[1]], s] &, sources, targets, 1]
+	]
+
+cylinderVolume[dm_, pi_, qi_, s_] :=
+	With[{dpq = dm[[pi, qi]]},
+		If[dpq === Infinity, 0,
+			With[{interval = Flatten @ Position[dm[[pi]] + dm[[qi]], dpq]},
+				If[s == 0, Length[interval], Count[Min /@ Transpose[dm[[interval]]], x_ /; x <= s]]
+			]
+		]
+	]
+
+
 (* ===================== Wolfram-Ricci scalar curvature ===================== *)
 
 (* Volume-comparison Ricci scalar at vertex v and integer radius r:
@@ -309,9 +362,7 @@ WolframRicciCurvature[g_Graph,
    window -> Indeterminate. *)
 
 wolframRicciAtVertex[g_Graph, v_, range_, dim_] := Module[{vols, top, rs},
-	vols = With[{c = KeySort @ Counts @ DeleteCases[GraphDistance[g, v], Infinity]},
-		AssociationThread[Keys[c] -> Accumulate[Values[c]]]
-	];
+	vols = ballVolumeProfileAt[g, v];
 	top = Max[Keys[vols]] - Boole[dim === Automatic];
 	rs = Switch[range,
 		All,                  Range[1, top],
@@ -363,9 +414,7 @@ WolframHausdorffDimension[g_Graph,
 
 
 wolframHausdorffDimensionAtVertex[g_Graph, v_, range_] := Module[{vols, top, rs},
-	vols = With[{c = KeySort @ Counts @ DeleteCases[GraphDistance[g, v], Infinity]},
-		AssociationThread[Keys[c] -> Accumulate[Values[c]]]
-	];
+	vols = ballVolumeProfileAt[g, v];
 	top = Max[Keys[vols]] - 1;
 	rs = Switch[range,
 		All,                  Range[1, top],
