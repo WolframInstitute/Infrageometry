@@ -10,6 +10,7 @@ PackageScope[shapeName]
 PackageScope[hyperbolicMap]
 PackageScope[psl2Group]
 PackageScope[mobiusPerm]
+PackageScope[nthRegularMap]
 
 (* Regular maps as coset graphs of (2,p,q)-generated groups; see Wiki/Concepts/RegularMaps.md.
    Refs: Coxeter & Moser, Generators and Relations for Discrete Groups (1957);
@@ -51,14 +52,40 @@ RegularMapsAt[{p_, q_}, ell_?PrimeQ] :=
          GroupOrder[PermutationGroup[#]] == ord &],
       IsomorphicGraphQ]];
 
-(* smallest regular map of type {p, q}; size n scales the Euclidean (flat-torus) and
-   hyperbolic (n-th PSL(2,ell) quotient) cases, dispatch on the sign of (p-2)(q-2) - 4 *)
-SchlafliTessellation[{p_, q_}, n_: 1] :=
-  With[{c = (p - 2) (q - 2)},
-    Which[
-      c < 4,  RegularMap[{p, q}, sphericalGroup[{p, q}]],
-      c == 4, TorusTessellation[{n, n}, shapeName[{p, q}]],
-      True,   hyperbolicMap[{p, q}, n]]];
+(* n-th smallest regular map of type {p, q}, dispatched by Method. The default Automatic uses the
+   fast realiser per curvature -- finite group (spherical), flat torus (Euclidean), PSL(2,ell)
+   congruence quotient (hyperbolic) -- each of which is the map the general enumeration would return;
+   if no realiser applies (a hyperbolic {p, q} with no congruence family) it falls back to the general
+   coset enumeration at a small index budget. The realisers are also selectable directly:
+   "Platonic" | "Torus" | "PSL2" force one path; "CosetEnumeration" (with the "MaxIndex" sub-option)
+   forces the general low-index method, curvature-agnostic but feasible in pure WL only at small index. *)
+Options[SchlafliTessellation] = {Method -> Automatic};
+
+SchlafliTessellation[{p_, q_}, n_Integer : 1, opts : OptionsPattern[]] :=
+  With[{method = OptionValue[Method], c = (p - 2) (q - 2)},
+    With[{name = If[ListQ[method], First[method], method],
+      budget = If[ListQ[method], Lookup[Rest[method], "MaxIndex", 24],
+                  If[c < 4, 4 p q / (2 p + 2 q - p q), 24]]},
+      Switch[name,
+        Automatic,
+          Which[
+            c < 4,  RegularMap[{p, q}, sphericalGroup[{p, q}]],
+            c == 4, TorusTessellation[{n, n}, shapeName[{p, q}]],
+            True,   With[{psl = hyperbolicMap[{p, q}, n]}, If[psl =!= $Failed, psl, nthRegularMap[{p, q}, n, 24]]]],
+        "Platonic",            RegularMap[{p, q}, sphericalGroup[{p, q}]],
+        "Torus",               TorusTessellation[{n, n}, shapeName[{p, q}]],
+        "PSL2" | "Congruence", hyperbolicMap[{p, q}, n],
+        "CosetEnumeration",    nthRegularMap[{p, q}, n, budget],
+        _, Message[SchlafliTessellation::badmethod, name]; $Failed]]];
+
+SchlafliTessellation::badmethod = "Unknown Method `1`; use Automatic, \"Platonic\", \"Torus\", \"PSL2\", or \"CosetEnumeration\".";
+
+(* n-th smallest regular (normal-subgroup) {p,q} map by index, from the general coset enumeration
+   (LowIndexMaps in CosetEnumeration.wl), built via the coset-graph builder RegularMap;
+   $Failed if fewer than n regular maps occur up to index maxIndex *)
+nthRegularMap[{p_, q_}, n_, maxIndex_] := Module[
+  {maps = SortBy[Select[LowIndexMaps[p, q, maxIndex], #["Regular"] &], #["Index"] &]},
+  If[Length[maps] < n, $Failed, RegularMap[{p, q}, maps[[n]]["Generators"]]]];
 
 
 (* ===================== Sourcing the group (r, s) ===================== *)

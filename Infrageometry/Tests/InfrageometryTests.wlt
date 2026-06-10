@@ -2021,6 +2021,35 @@ VerificationTest[
 VerificationTest[ TessellationGraph[ { 3, 7 }, 99 ], $Failed, TestID -> "Schlafli-hyperbolic-unreachable-is-Failed" ]
 VerificationTest[ IsomorphicGraphQ[ TessellationGraph[ { 4, 3 }, SymmetricGroup[ 4 ] ], GraphData[ "CubicalGraph" ] ], True, TestID -> "RegularMap-explicit-group-cube" ]
 
+(* --- General coset enumeration (Todd-Coxeter / low-index) via Method --- *)
+
+(* Todd-Coxeter index: |D(4,3,2)| = 24, and V = [D:<y>] = 8, E = [D:<xy>] = 12, F = [D:<x>] = 6 (cube) *)
+VerificationTest[
+  { CosetEnumeration[ 4, 3, { }, 400 ], CosetEnumeration[ 4, 3, { { 3 } }, 400 ], CosetEnumeration[ 4, 3, { { 1, 3 } }, 400 ], CosetEnumeration[ 4, 3, { { 1 } }, 400 ] },
+  { 24, 8, 12, 6 },
+  TestID -> "CosetEnumeration-cube-VEF"
+]
+
+(* trivial subgroup of an infinite (hyperbolic) von Dyck group has infinite index *)
+VerificationTest[ CosetEnumeration[ 3, 7, { }, 60 ], $Failed, TestID -> "CosetEnumeration-hyperbolic-infinite" ]
+
+(* the general low-index method recovers the Platonic solids (Method -> "CosetEnumeration") *)
+VerificationTest[ IsomorphicGraphQ[ TessellationGraph[ { 3, 3 }, Method -> "CosetEnumeration" ], GraphData[ "TetrahedralGraph" ] ], True, TestID -> "CosetEnumeration-recovers-tetrahedron" ]
+VerificationTest[ IsomorphicGraphQ[ TessellationGraph[ { 3, 5 }, Method -> "CosetEnumeration" ], GraphData[ "IcosahedralGraph" ] ], True, TestID -> "CosetEnumeration-recovers-icosahedron" ]
+
+(* the explicit realiser Methods agree with the Automatic default *)
+VerificationTest[ IsomorphicGraphQ[ TessellationGraph[ { 4, 3 }, Method -> "Platonic" ], TessellationGraph[ { 4, 3 } ] ], True, TestID -> "Method-Platonic-matches-default" ]
+VerificationTest[ IsomorphicGraphQ[ TessellationGraph[ { 3, 7 }, Method -> "PSL2" ], TessellationGraph[ { 3, 7 } ] ], True, TestID -> "Method-PSL2-matches-default" ]
+
+(* low-index enumeration: the only genuine {3,3} map up to index 12 is the tetrahedron, regular, genus 0 *)
+VerificationTest[
+  { Length @ #, #[[ 1, "Index" ]], #[[ 1, "Regular" ]], #[[ 1, "Genus" ]] } &@ LowIndexMaps[ 3, 3, 12 ],
+  { 1, 12, True, 0 },
+  TestID -> "LowIndexMaps-33-tetrahedron"
+]
+
+VerificationTest[ Head @ Quiet @ TessellationGraph[ { 3, 3 }, Method -> "Nonsense" ], Symbol, TestID -> "Method-unknown-is-Failed" ]
+
 (* --- Uniform / Archimedean maps --- *)
 
 VerificationTest[ IsomorphicGraphQ[ TessellationGraph[ { 3, 4, 3, 4 } ], PolyhedronData[ "Cuboctahedron", "SkeletonGraph" ] ], True, TestID -> "Archimedean-3434-is-cuboctahedron" ]
