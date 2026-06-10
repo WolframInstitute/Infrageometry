@@ -10,8 +10,6 @@ PackageExport[BallHull]
 PackageExport[BallVolumeProfile]
 PackageExport[CoordinationSequence]
 PackageExport[CylinderVolumes]
-PackageScope[ballVolumeProfileAt]
-PackageScope[coordinationSequenceAt]
 PackageScope[cylinderVolume]
 
 PackageExport[FormanRicciCurvature]
@@ -283,23 +281,35 @@ wasserstein1[mu_List, nu_List, costs_List] := Module[{m = Length[mu], n = Length
 
 BallVolumeProfile[g_Graph] := BallVolumeProfile[g, All, All]
 
+(* the all/list form reads every vertex's distances off one GraphDistanceMatrix:
+   one optimized all-pairs call is ~200x faster than V separate GraphDistance BFS
+   calls (each carries a fixed graph-to-internal-rep overhead paid V times) *)
 BallVolumeProfile[g_Graph,
 	vertices : (_List | All),
 	range : (_Integer | {_Integer, _Integer} | All) : All
 ] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
-	ballVolumeProfileAt[g, #, range] & /@ If[vertices === All, VertexList[g], vertices]
+	With[{dm = GraphDistanceMatrix[g], idx = PositionIndex @ VertexList[g]},
+		With[{p = Accumulate @ Values @ KeySort @ Counts @ DeleteCases[dm[[idx[#][[1]]]], Infinity]},
+			Switch[range,
+				All,                  p,
+				_Integer,             If[0 <= range < Length[p], p[[range + 1]], Last[p]],
+				{_Integer, _Integer}, p[[Max[1, range[[1]] + 1] ;; Min[Length[p], range[[2]] + 1]]]
+			]
+		] & /@ If[vertices === All, VertexList[g], vertices]
+	]
 
+(* full profile {V(0), ..., V(ecc)} = running totals of the sphere sizes; r_Integer
+   saturates at the reachable-vertex count past ecc, {a, b} clips to that window *)
 BallVolumeProfile[g_Graph,
 	vertex : Except[All | _Rule | _RuleDelayed],
 	range : (_Integer | {_Integer, _Integer} | All) : All
-] := ballVolumeProfileAt[g, vertex, range]
-
-(* full profile {V(0), ..., V(ecc)} = running totals of the sphere sizes; the form consumed internally by WolframHausdorffDimension / WolframRicciCurvature *)
-ballVolumeProfileAt[g_Graph, v_] := Accumulate @ coordinationSequenceAt[g, v]
-
-ballVolumeProfileAt[g_Graph, v_, All] := ballVolumeProfileAt[g, v]
-ballVolumeProfileAt[g_Graph, v_, r_Integer] := With[{p = ballVolumeProfileAt[g, v]}, If[0 <= r < Length[p], p[[r + 1]], Last[p]]]
-ballVolumeProfileAt[g_Graph, v_, {a_, b_}] := With[{p = ballVolumeProfileAt[g, v]}, p[[Max[1, a + 1] ;; Min[Length[p], b + 1]]]]
+] := With[{p = Accumulate @ Values @ KeySort @ Counts @ DeleteCases[GraphDistance[g, vertex], Infinity]},
+	Switch[range,
+		All,                  p,
+		_Integer,             If[0 <= range < Length[p], p[[range + 1]], Last[p]],
+		{_Integer, _Integer}, p[[Max[1, range[[1]] + 1] ;; Min[Length[p], range[[2]] + 1]]]
+	]
+]
 
 
 (* ===================== Coordination sequence ===================== *)
@@ -314,22 +324,31 @@ ballVolumeProfileAt[g_Graph, v_, {a_, b_}] := With[{p = ballVolumeProfileAt[g, v
 
 CoordinationSequence[g_Graph] := CoordinationSequence[g, All, All]
 
+(* all/list form: one GraphDistanceMatrix; single vertex stays on one GraphDistance *)
 CoordinationSequence[g_Graph,
 	vertices : (_List | All),
 	range : (_Integer | {_Integer, _Integer} | All) : All
 ] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
-	coordinationSequenceAt[g, #, range] & /@ If[vertices === All, VertexList[g], vertices]
+	With[{dm = GraphDistanceMatrix[g], idx = PositionIndex @ VertexList[g]},
+		With[{s = Values @ KeySort @ Counts @ DeleteCases[dm[[idx[#][[1]]]], Infinity]},
+			Switch[range,
+				All,                  s,
+				_Integer,             If[0 <= range < Length[s], s[[range + 1]], 0],
+				{_Integer, _Integer}, s[[Max[1, range[[1]] + 1] ;; Min[Length[s], range[[2]] + 1]]]
+			]
+		] & /@ If[vertices === All, VertexList[g], vertices]
+	]
 
 CoordinationSequence[g_Graph,
 	vertex : Except[All | _Rule | _RuleDelayed],
 	range : (_Integer | {_Integer, _Integer} | All) : All
-] := coordinationSequenceAt[g, vertex, range]
-
-coordinationSequenceAt[g_Graph, v_] := Values @ KeySort @ Counts @ DeleteCases[GraphDistance[g, v], Infinity]
-
-coordinationSequenceAt[g_Graph, v_, All] := coordinationSequenceAt[g, v]
-coordinationSequenceAt[g_Graph, v_, r_Integer] := With[{s = coordinationSequenceAt[g, v]}, If[0 <= r < Length[s], s[[r + 1]], 0]]
-coordinationSequenceAt[g_Graph, v_, {a_, b_}] := With[{s = coordinationSequenceAt[g, v]}, s[[Max[1, a + 1] ;; Min[Length[s], b + 1]]]]
+] := With[{s = Values @ KeySort @ Counts @ DeleteCases[GraphDistance[g, vertex], Infinity]},
+	Switch[range,
+		All,                  s,
+		_Integer,             If[0 <= range < Length[s], s[[range + 1]], 0],
+		{_Integer, _Integer}, s[[Max[1, range[[1]] + 1] ;; Min[Length[s], range[[2]] + 1]]]
+	]
+]
 
 
 (* ===================== Cylinder volumes ===================== *)
@@ -365,9 +384,10 @@ cylinderVolume[dm_, pi_, qi_, s_] :=
        R(v, r) = 6 (d + 2) / r^2 (1 - V(r) / V_E(d, r)),
        V_E(d, r) = pi^(d/2) r^d / Gamma[d/2 + 1],
    with V(r) = |B_r(v)|.  Local dimension d is supplied via "Dimension" -> d
-   or read off from the log-difference (Log V(r+1) - Log V(r)) / (Log(r+1) - Log r)
-   when "Dimension" -> Automatic (default; caps the per-vertex valid radius
-   range at eccentricity(v) - 1 since V(r+1) must exist).
+   or read off the volume-growth local exponent when "Dimension" -> Automatic
+   (default); in that case option "Differencing" selects the finite-difference
+   scheme (shared with WolframHausdorffDimension), and the per-vertex valid radius
+   range is that scheme's window intersected with r >= 1 (the 1/r^2 in R).
 
    The radius slot is a pure selector (matches BallVolumeProfile /
    CoordinationSequence): r_Integer -> the scalar R(v, r), a span or All ->
@@ -383,98 +403,163 @@ cylinderVolume[dm_, pi_, qi_, s_] :=
    WolframRicciCurvature[g]                    -> list over VertexList[g], each a full profile.
    An integer r outside a vertex's valid range -> Indeterminate; an empty span -> {}. *)
 
-Options[WolframRicciCurvature] = {"Dimension" -> Automatic};
+Options[WolframRicciCurvature] = {"Dimension" -> Automatic, "Differencing" -> "Forward"};
 
 WolframRicciCurvature[g_Graph, opts : OptionsPattern[]] :=
 	WolframRicciCurvature[g, All, All, opts]
 
+(* all/list form maps over BallVolumeProfile[g, vertices, All] (one GraphDistanceMatrix) *)
 WolframRicciCurvature[g_Graph,
 	vertices : (_List | All),
 	range : (_Integer | {_Integer, _Integer} | All) : All,
 	OptionsPattern[]
-] /; vertices === All || ! MemberQ[VertexList[g], vertices] := With[{dim = OptionValue["Dimension"]},
-	wolframRicciAtVertex[g, #, range, dim] & /@ If[vertices === All, VertexList[g], vertices]
-]
+] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
+	With[{dim = OptionValue["Dimension"], diff = OptionValue["Differencing"]},
+		(With[{vols = #},
+			{spec = If[dim === Automatic, hausdorffScheme[diff, vols], {dim &, 1, Length[vols] - 1}]},
+			{dimFn = spec[[1]], rlo = Max[1, spec[[2]]], rhi = spec[[3]]},
+			{ricci = r |-> With[{dr = dimFn[r], vr = vols[[r + 1]]}, N[6 (dr + 2) / r^2 (1 - vr Gamma[dr / 2 + 1] / (Pi^(dr / 2) r^dr))]]},
+			Switch[range,
+				All,                  ricci /@ Range[rlo, rhi],
+				_Integer,             If[rlo <= range <= rhi, ricci[range], Indeterminate],
+				{_Integer, _Integer}, ricci /@ Range[Max[rlo, range[[1]]], Min[rhi, range[[2]]]]
+			]
+		] &) /@ BallVolumeProfile[g, vertices, All]
+	]
 
 (* Except[All | _Rule | _RuleDelayed] (not also _List) so a single list-valued
-   vertex lands here while option rules still defer to the OptionsPattern form *)
+   vertex lands here while option rules still defer to the OptionsPattern form.
+   In Automatic-dim mode the local exponent dr and valid radius window come from the
+   chosen "Differencing" scheme (the same hausdorffScheme as WolframHausdorffDimension);
+   the Ricci 1/r^2 also forbids r = 0, hence the Max[1, .] clamp.  Explicit dim
+   keeps the full [1, ecc] window. *)
 WolframRicciCurvature[g_Graph,
 	vertex : Except[All | _Rule | _RuleDelayed],
 	range : (_Integer | {_Integer, _Integer} | All) : All,
 	OptionsPattern[]
-] := wolframRicciAtVertex[g, vertex, range, OptionValue["Dimension"]]
-
-
-(* Per-vertex helper: builds V(r) by accumulating distance counts, then selects
-   R(v, r) over the requested radii (window capped at ecc(v), or ecc(v) - 1 in
-   Automatic dim mode).  Integer r -> scalar (Indeterminate if out of range);
-   span / All -> list (possibly empty). *)
-
-wolframRicciAtVertex[g_Graph, v_, range_, dim_] := Module[{vols, top, ricci},
-	vols = ballVolumeProfileAt[g, v];
-	top = (Length[vols] - 1) - Boole[dim === Automatic];
-	ricci = r |-> With[{
-			dr = If[dim === Automatic,
-				N[(Log[vols[[r + 2]]] - Log[vols[[r + 1]]]) / (Log[r + 1] - Log[r])],
-				dim
-			],
-			vr = vols[[r + 1]]
-		},
-		N[6 (dr + 2) / r^2 (1 - vr Gamma[dr / 2 + 1] / (Pi^(dr / 2) r^dr))]
-	];
+] := With[{dim = OptionValue["Dimension"], diff = OptionValue["Differencing"], vols = BallVolumeProfile[g, vertex]},
+	{spec = If[dim === Automatic, hausdorffScheme[diff, vols], {dim &, 1, Length[vols] - 1}]},
+	{dimFn = spec[[1]], rlo = Max[1, spec[[2]]], rhi = spec[[3]]},
+	{ricci = r |-> With[{dr = dimFn[r], vr = vols[[r + 1]]}, N[6 (dr + 2) / r^2 (1 - vr Gamma[dr / 2 + 1] / (Pi^(dr / 2) r^dr))]]},
 	Switch[range,
-		All,                  ricci /@ Range[1, top],
-		_Integer,             If[1 <= range <= top, ricci[range], Indeterminate],
-		{_Integer, _Integer}, ricci /@ Range[Max[1, range[[1]]], Min[top, range[[2]]]]
+		All,                  ricci /@ Range[rlo, rhi],
+		_Integer,             If[rlo <= range <= rhi, ricci[range], Indeterminate],
+		{_Integer, _Integer}, ricci /@ Range[Max[rlo, range[[1]]], Min[rhi, range[[2]]]]
 	]
 ]
 
 
-(* Volume-growth local dimension at vertex v and integer radius r:
-       d(v, r) = (Log V(r+1) - Log V(r)) / (Log(r+1) - Log r),
-   with V(r) = |B_r(v)|.  The same estimate used internally by
-   WolframRicciCurvature[..., "Dimension" -> Automatic], exposed on its own
-   with the matching calling convention.
+(* Volume-growth local dimension at vertex v and radius r: the local scaling
+   exponent (elasticity) d(v, r) = d log V / d log r of the ball volume
+   V(r) = |B_r(v)|, estimated by a finite-difference scheme on the profile.
+   Shared with WolframRicciCurvature[..., "Dimension" -> Automatic]; same
+   selector calling convention.
 
-   The radius slot is a pure selector (matches BallVolumeProfile /
-   CoordinationSequence): r_Integer -> the scalar d(v, r), a span or All ->
-   the list of d(v, r) over that radius window.  Aggregate yourself, e.g.
-   Mean @ WolframHausdorffDimension[g, v, All], for a single representative scalar.
+   Option "Differencing" picks the stencil for the slope of y = log V against
+   u = log r.  Each is a linear combination of the y-values at neighbouring
+   radii (Sum c_i y(r_i)), the weights c_i fixed by the method of undetermined
+   coefficients on the nodes u_i = log r_i:
 
-   Vertex slot 2, radius slot 3 (default All):
-   WolframHausdorffDimension[g, v, r_Integer]     -> d(v, r), scalar
-   WolframHausdorffDimension[g, v, {rmin, rmax}]  -> { d(v, r) } over [rmin, rmax], list
-   WolframHausdorffDimension[g, v] / [g, v, All]  -> { d(v, r) } over r = 1..ecc(v) - 1, list
-   WolframHausdorffDimension[g, {v1, ...}, range] -> list, one entry per vertex
+     "Forward"  (default)  secant on [r, r+1]:   (y(r+1) - y(r)) / (u(r+1) - u(r))
+     "Backward"            secant on [r-1, r]:   (y(r) - y(r-1)) / (u(r) - u(r-1))
+     "Central"             secant on [r-1, r+1]: (y(r+1) - y(r-1)) / (u(r+1) - u(r-1))
+     "Trapezoid"           mean of the Forward and Backward secant slopes
+                           (the slope of the piecewise-linear interpolant at r)
+     {"Stencil", offsets}  general k-point scheme: Fornberg / undetermined-
+                           coefficient weights for dy/du at u(r) on the nodes
+                           {u(r+o) : o in offsets}.  {0,1} reproduces Forward and
+                           {-1,0} Backward exactly (a 2-point stencil is the unique
+                           secant); a 3+-point stencil is the genuine higher-order
+                           derivative (exact on degree k-1, error O(h^{k-1})) and,
+                           on this non-uniform log grid, differs from the 2-point
+                           "Central" secant -- it reduces to it only on a uniform grid.
+
+   All share the limit d as r -> infinity; on a unit lattice each still carries
+   an O(1/r) finite-radius bias (Central / Trapezoid with a smaller constant
+   than the one-sided pair) -- see the research note for the bias analysis and
+   the abscissa-shift that removes it.
+
+   Missing values: a scheme is undefined at radii where its stencil leaves the
+   profile 0..ecc or hits log 0; these are returned as Indeterminate (never a
+   silent one-sided stand-in), so each scheme carries a valid window [rlo, rhi]:
+     "Forward"            [1, ecc-1]                  "Backward"  [2, ecc]
+     "Central"/"Trapezoid" [2, ecc-1]
+     {"Stencil", offsets} [max(1, 1 - min offsets), ecc - max offsets]
+
+   Vertex slot 2, radius slot 3 (default All), then the option:
+   WolframHausdorffDimension[g, v, r_Integer]     -> d(v, r) or Indeterminate
+   WolframHausdorffDimension[g, v, {rmin, rmax}]  -> { d(v, r) } clamped to the window
+   WolframHausdorffDimension[g, v] / [g, v, All]  -> { d(v, r) } over the window
+   WolframHausdorffDimension[g, {v1, ...}, range] -> one entry per vertex
    WolframHausdorffDimension[g, All, range]       -> list over VertexList[g]
-   WolframHausdorffDimension[g]                    -> list over VertexList[g], each a full profile.
-   An integer r outside a vertex's valid range -> Indeterminate; an empty span -> {}. *)
+   WolframHausdorffDimension[g]                    -> list over VertexList[g]. *)
 
-WolframHausdorffDimension[g_Graph] := WolframHausdorffDimension[g, All, All]
+WolframHausdorffDimension::baddiff = "Unknown \"Differencing\" scheme `1`; use \"Forward\", \"Backward\", \"Central\", \"Trapezoid\", or {\"Stencil\", offsets}.";
 
+Options[WolframHausdorffDimension] = {"Differencing" -> "Forward"};
+
+WolframHausdorffDimension[g_Graph, opts : OptionsPattern[]] := WolframHausdorffDimension[g, All, All, opts]
+
+(* all/list form maps over BallVolumeProfile[g, vertices, All] (one GraphDistanceMatrix) *)
 WolframHausdorffDimension[g_Graph,
 	vertices : (_List | All),
-	range : (_Integer | {_Integer, _Integer} | All) : All
+	range : (_Integer | {_Integer, _Integer} | All) : All,
+	OptionsPattern[]
 ] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
-	wolframHausdorffDimensionAtVertex[g, #, range] & /@ If[vertices === All, VertexList[g], vertices]
-
-(* Except[All] (not Except[_List | All]) so a single list-valued vertex
-   (e.g. MeshConnectivityGraph cell labels {i, j}) lands here, not the list branch *)
-WolframHausdorffDimension[g_Graph,
-	vertex : Except[All],
-	range : (_Integer | {_Integer, _Integer} | All) : All
-] := wolframHausdorffDimensionAtVertex[g, vertex, range]
-
-
-wolframHausdorffDimensionAtVertex[g_Graph, v_, range_] := Module[{vols, top, d},
-	vols = ballVolumeProfileAt[g, v];
-	top = (Length[vols] - 1) - 1;
-	d = r |-> N[(Log[vols[[r + 2]]] - Log[vols[[r + 1]]]) / (Log[r + 1] - Log[r])];
-	Switch[range,
-		All,                  d /@ Range[1, top],
-		_Integer,             If[1 <= range <= top, d[range], Indeterminate],
-		{_Integer, _Integer}, d /@ Range[Max[1, range[[1]]], Min[top, range[[2]]]]
+	With[{diff = OptionValue["Differencing"]},
+		(With[{spec = hausdorffScheme[diff, #]},
+			Switch[range,
+				All,                  spec[[1]] /@ Range[spec[[2]], spec[[3]]],
+				_Integer,             If[spec[[2]] <= range <= spec[[3]], spec[[1]][range], Indeterminate],
+				{_Integer, _Integer}, spec[[1]] /@ Range[Max[spec[[2]], range[[1]]], Min[spec[[3]], range[[2]]]]
+			]
+		] &) /@ BallVolumeProfile[g, vertices, All]
 	]
+
+(* Except[All | _Rule | _RuleDelayed] so a single list-valued vertex lands here
+   while a trailing option rule defers to the options form *)
+WolframHausdorffDimension[g_Graph,
+	vertex : Except[All | _Rule | _RuleDelayed],
+	range : (_Integer | {_Integer, _Integer} | All) : All,
+	OptionsPattern[]
+] := With[{spec = hausdorffScheme[OptionValue["Differencing"], BallVolumeProfile[g, vertex]]},
+	Switch[range,
+		All,                  spec[[1]] /@ Range[spec[[2]], spec[[3]]],
+		_Integer,             If[spec[[2]] <= range <= spec[[3]], spec[[1]][range], Indeterminate],
+		{_Integer, _Integer}, spec[[1]] /@ Range[Max[spec[[2]], range[[1]]], Min[spec[[3]], range[[2]]]]
+	]
+]
+
+(* {localExponentFn, rlo, rhi}: the scheme's per-radius estimator and its valid
+   radius window on the profile vols (vols[[r+1]] = V(r), ecc = Length - 1) *)
+hausdorffScheme[diff_, vols_] := With[{lv = Log[N[vols]], ecc = Length[vols] - 1},
+	Switch[diff,
+		"Forward",   {r |-> (lv[[r + 2]] - lv[[r + 1]]) / (Log[r + 1] - Log[r]),     1, ecc - 1},
+		"Backward",  {r |-> (lv[[r + 1]] - lv[[r]])     / (Log[r] - Log[r - 1]),     2, ecc},
+		"Central",   {r |-> (lv[[r + 2]] - lv[[r]])     / (Log[r + 1] - Log[r - 1]), 2, ecc - 1},
+		"Trapezoid", {r |-> ((lv[[r + 2]] - lv[[r + 1]]) / (Log[r + 1] - Log[r]) + (lv[[r + 1]] - lv[[r]]) / (Log[r] - Log[r - 1])) / 2, 2, ecc - 1},
+		{"Stencil", {__Integer}}, stencilScheme[lv, ecc, diff[[2]]],
+		_, Message[WolframHausdorffDimension::baddiff, diff];
+		   {r |-> (lv[[r + 2]] - lv[[r + 1]]) / (Log[r + 1] - Log[r]), 1, ecc - 1}
+	]
+]
+
+(* general k-point discrete derivative: weights from the method of undetermined
+   coefficients (Fornberg) for dy/du = d log V / d log r at the node u = log r,
+   on the nodes log(r + o), o in offsets.  Recovers Forward {0,1}, Backward
+   {-1,0}, Central {-1,0,1}; the window keeps every r + o >= 1 and r + o <= ecc *)
+stencilScheme[lv_, ecc_, offsets_] := {
+	r |-> fdWeights[Log[r + offsets], Log[r], 1] . lv[[r + offsets + 1]],
+	Max[1, 1 - Min[offsets]], ecc - Max[offsets]
+}
+
+(* weights c_i with Sum_i c_i (x_i - x0)^j = m! delta_{j,m}, j = 0..k-1: the unique
+   k-point stencil exact on polynomials of degree < k, approximating the m-th
+   derivative at x0 (order k - m).  Vandermonde solve; Fornberg's stable recursion
+   for large k, unneeded at the k <= 5 used here. *)
+fdWeights[nodes_, x0_, m_] := LinearSolve[
+	Table[If[j == 0, 1, (nodes[[i]] - x0)^j], {j, 0, Length[nodes] - 1}, {i, Length[nodes]}],
+	m! UnitVector[Length[nodes], m + 1]
 ]
 
 
