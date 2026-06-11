@@ -1259,8 +1259,8 @@ VerificationTest[
 
 (* d(v, r) = (Log V(r+1) - Log V(r)) / (Log(r+1) - Log r); on a cycle V(r) = 2r+1 *)
 VerificationTest[
-    WolframHausdorffDimension[CycleGraph[40], 1, 10],
-    N[(Log[23] - Log[21]) / (Log[11] - Log[10])],
+    Chop[WolframHausdorffDimension[CycleGraph[40], 1, 10] - N[(Log[23] - Log[21]) / (Log[11] - Log[10])]],
+    0,
     TestID -> "WolframHausdorffDimension-C40-single-radius-formula"
 ]
 
@@ -1283,6 +1283,120 @@ VerificationTest[
     WolframHausdorffDimension[HypercubeGraph[3], 1, {5, 7}],
     {},
     TestID -> "WolframHausdorffDimension-Q3-empty-window-empty"
+]
+
+(* {"Skew", 1/2} is lattice-exact: on a cycle V(r) = 2r+1 = 2(r+1/2), so the
+   estimate is exactly 1 at every pre-saturation radius (here r = 1..18) *)
+VerificationTest[
+    Union @ Chop[WolframHausdorffDimension[CycleGraph[40], 1, {1, 18}, "DerivativeDiscretizationScheme" -> {"Skew", 1/2}] - 1],
+    {0},
+    TestID -> "WolframHausdorffDimension-Skew-half-lattice-exact"
+]
+
+(* {"Skew", 0} (Forward) undershoots the dimension from below on a lattice *)
+VerificationTest[
+    WolframHausdorffDimension[CycleGraph[40], 1, 10] < 1,
+    True,
+    TestID -> "WolframHausdorffDimension-Skew-zero-undershoots"
+]
+
+(* every scheme returns an index-aligned list over r = 1..ecc: Forward and
+   Backward have equal length, with Indeterminate where the stencil runs off an end *)
+VerificationTest[
+    With[{p = PathGraph[Range[7]]},
+        {
+            Length @ WolframHausdorffDimension[p, 1, All] === Length @ WolframHausdorffDimension[p, 1, All, "DerivativeDiscretizationScheme" -> "Backward"],
+            WolframHausdorffDimension[p, 1, 1, "DerivativeDiscretizationScheme" -> "Backward"],
+            Last @ WolframHausdorffDimension[p, 1, All]
+        }
+    ],
+    {True, Indeterminate, Indeterminate},
+    TestID -> "WolframHausdorffDimension-index-aligned-padding"
+]
+
+(* "Central" is the 2-point secant: the centred difference D0 = stencil {-1, 1} *)
+VerificationTest[
+    With[{g = GridGraph[{5, 5}]},
+        WolframHausdorffDimension[g, 1, All, "DerivativeDiscretizationScheme" -> "Central"] ===
+        WolframHausdorffDimension[g, 1, All, "DerivativeDiscretizationScheme" -> {"Stencil", {-1, 1}}]
+    ],
+    True,
+    TestID -> "WolframHausdorffDimension-Central-is-secant-stencil"
+]
+
+
+(* ===== WolframDimensionCurvatureFit: Bishop-Gromov fit + Automatic window ===== *)
+
+(* endpoint of a path: V(r) = r + 1 exactly, so q(r) == 1 and the fit is exact *)
+VerificationTest[
+    With[{r = WolframDimensionCurvatureFit[PathGraph[Range[5]], 1]},
+        {Chop[r["Dimension"] - 1], Chop @ r["ScalarCurvature"]}
+    ],
+    {0, 0},
+    TestID -> "WolframDimensionCurvatureFit-P5-exact-line"
+]
+
+(* cycle: d = 1, R = 0; the Automatic window drops the small-r preamble bias
+   q(r) ~ 1 + 1/r and beats the full-range fit on both estimates *)
+VerificationTest[
+    With[{auto = WolframDimensionCurvatureFit[CycleGraph[40], 1], full = WolframDimensionCurvatureFit[CycleGraph[40], 1, All]},
+        {
+            Abs[auto["Dimension"] - 1] < 0.06,
+            Abs[auto["Dimension"] - 1] < Abs[full["Dimension"] - 1],
+            Abs[auto["ScalarCurvature"]] < Abs[full["ScalarCurvature"]]
+        }
+    ],
+    {True, True, True},
+    TestID -> "WolframDimensionCurvatureFit-C40-automatic-beats-full"
+]
+
+(* flat 20x20 square torus: d = 2, R = 0; Automatic cuts the wrap-around tail *)
+VerificationTest[
+    With[{g = TessellationGraph[{4, 4}, {20, 20}]},
+        {v = First @ VertexList @ g},
+        {auto = WolframDimensionCurvatureFit[g, v], full = WolframDimensionCurvatureFit[g, v, All]},
+        {
+            Abs[auto["Dimension"] - 2] < 0.3,
+            Abs[auto["Dimension"] - 2] < Abs[full["Dimension"] - 2],
+            Abs[auto["ScalarCurvature"]] < Abs[full["ScalarCurvature"]]
+        }
+    ],
+    {True, True, True},
+    TestID -> "WolframDimensionCurvatureFit-torus-automatic-cuts-wrap-tail"
+]
+
+(* the Automatic fit is reproducible from its own reported window *)
+VerificationTest[
+    With[{auto = WolframDimensionCurvatureFit[CycleGraph[40], 1]},
+        auto === WolframDimensionCurvatureFit[CycleGraph[40], 1, auto["Window"]]
+    ],
+    True,
+    TestID -> "WolframDimensionCurvatureFit-automatic-window-consistency"
+]
+
+(* fewer than 5 quotients: Automatic falls back to the full range *)
+VerificationTest[
+    WolframDimensionCurvatureFit[PathGraph[Range[5]], 1] === WolframDimensionCurvatureFit[PathGraph[Range[5]], 1, All],
+    True,
+    TestID -> "WolframDimensionCurvatureFit-short-profile-fallback"
+]
+
+(* positively curved Hamming cube: R > 0 on the detected core *)
+VerificationTest[
+    WolframDimensionCurvatureFit[HypercubeGraph[8], 1]["ScalarCurvature"] > 0,
+    True,
+    TestID -> "WolframDimensionCurvatureFit-Q8-positive-curvature"
+]
+
+(* pinned dimension fits only the slope, on the same detected window *)
+VerificationTest[
+    With[{g = TessellationGraph[{4, 4}, {20, 20}]},
+        {v = First @ VertexList @ g},
+        {pinned = WolframDimensionCurvatureFit[g, v, "Dimension" -> 2], auto = WolframDimensionCurvatureFit[g, v]},
+        {pinned["Dimension"], pinned["Window"] === auto["Window"]}
+    ],
+    {2., True},
+    TestID -> "WolframDimensionCurvatureFit-pinned-dimension-window"
 ]
 
 

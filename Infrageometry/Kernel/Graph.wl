@@ -14,10 +14,13 @@ PackageScope[cylinderVolume]
 
 PackageExport[FormanRicciCurvature]
 PackageExport[OllivierRicciCurvature]
+PackageExport[WolframVolumeLogDifferenceQuotients]
+PackageExport[WolframDimensionCurvatureFit]
 PackageExport[WolframRicciCurvature]
 PackageExport[WolframHausdorffDimension]
 PackageExport[SectionalCurvatures]
 PackageScope[wasserstein1]
+PackageScope[volumeSequences]
 
 PackageExport[EffectiveResistance]
 PackageExport[ResistanceQ]
@@ -378,188 +381,225 @@ cylinderVolume[dm_, pi_, qi_, s_] :=
 	]
 
 
+(* ===================== Volume-growth log-difference quotients ===================== *)
+
+(* q(r) = (log v(r+1) - log v(r)) / (log(r+1) - log r): the 2-point log-difference
+   quotient of the volume sequence v against the log-radius -- the discrete
+   d log V / d log r, best-approximating the elasticity at the geometric-mean
+   radius r* = Sqrt[r (r+1)] (the divided-difference midpoint in log r).  With the
+   default "PeeledBall" volume v(r) = V(r-1) this is SW's LogDifferences quotient,
+   the clean non-shifted form.  Default returns the flat sequence {q(1), ..., q(ecc-1)};
+   "Abscissa" -> True returns {r*, q} pairs (the ListPlot scatter feeding the fit).
+   Vertex slot 2 (single vertex, list, or All). *)
+
+Options[WolframVolumeLogDifferenceQuotients] = {"Volume" -> "PeeledBall", "Abscissa" -> False};
+
+WolframVolumeLogDifferenceQuotients[g_Graph, opts : OptionsPattern[]] :=
+	WolframVolumeLogDifferenceQuotients[g, All, opts]
+
+WolframVolumeLogDifferenceQuotients[g_Graph,
+	vertices : (_List | All),
+	OptionsPattern[]
+] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
+	With[{abscissa = TrueQ[OptionValue["Abscissa"]]},
+		(With[{lw = Log[N[#]], n = Length[#]},
+			With[{q = Table[(lw[[r + 2]] - lw[[r + 1]]) / (Log[r + 1.] - Log[r]), {r, 1, n - 2}]},
+				If[abscissa, Table[{Sqrt[r (r + 1)], q[[r]]}, {r, Length[q]}], q]
+			]
+		] &) /@ volumeSequences[g, vertices, OptionValue["Volume"]]
+	]
+
+WolframVolumeLogDifferenceQuotients[g_Graph,
+	vertex : Except[All | _Rule | _RuleDelayed],
+	OptionsPattern[]
+] := With[{w = volumeSequences[g, vertex, OptionValue["Volume"]], abscissa = TrueQ[OptionValue["Abscissa"]]},
+	With[{lw = Log[N[w]], n = Length[w]},
+		With[{q = Table[(lw[[r + 2]] - lw[[r + 1]]) / (Log[r + 1.] - Log[r]), {r, 1, n - 2}]},
+			If[abscissa, Table[{Sqrt[r (r + 1)], q[[r]]}, {r, Length[q]}], q]
+		]
+	]
+]
+
+
+(* ===================== Bishop-Gromov dimension + curvature fit ===================== *)
+
+(* Bishop-Gromov fit at a vertex: regress the log-difference quotient q(r) on
+   x = r (r+1), the squared geometric-mean radius.  The expansion
+   E V(rho) = d - R/(3(d+2)) rho^2 gives intercept = dimension d and
+   slope = -R/(3(d+2)), so scalar curvature R = -3 (d + 2) slope.  Returns
+   <|"Dimension" -> d, "ScalarCurvature" -> R, "Window" -> {rmin, rmax}|> with
+   the radius window the fit actually used.
+   "Dimension" -> d_Integer pins the intercept and fits only the slope.  Window
+   slot 3: {rmin, rmax} radii fed to the regression, All, or Automatic (default),
+   the linear core of the (x, q) scatter -- the longest radius window whose
+   least-squares residual error stays within twice the noise floor (the lower
+   quartile of all 5-point-window errors), ties to the smallest rmin since the
+   expansion is asymptotic at rho -> 0.  Vertex slot 2 (single, list, or All). *)
+
+Options[WolframDimensionCurvatureFit] = {"Volume" -> "PeeledBall", "Dimension" -> Automatic};
+
+WolframDimensionCurvatureFit[g_Graph, opts : OptionsPattern[]] :=
+	WolframDimensionCurvatureFit[g, All, Automatic, opts]
+
+WolframDimensionCurvatureFit[g_Graph,
+	vertices : (_List | All),
+	window : ({_Integer, _Integer} | All | Automatic) : Automatic,
+	OptionsPattern[]
+] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
+	With[{dim = OptionValue["Dimension"]},
+		(dimensionCurvature[#, window, dim] &) /@ volumeSequences[g, vertices, OptionValue["Volume"]]
+	]
+
+WolframDimensionCurvatureFit[g_Graph,
+	vertex : Except[All | _Rule | _RuleDelayed],
+	window : ({_Integer, _Integer} | All | Automatic) : Automatic,
+	OptionsPattern[]
+] := dimensionCurvature[volumeSequences[g, vertex, OptionValue["Volume"]], window, OptionValue["Dimension"]]
+
+(* one fit on a volume sequence: q(r) on x = r (r+1) over the radius window;
+   Automatic detects the linear core by exhaustive interval search (detection
+   always uses the free 2-parameter line, independent of a pinned dimension);
+   prefix sums give each interval's residual error in O(1) *)
+dimensionCurvature[w_, window_, dimOpt_] := With[
+	{lw = Log[N[w]], n = Length[w]},
+	{qAll = Table[(lw[[r + 2]] - lw[[r + 1]]) / (Log[r + 1.] - Log[r]), {r, 1, n - 2}]},
+	{rs = Which[
+		window === All, Range[1, n - 2],
+		ListQ[window], Select[Range[1, n - 2], window[[1]] <= # <= window[[2]] &],
+		n - 2 < 5, Range[1, n - 2],
+		True, With[
+			{k = n - 2, k0 = 5, xAll = N[Range[n - 2] (Range[n - 2] + 1)]},
+			{sx = Prepend[Accumulate[xAll], 0.], sxx = Prepend[Accumulate[xAll^2], 0.],
+			 sq = Prepend[Accumulate[qAll], 0.], sqq = Prepend[Accumulate[qAll^2], 0.],
+			 sxq = Prepend[Accumulate[xAll qAll], 0.]},
+			{rse = {i, j} |-> With[
+				{m = N[j - i + 1],
+				 ax = sx[[j + 1]] - sx[[i]], axx = sxx[[j + 1]] - sxx[[i]],
+				 aq = sq[[j + 1]] - sq[[i]], aqq = sqq[[j + 1]] - sqq[[i]],
+				 axq = sxq[[j + 1]] - sxq[[i]]},
+				{b = (m axq - ax aq) / (m axx - ax^2)},
+				Sqrt[Max[aqq - (aq - b ax) aq / m - b axq, 0.] / (m - 2)]
+			]},
+			{tol = Max[2 Quantile[Table[rse[i, i + k0 - 1], {i, 1, k - k0 + 1}], 1/4], 1.*^-10]},
+			Range @@ SelectFirst[
+				Catenate @ Table[{i, i + len - 1}, {len, k, k0, -1}, {i, 1, k - len + 1}],
+				p |-> rse[p[[1]], p[[2]]] <= tol,
+				{1, k}
+			]
+		]
+	]},
+	{x = N[rs (rs + 1)], q = qAll[[rs]]},
+	If[dimOpt === Automatic,
+		With[{c = LeastSquares[Transpose[{ConstantArray[1., Length[x]], x}], q]},
+			<|"Dimension" -> c[[1]], "ScalarCurvature" -> -3 (c[[1]] + 2) c[[2]], "Window" -> MinMax[rs]|>
+		],
+		With[{m = First @ LeastSquares[Transpose[{x}], q - dimOpt]},
+			<|"Dimension" -> N[dimOpt], "ScalarCurvature" -> -3 (dimOpt + 2) m, "Window" -> MinMax[rs]|>
+		]
+	]
+]
+
+
+(* ===================== Wolfram-Hausdorff dimension ===================== *)
+
+(* Volume-growth (Hausdorff) dimension: the fitted intercept d of the Bishop-Gromov
+   regression, i.e. the "Dimension" projection of WolframDimensionCurvatureFit.
+   Window slot 3 ({rmin, rmax}, All, or Automatic (default), the linear core),
+   vertex slot 2 (single, list, or All). *)
+
+Options[WolframHausdorffDimension] = {"Volume" -> "PeeledBall"};
+
+WolframHausdorffDimension[g_Graph, opts : OptionsPattern[]] :=
+	WolframHausdorffDimension[g, All, Automatic, opts]
+
+WolframHausdorffDimension[g_Graph,
+	vertices : (_List | All),
+	window : ({_Integer, _Integer} | All | Automatic) : Automatic,
+	OptionsPattern[]
+] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
+	#["Dimension"] & /@ WolframDimensionCurvatureFit[g, vertices, window, "Volume" -> OptionValue["Volume"]]
+
+WolframHausdorffDimension[g_Graph,
+	vertex : Except[All | _Rule | _RuleDelayed],
+	window : ({_Integer, _Integer} | All | Automatic) : Automatic,
+	OptionsPattern[]
+] := WolframDimensionCurvatureFit[g, vertex, window, "Volume" -> OptionValue["Volume"]]["Dimension"]
+
+
 (* ===================== Wolfram-Ricci scalar curvature ===================== *)
 
-(* Volume-comparison Ricci scalar at vertex v and integer radius r:
-       R(v, r) = 6 (d + 2) / r^2 (1 - V(r) / V_E(d, r)),
-       V_E(d, r) = pi^(d/2) r^d / Gamma[d/2 + 1],
-   with V(r) = |B_r(v)|.  Local dimension d is supplied via "Dimension" -> d
-   or read off the volume-growth local exponent when "Dimension" -> Automatic
-   (default); in that case option "Differencing" selects the finite-difference
-   scheme (shared with WolframHausdorffDimension), and the per-vertex valid radius
-   range is that scheme's window intersected with r >= 1 (the 1/r^2 in R).
+(* Volume-comparison Ricci scalar at vertex v: R(v, r) = 6 (d + 2)/r^2 (1 - v(r)/V_E(d, r)),
+   V_E(d, r) = pi^(d/2) r^d / Gamma[d/2 + 1], one value per radius r = 1..ecc.
+   Dimension d is supplied via "Dimension" -> d, or fitted once via
+   WolframDimensionCurvatureFit when "Dimension" -> Automatic (default).  Volume
+   v(r) is the chosen "Volume" convention (default "PeeledBall").  Vertex slot 2
+   (single, list, or All). *)
 
-   The radius slot is a pure selector (matches BallVolumeProfile /
-   CoordinationSequence): r_Integer -> the scalar R(v, r), a span or All ->
-   the list of R(v, r) over that radius window.  Aggregate yourself, e.g.
-   Mean @ WolframRicciCurvature[g, v, All], for a single representative scalar.
-
-   Vertex slot 2, radius slot 3 (default All):
-   WolframRicciCurvature[g, v, r_Integer]     -> R(v, r), scalar
-   WolframRicciCurvature[g, v, {rmin, rmax}]  -> { R(v, r) } over [rmin, rmax], list
-   WolframRicciCurvature[g, v] / [g, v, All]  -> { R(v, r) } over r = 1..ecc(v) - 1 (Automatic dim; ecc(v) with explicit "Dimension"), list
-   WolframRicciCurvature[g, {v1, ...}, range] -> list, one entry per vertex
-   WolframRicciCurvature[g, All, range]       -> list over VertexList[g]
-   WolframRicciCurvature[g]                    -> list over VertexList[g], each a full profile.
-   An integer r outside a vertex's valid range -> Indeterminate; an empty span -> {}. *)
-
-Options[WolframRicciCurvature] = {"Dimension" -> Automatic, "Differencing" -> "Forward"};
+Options[WolframRicciCurvature] = {"Dimension" -> Automatic, "Volume" -> "PeeledBall"};
 
 WolframRicciCurvature[g_Graph, opts : OptionsPattern[]] :=
-	WolframRicciCurvature[g, All, All, opts]
+	WolframRicciCurvature[g, All, opts]
 
-(* all/list form maps over BallVolumeProfile[g, vertices, All] (one GraphDistanceMatrix) *)
 WolframRicciCurvature[g_Graph,
 	vertices : (_List | All),
-	range : (_Integer | {_Integer, _Integer} | All) : All,
 	OptionsPattern[]
 ] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
-	With[{dim = OptionValue["Dimension"], diff = OptionValue["Differencing"]},
-		(With[{vols = #},
-			{spec = If[dim === Automatic, hausdorffScheme[diff, vols], {dim &, 1, Length[vols] - 1}]},
-			{dimFn = spec[[1]], rlo = Max[1, spec[[2]]], rhi = spec[[3]]},
-			{ricci = r |-> With[{dr = dimFn[r], vr = vols[[r + 1]]}, N[6 (dr + 2) / r^2 (1 - vr Gamma[dr / 2 + 1] / (Pi^(dr / 2) r^dr))]]},
-			Switch[range,
-				All,                  ricci /@ Range[rlo, rhi],
-				_Integer,             If[rlo <= range <= rhi, ricci[range], Indeterminate],
-				{_Integer, _Integer}, ricci /@ Range[Max[rlo, range[[1]]], Min[rhi, range[[2]]]]
+	With[{vol = OptionValue["Volume"], dimOpt = OptionValue["Dimension"]},
+		With[{
+			seqs = volumeSequences[g, vertices, vol],
+			dims = If[dimOpt === Automatic,
+				#["Dimension"] & /@ WolframDimensionCurvatureFit[g, vertices, Automatic, "Volume" -> vol],
+				ConstantArray[dimOpt, Length @ If[vertices === All, VertexList[g], vertices]]
 			]
-		] &) /@ BallVolumeProfile[g, vertices, All]
+		},
+			MapThread[
+				Function[{w, d},
+					Table[N[6 (d + 2) / r^2 (1 - w[[r + 1]] Gamma[d / 2 + 1] / (Pi^(d / 2) r^d))], {r, 1, Length[w] - 1}]
+				],
+				{seqs, dims}
+			]
+		]
 	]
 
-(* Except[All | _Rule | _RuleDelayed] (not also _List) so a single list-valued
-   vertex lands here while option rules still defer to the OptionsPattern form.
-   In Automatic-dim mode the local exponent dr and valid radius window come from the
-   chosen "Differencing" scheme (the same hausdorffScheme as WolframHausdorffDimension);
-   the Ricci 1/r^2 also forbids r = 0, hence the Max[1, .] clamp.  Explicit dim
-   keeps the full [1, ecc] window. *)
 WolframRicciCurvature[g_Graph,
 	vertex : Except[All | _Rule | _RuleDelayed],
-	range : (_Integer | {_Integer, _Integer} | All) : All,
 	OptionsPattern[]
-] := With[{dim = OptionValue["Dimension"], diff = OptionValue["Differencing"], vols = BallVolumeProfile[g, vertex]},
-	{spec = If[dim === Automatic, hausdorffScheme[diff, vols], {dim &, 1, Length[vols] - 1}]},
-	{dimFn = spec[[1]], rlo = Max[1, spec[[2]]], rhi = spec[[3]]},
-	{ricci = r |-> With[{dr = dimFn[r], vr = vols[[r + 1]]}, N[6 (dr + 2) / r^2 (1 - vr Gamma[dr / 2 + 1] / (Pi^(dr / 2) r^dr))]]},
-	Switch[range,
-		All,                  ricci /@ Range[rlo, rhi],
-		_Integer,             If[rlo <= range <= rhi, ricci[range], Indeterminate],
-		{_Integer, _Integer}, ricci /@ Range[Max[rlo, range[[1]]], Min[rhi, range[[2]]]]
+] := With[{vol = OptionValue["Volume"], dimOpt = OptionValue["Dimension"]},
+	With[{
+		w = volumeSequences[g, vertex, vol],
+		d = If[dimOpt === Automatic, WolframDimensionCurvatureFit[g, vertex, Automatic, "Volume" -> vol]["Dimension"], dimOpt]
+	},
+		Table[N[6 (d + 2) / r^2 (1 - w[[r + 1]] Gamma[d / 2 + 1] / (Pi^(d / 2) r^d))], {r, 1, Length[w] - 1}]
 	]
 ]
 
 
-(* Volume-growth local dimension at vertex v and radius r: the local scaling
-   exponent (elasticity) d(v, r) = d log V / d log r of the ball volume
-   V(r) = |B_r(v)|, estimated by a finite-difference scheme on the profile.
-   Shared with WolframRicciCurvature[..., "Dimension" -> Automatic]; same
-   selector calling convention.
+(* ===================== Volume conventions ===================== *)
 
-   Option "Differencing" picks the stencil for the slope of y = log V against
-   u = log r.  Each is a linear combination of the y-values at neighbouring
-   radii (Sum c_i y(r_i)), the weights c_i fixed by the method of undetermined
-   coefficients on the nodes u_i = log r_i:
+(* The ball-volume sequence v(0), v(1), ..., v(ecc) under one of three conventions:
+   "Count" = |B_r| (raw cumulative count); "PeeledBall" = |B_{r-1}| (outer shell
+   peeled -- SW's implicit convention, reproducing the LogDifferences shift);
+   "Interior" = |B_r| - |dB_r| = |GraphInterior[B_r]| (boundary-corrected; equals
+   "PeeledBall" in the bulk, differs near the eccentricity).  All/list form reads
+   one GraphDistanceMatrix; single-vertex form one GraphDistance. *)
 
-     "Forward"  (default)  secant on [r, r+1]:   (y(r+1) - y(r)) / (u(r+1) - u(r))
-     "Backward"            secant on [r-1, r]:   (y(r) - y(r-1)) / (u(r) - u(r-1))
-     "Central"             secant on [r-1, r+1]: (y(r+1) - y(r-1)) / (u(r+1) - u(r-1))
-     "Trapezoid"           mean of the Forward and Backward secant slopes
-                           (the slope of the piecewise-linear interpolant at r)
-     {"Stencil", offsets}  general k-point scheme: Fornberg / undetermined-
-                           coefficient weights for dy/du at u(r) on the nodes
-                           {u(r+o) : o in offsets}.  {0,1} reproduces Forward and
-                           {-1,0} Backward exactly (a 2-point stencil is the unique
-                           secant); a 3+-point stencil is the genuine higher-order
-                           derivative (exact on degree k-1, error O(h^{k-1})) and,
-                           on this non-uniform log grid, differs from the 2-point
-                           "Central" secant -- it reduces to it only on a uniform grid.
-
-   All share the limit d as r -> infinity; on a unit lattice each still carries
-   an O(1/r) finite-radius bias (Central / Trapezoid with a smaller constant
-   than the one-sided pair) -- see the research note for the bias analysis and
-   the abscissa-shift that removes it.
-
-   Missing values: a scheme is undefined at radii where its stencil leaves the
-   profile 0..ecc or hits log 0; these are returned as Indeterminate (never a
-   silent one-sided stand-in), so each scheme carries a valid window [rlo, rhi]:
-     "Forward"            [1, ecc-1]                  "Backward"  [2, ecc]
-     "Central"/"Trapezoid" [2, ecc-1]
-     {"Stencil", offsets} [max(1, 1 - min offsets), ecc - max offsets]
-
-   Vertex slot 2, radius slot 3 (default All), then the option:
-   WolframHausdorffDimension[g, v, r_Integer]     -> d(v, r) or Indeterminate
-   WolframHausdorffDimension[g, v, {rmin, rmax}]  -> { d(v, r) } clamped to the window
-   WolframHausdorffDimension[g, v] / [g, v, All]  -> { d(v, r) } over the window
-   WolframHausdorffDimension[g, {v1, ...}, range] -> one entry per vertex
-   WolframHausdorffDimension[g, All, range]       -> list over VertexList[g]
-   WolframHausdorffDimension[g]                    -> list over VertexList[g]. *)
-
-WolframHausdorffDimension::baddiff = "Unknown \"Differencing\" scheme `1`; use \"Forward\", \"Backward\", \"Central\", \"Trapezoid\", or {\"Stencil\", offsets}.";
-
-Options[WolframHausdorffDimension] = {"Differencing" -> "Forward"};
-
-WolframHausdorffDimension[g_Graph, opts : OptionsPattern[]] := WolframHausdorffDimension[g, All, All, opts]
-
-(* all/list form maps over BallVolumeProfile[g, vertices, All] (one GraphDistanceMatrix) *)
-WolframHausdorffDimension[g_Graph,
-	vertices : (_List | All),
-	range : (_Integer | {_Integer, _Integer} | All) : All,
-	OptionsPattern[]
-] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
-	With[{diff = OptionValue["Differencing"]},
-		(With[{spec = hausdorffScheme[diff, #]},
-			Switch[range,
-				All,                  spec[[1]] /@ Range[spec[[2]], spec[[3]]],
-				_Integer,             If[spec[[2]] <= range <= spec[[3]], spec[[1]][range], Indeterminate],
-				{_Integer, _Integer}, spec[[1]] /@ Range[Max[spec[[2]], range[[1]]], Min[spec[[3]], range[[2]]]]
-			]
-		] &) /@ BallVolumeProfile[g, vertices, All]
-	]
-
-(* Except[All | _Rule | _RuleDelayed] so a single list-valued vertex lands here
-   while a trailing option rule defers to the options form *)
-WolframHausdorffDimension[g_Graph,
-	vertex : Except[All | _Rule | _RuleDelayed],
-	range : (_Integer | {_Integer, _Integer} | All) : All,
-	OptionsPattern[]
-] := With[{spec = hausdorffScheme[OptionValue["Differencing"], BallVolumeProfile[g, vertex]]},
-	Switch[range,
-		All,                  spec[[1]] /@ Range[spec[[2]], spec[[3]]],
-		_Integer,             If[spec[[2]] <= range <= spec[[3]], spec[[1]][range], Indeterminate],
-		{_Integer, _Integer}, spec[[1]] /@ Range[Max[spec[[2]], range[[1]]], Min[spec[[3]], range[[2]]]]
+volumeSequences[g_Graph, vertices : (_List | All), vol_] /;
+	vertices === All || ! MemberQ[VertexList[g], vertices] := Switch[vol,
+	"Count",      BallVolumeProfile[g, vertices, All],
+	"PeeledBall", (Join[{First[#]}, Most[#]] &) /@ BallVolumeProfile[g, vertices, All],
+	"Interior",   With[{vs = VertexList[g], dm = GraphDistanceMatrix[g], idx = PositionIndex @ VertexList[g]},
+		(With[{row = dm[[idx[#][[1]]]]},
+			Table[Length @ GraphInterior[g, Pick[vs, Thread[row <= r]]], {r, 0, Max @ DeleteCases[row, Infinity]}]
+		] &) /@ If[vertices === All, vs, vertices]
 	]
 ]
 
-(* {localExponentFn, rlo, rhi}: the scheme's per-radius estimator and its valid
-   radius window on the profile vols (vols[[r+1]] = V(r), ecc = Length - 1) *)
-hausdorffScheme[diff_, vols_] := With[{lv = Log[N[vols]], ecc = Length[vols] - 1},
-	Switch[diff,
-		"Forward",   {r |-> (lv[[r + 2]] - lv[[r + 1]]) / (Log[r + 1] - Log[r]),     1, ecc - 1},
-		"Backward",  {r |-> (lv[[r + 1]] - lv[[r]])     / (Log[r] - Log[r - 1]),     2, ecc},
-		"Central",   {r |-> (lv[[r + 2]] - lv[[r]])     / (Log[r + 1] - Log[r - 1]), 2, ecc - 1},
-		"Trapezoid", {r |-> ((lv[[r + 2]] - lv[[r + 1]]) / (Log[r + 1] - Log[r]) + (lv[[r + 1]] - lv[[r]]) / (Log[r] - Log[r - 1])) / 2, 2, ecc - 1},
-		{"Stencil", {__Integer}}, stencilScheme[lv, ecc, diff[[2]]],
-		_, Message[WolframHausdorffDimension::baddiff, diff];
-		   {r |-> (lv[[r + 2]] - lv[[r + 1]]) / (Log[r + 1] - Log[r]), 1, ecc - 1}
+volumeSequences[g_Graph, vertex_, vol_] := Switch[vol,
+	"Count",      BallVolumeProfile[g, vertex],
+	"PeeledBall", With[{c = BallVolumeProfile[g, vertex]}, Join[{First[c]}, Most[c]]],
+	"Interior",   With[{vs = VertexList[g], row = GraphDistance[g, vertex]},
+		Table[Length @ GraphInterior[g, Pick[vs, Thread[row <= r]]], {r, 0, Max @ DeleteCases[row, Infinity]}]
 	]
-]
-
-(* general k-point discrete derivative: weights from the method of undetermined
-   coefficients (Fornberg) for dy/du = d log V / d log r at the node u = log r,
-   on the nodes log(r + o), o in offsets.  Recovers Forward {0,1}, Backward
-   {-1,0}, Central {-1,0,1}; the window keeps every r + o >= 1 and r + o <= ecc *)
-stencilScheme[lv_, ecc_, offsets_] := {
-	r |-> fdWeights[Log[r + offsets], Log[r], 1] . lv[[r + offsets + 1]],
-	Max[1, 1 - Min[offsets]], ecc - Max[offsets]
-}
-
-(* weights c_i with Sum_i c_i (x_i - x0)^j = m! delta_{j,m}, j = 0..k-1: the unique
-   k-point stencil exact on polynomials of degree < k, approximating the m-th
-   derivative at x0 (order k - m).  Vandermonde solve; Fornberg's stable recursion
-   for large k, unneeded at the k <= 5 used here. *)
-fdWeights[nodes_, x0_, m_] := LinearSolve[
-	Table[If[j == 0, 1, (nodes[[i]] - x0)^j], {j, 0, Length[nodes] - 1}, {i, Length[nodes]}],
-	m! UnitVector[Length[nodes], m + 1]
 ]
 
 
