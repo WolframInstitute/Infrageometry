@@ -21,6 +21,7 @@ PackageExport[WolframHausdorffDimension]
 PackageExport[SectionalCurvatures]
 PackageScope[wasserstein1]
 PackageScope[volumeSequences]
+PackageScope[logDifferenceSlope]
 
 PackageExport[EffectiveResistance]
 PackageExport[ResistanceQ]
@@ -392,16 +393,21 @@ cylinderVolume[dm_, pi_, qi_, s_] :=
 
 (* ===================== Volume-growth log-difference quotients ===================== *)
 
-(* q(r) = (log v(r+1) - log v(r)) / (log(r+1) - log r): the 2-point log-difference
-   quotient of the volume sequence v against the log-radius -- the discrete
-   d log V / d log r, best-approximating the elasticity at the geometric-mean
-   radius r* = Sqrt[r (r+1)] (the divided-difference midpoint in log r).  With the
-   default "PeeledBall" volume v(r) = V(r-1) this is SW's LogDifferences quotient,
-   the clean non-shifted form.  Default returns the flat sequence {q(1), ..., q(ecc-1)};
-   "Abscissa" -> True returns {r*, q} pairs (the ListPlot scatter feeding the fit).
-   Vertex slot 2 (single vertex, list, or All). *)
+(* q(r) = (log V(r) - log V(r-1)) / (log(r+1) - log r): the log-difference quotient of
+   the ball-volume sequence against the log-radius -- the discrete d log V / d log r,
+   == ResourceFunction["LogDifferences"][V] (default "Volume" -> "Count").  Returns the
+   full {q(1), ..., q(ecc)} (ecc values, the last being the approach to saturation);
+   "Abscissa" -> True returns {Sqrt[r (r+1)], q} pairs (the divided-difference midpoint
+   in log r, the ListPlot scatter feeding the fit).  Vertex slot 2 (single vertex, list,
+   or All); "Aggregation" averages the volume profiles before the slope (slope-of-mean). *)
 
-Options[WolframVolumeLogDifferenceQuotients] = {"Volume" -> "PeeledBall", "Abscissa" -> False, "Aggregation" -> None};
+Options[WolframVolumeLogDifferenceQuotients] = {"Volume" -> "Count", "Abscissa" -> False, "Aggregation" -> None};
+
+(* log-log slope of a ball-volume sequence w = {V(0), ..., V(ecc)}:
+   Log[Ratios[Range[n]], Ratios[w]] == ResourceFunction["LogDifferences"][w], the
+   discrete d Log V / d Log r at each radius step.  n - 1 values, including the final
+   approach to saturation -- the estimator SW's dimension chapters plot. *)
+logDifferenceSlope[w_] := Log[Ratios[Range[Length[w]]], Ratios[N[w]]]
 
 WolframVolumeLogDifferenceQuotients[g_Graph, opts : OptionsPattern[]] :=
 	WolframVolumeLogDifferenceQuotients[g, All, opts]
@@ -419,10 +425,9 @@ WolframVolumeLogDifferenceQuotients[g_Graph,
 		{seqs = volumeSequences[g, vertices, OptionValue["Volume"]]},
 		{profiles = If[agg === None, seqs,
 			{(Switch[agg, "MeanAround", MeanAround, "Mean", Mean] /@ Transpose[(Take[#, Min[Length /@ seqs]] &) /@ seqs])}]},
-		{out = (With[{lw = Log[N[#]], n = Length[#]},
-			With[{q = Table[(lw[[r + 2]] - lw[[r + 1]]) / (Log[r + 1.] - Log[r]), {r, 1, n - 2}]},
+		{out = (With[{q = logDifferenceSlope[#]},
 				If[abscissa, Table[{Sqrt[r (r + 1)], q[[r]]}, {r, Length[q]}], q]
-			]] &) /@ profiles},
+			] &) /@ profiles},
 		If[agg === None, out, First[out]]
 	]
 
@@ -430,10 +435,8 @@ WolframVolumeLogDifferenceQuotients[g_Graph,
 	vertex : Except[All | _Rule | _RuleDelayed],
 	OptionsPattern[]
 ] := With[{w = volumeSequences[g, vertex, OptionValue["Volume"]], abscissa = TrueQ[OptionValue["Abscissa"]]},
-	With[{lw = Log[N[w]], n = Length[w]},
-		With[{q = Table[(lw[[r + 2]] - lw[[r + 1]]) / (Log[r + 1.] - Log[r]), {r, 1, n - 2}]},
-			If[abscissa, Table[{Sqrt[r (r + 1)], q[[r]]}, {r, Length[q]}], q]
-		]
+	With[{q = logDifferenceSlope[w]},
+		If[abscissa, Table[{Sqrt[r (r + 1)], q[[r]]}, {r, Length[q]}], q]
 	]
 ]
 

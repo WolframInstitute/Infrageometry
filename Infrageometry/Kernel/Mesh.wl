@@ -125,8 +125,10 @@ GraphMesh[g_ ? GraphQ] := MeshRegion[
 ]
 
 
-(* surface vertices lie on a boundary face (a (d-1)-subset of a top simplex occurring in exactly one top cell); keep every edge with at least one interior endpoint, dropping surface vertices left with none (so components match the region's) *)
-InteriorMeshGraph[mr_MeshRegion] := With[
+Options[InteriorMeshGraph] = {"KeepCoordinates" -> False};
+
+(* surface vertices lie on a boundary face (a (d-1)-subset of a top simplex occurring in exactly one top cell); keep every edge with at least one interior endpoint, dropping surface vertices left with none (so components match the region's). "KeepCoordinates" -> True attaches the mesh coordinates as VertexCoordinates; by default they are dropped *)
+InteriorMeshGraph[mr_MeshRegion, opts : OptionsPattern[]] := With[
 	{coords = MeshCoordinates[mr], d = RegionDimension[mr], edges = UndirectedEdge @@@ (First /@ MeshCells[mr, 1])},
 	{surface = If[d <= 1,
 		{},
@@ -134,7 +136,7 @@ InteriorMeshGraph[mr_MeshRegion] := With[
 	]},
 	{kept = Select[edges, ! SubsetQ[surface, List @@ #] &]},
 	{vertices = Union @@ (List @@@ kept)},
-	Graph[vertices, kept, VertexCoordinates -> coords[[vertices]]]
+	Graph[vertices, kept, Sequence @@ If[OptionValue["KeepCoordinates"], {VertexCoordinates -> coords[[vertices]]}, {}]]
 ]
 
 
@@ -403,11 +405,13 @@ Options[UnitLengthGraph] = {
 	"Tolerance" -> 10.^-6,
 	"ProjectionStep" -> 1.,
 	"Overpack" -> 1.,
-	"ContactTolerance" -> 0.25
+	"ContactTolerance" -> 0.25,
+	"KeepCoordinates" -> False
 };
 
 (* unit-length graph of region: contact graph of a relaxed hard-sphere packing of n spheres in
-   region, every edge length 2r; the packing is stored in VertexCoordinates.  The automatic radius
+   region, every edge length 2r.  "KeepCoordinates" -> True stores the packing in VertexCoordinates;
+   by default the coordinates are dropped.  The automatic radius
    spaces the spheres to tile the region's content C in its own dimension d (2r = C/n on a curve,
    Sqrt[2 C / (n Sqrt[3])] hexagonally on a surface, 1.12 (C/n)^(1/3) in a solid), so the packing
    jams into contacts; "Overpack" > 1 tightens the contact shell *)
@@ -433,7 +437,9 @@ UnitLengthGraph[region_ ? RegionQ, n_Integer, opts : OptionsPattern[]] := Module
 				OptionValue["ProjectionStep"], OptionValue["MaxIterations"], OptionValue["Tolerance"]
 			]
 	];
-	contactGraph[points, radius, OptionValue["ContactTolerance"]]
+	With[{cg = contactGraph[points, radius, OptionValue["ContactTolerance"]]},
+		If[OptionValue["KeepCoordinates"], cg, Graph[cg, VertexCoordinates -> Automatic]]
+	]
 ]
 
 
