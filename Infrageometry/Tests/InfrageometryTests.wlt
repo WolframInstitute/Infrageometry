@@ -1325,6 +1325,49 @@ VerificationTest[
 ]
 
 
+(* ===== WolframVolumeLogDifferenceQuotients: aggregation ===== *)
+
+(* default Aggregation -> None gives one slope list per vertex (list of lists) *)
+VerificationTest[
+    MatchQ[WolframVolumeLogDifferenceQuotients[CycleGraph[10], All], {__List}],
+    True,
+    TestID -> "WVLDQ-default-per-vertex"
+]
+
+(* "Mean" aggregation returns a single slope-of-mean list (flat, not per-vertex) *)
+VerificationTest[
+    MatchQ[WolframVolumeLogDifferenceQuotients[CycleGraph[40], All, "Aggregation" -> "Mean"], {__Real}],
+    True,
+    TestID -> "WVLDQ-Mean-aggregation-flat-list"
+]
+
+(* on a vertex-transitive graph every profile is identical, so slope-of-mean over
+   all vertices equals the single-vertex slope *)
+VerificationTest[
+    Max @ Abs[WolframVolumeLogDifferenceQuotients[CycleGraph[40], All, "Aggregation" -> "Mean"]
+              - WolframVolumeLogDifferenceQuotients[CycleGraph[40], 1]] < 10.^-10,
+    True,
+    TestID -> "WVLDQ-Mean-aggregation-vertex-transitive"
+]
+
+(* aggregating over a vertex SUBSET averages only those profiles; on a
+   vertex-transitive graph any subset reproduces the single-vertex slope *)
+VerificationTest[
+    Max @ Abs[WolframVolumeLogDifferenceQuotients[CycleGraph[40], {1, 5, 9}, "Aggregation" -> "Mean"]
+              - WolframVolumeLogDifferenceQuotients[CycleGraph[40], 1]] < 10.^-10,
+    True,
+    TestID -> "WVLDQ-subset-aggregation"
+]
+
+(* "MeanAround" carries the spread into Around; central values match "Mean" *)
+VerificationTest[
+    Max @ Abs[(#[[1]] & /@ WolframVolumeLogDifferenceQuotients[GridGraph[{5, 5}], All, "Aggregation" -> "MeanAround"])
+              - WolframVolumeLogDifferenceQuotients[GridGraph[{5, 5}], All, "Aggregation" -> "Mean"]] < 10.^-10,
+    True,
+    TestID -> "WVLDQ-MeanAround-central-equals-Mean"
+]
+
+
 (* ===== WolframDimensionCurvatureFit: Bishop-Gromov fit + Automatic window ===== *)
 
 (* endpoint of a path: V(r) = r + 1 exactly, so q(r) == 1 and the fit is exact *)
@@ -1691,7 +1734,7 @@ VerificationTest[
     TestID -> "GraphBoundary-cycle-arc"
 ]
 
-(* Subgraph form agrees with the vertex-list form *)
+(* Subgraph form agrees with the vertex-list form when the subgraph is induced *)
 VerificationTest[
     With[{g = GridGraph[{4, 4}], s = {1, 2, 3, 6, 7, 11}},
         GraphBoundary[g, Subgraph[g, s]] === GraphBoundary[g, s] &&
@@ -1699,6 +1742,18 @@ VerificationTest[
     ],
     True,
     TestID -> "GraphBoundary-subgraph-form"
+]
+
+(* A NON-induced subgraph (a Hamiltonian path/curve through every vertex) is
+   edge-aware: as a curve it is all boundary but for two pass-through corners,
+   whereas the same vertices as a list (full set) are entirely interior *)
+VerificationTest[
+    With[{g = GridGraph[{3, 3}],
+          curve = Graph[Range[9], UndirectedEdge @@@ Partition[{1, 2, 3, 6, 5, 4, 7, 8, 9}, 2, 1]]},
+        {Length @ GraphInterior[g, curve], Length @ GraphInterior[g, VertexList[g]]}
+    ],
+    {2, 9},
+    TestID -> "GraphInterior-noninduced-curve-vs-list"
 ]
 
 (* Empty subset; isolated vertex is interior *)

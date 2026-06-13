@@ -64,18 +64,27 @@ GraphVertexWeights[g_Graph] := Replace[
 
 (* ===================== Inner vertex boundary / interior ===================== *)
 
-(* GraphBoundary[g, S]: inner vertex boundary {v in S : v has a neighbor outside S}. *)
-GraphBoundary[g_Graph, subgraph_Graph] :=
-	GraphBoundary[g, VertexList[subgraph]]
+(* GraphBoundary[g, S]: inner vertex boundary. Two input forms, one notion (a
+   vertex is boundary iff some g-edge at it escapes the given object):
+     - vertex list S: the object is the INDUCED subgraph, so "escaping g-edge"
+       means a neighbor outside S -- {v in S : v has a neighbor in V\S};
+     - subgraph h (its own edges, e.g. a path/curve): {v in V(h) : v has a
+       g-neighbor it is not joined to in h}. For an induced h this agrees with
+       the list form; for a sparser h a curve is all boundary (every vertex has
+       g-neighbors off the curve), so a 1-D object has empty interior. *)
+GraphBoundary[g_Graph, h_Graph] :=
+	With[{hAdj = AssociationThread[VertexList[h], AdjacencyList[h]]},
+		Select[VertexList[h], ! SubsetQ[Lookup[hAdj, #, {}], AdjacencyList[g, #]] &]
+	]
 
 GraphBoundary[g_Graph, subset_List] :=
 	With[{outside = Complement[VertexList[g], subset]},
 		Select[subset, IntersectingQ[AdjacencyList[g, #], outside] &]
 	]
 
-(* GraphInterior[g, S]: {v in S : all neighbors of v lie in S} = S \ GraphBoundary[g, S]. *)
-GraphInterior[g_Graph, subgraph_Graph] :=
-	GraphInterior[g, VertexList[subgraph]]
+(* GraphInterior[g, S]: S \ GraphBoundary[g, S], same two input forms. *)
+GraphInterior[g_Graph, h_Graph] :=
+	Complement[VertexList[h], GraphBoundary[g, h]]
 
 GraphInterior[g_Graph, subset_List] :=
 	Complement[subset, GraphBoundary[g, subset]]
@@ -392,21 +401,29 @@ cylinderVolume[dm_, pi_, qi_, s_] :=
    "Abscissa" -> True returns {r*, q} pairs (the ListPlot scatter feeding the fit).
    Vertex slot 2 (single vertex, list, or All). *)
 
-Options[WolframVolumeLogDifferenceQuotients] = {"Volume" -> "PeeledBall", "Abscissa" -> False};
+Options[WolframVolumeLogDifferenceQuotients] = {"Volume" -> "PeeledBall", "Abscissa" -> False, "Aggregation" -> None};
 
 WolframVolumeLogDifferenceQuotients[g_Graph, opts : OptionsPattern[]] :=
 	WolframVolumeLogDifferenceQuotients[g, All, opts]
 
+(* "Aggregation" -> "MeanAround" | "Mean": average the volume profiles over the
+   vertex slot first (truncate-to-min radius), then take one slope -- the
+   chapters' slope-of-mean estimator (MeanAround carries the spread into Around
+   error bars).  None (default): one slope list per vertex. *)
 WolframVolumeLogDifferenceQuotients[g_Graph,
 	vertices : (_List | All),
 	OptionsPattern[]
 ] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
-	With[{abscissa = TrueQ[OptionValue["Abscissa"]]},
-		(With[{lw = Log[N[#]], n = Length[#]},
+	With[
+		{abscissa = TrueQ[OptionValue["Abscissa"]], agg = OptionValue["Aggregation"]},
+		{seqs = volumeSequences[g, vertices, OptionValue["Volume"]]},
+		{profiles = If[agg === None, seqs,
+			{(Switch[agg, "MeanAround", MeanAround, "Mean", Mean] /@ Transpose[(Take[#, Min[Length /@ seqs]] &) /@ seqs])}]},
+		{out = (With[{lw = Log[N[#]], n = Length[#]},
 			With[{q = Table[(lw[[r + 2]] - lw[[r + 1]]) / (Log[r + 1.] - Log[r]), {r, 1, n - 2}]},
 				If[abscissa, Table[{Sqrt[r (r + 1)], q[[r]]}, {r, Length[q]}], q]
-			]
-		] &) /@ volumeSequences[g, vertices, OptionValue["Volume"]]
+			]] &) /@ profiles},
+		If[agg === None, out, First[out]]
 	]
 
 WolframVolumeLogDifferenceQuotients[g_Graph,
