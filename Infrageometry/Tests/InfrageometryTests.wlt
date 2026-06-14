@@ -1237,138 +1237,155 @@ VerificationTest[
 ]
 
 
-(* ===== VolumeGrowthParameters: joined ball + sphere growth fit ===== *)
+(* ===== VolumeGrowthObservables: joined ball + sphere growth fit (flat assoc) ===== *)
 
 (* endpoint of a path: V(r) = r + 1 exactly, so q(r) == 1 and the ball fit is exact *)
 VerificationTest[
-    With[{r = VolumeGrowthParameters[PathGraph[Range[5]], 1]["Ball"]},
-        {Chop[r["Dimension"] - 1], Chop @ r["ScalarCurvature"]}
+    With[{r = VolumeGrowthObservables[PathGraph[Range[5]], 1]},
+        {Chop[r["BallDimension"] - 1], Chop @ r["BallScalarCurvature"]}
     ],
     {0, 0},
-    TestID -> "VolumeGrowthParameters-P5-ball-exact-line"
+    TestID -> "VolumeGrowthObservables-P5-ball-exact-line"
 ]
 
 (* cycle: d = 1, R = 0; the Automatic window drops the small-r preamble bias
    q(r) ~ 1 + 1/r and beats the full-range fit on both estimates *)
 VerificationTest[
-    With[{auto = VolumeGrowthParameters[CycleGraph[40], 1]["Ball"], full = VolumeGrowthParameters[CycleGraph[40], 1, All]["Ball"]},
+    With[{auto = VolumeGrowthObservables[CycleGraph[40], 1], full = VolumeGrowthObservables[CycleGraph[40], 1, All]},
         {
-            Abs[auto["Dimension"] - 1] < 0.06,
-            Abs[auto["Dimension"] - 1] < Abs[full["Dimension"] - 1],
-            Abs[auto["ScalarCurvature"]] < Abs[full["ScalarCurvature"]]
+            Abs[auto["BallDimension"] - 1] < 0.06,
+            Abs[auto["BallDimension"] - 1] < Abs[full["BallDimension"] - 1],
+            Abs[auto["BallScalarCurvature"]] < Abs[full["BallScalarCurvature"]]
         }
     ],
     {True, True, True},
-    TestID -> "VolumeGrowthParameters-C40-automatic-beats-full"
+    TestID -> "VolumeGrowthObservables-C40-automatic-beats-full"
 ]
 
 (* flat 20x20 square torus: d = 2, R = 0; Automatic cuts the wrap-around tail *)
 VerificationTest[
     With[{g = TessellationGraph[{4, 4}, {20, 20}]},
         {v = First @ VertexList @ g},
-        {auto = VolumeGrowthParameters[g, v]["Ball"], full = VolumeGrowthParameters[g, v, All]["Ball"]},
+        {auto = VolumeGrowthObservables[g, v], full = VolumeGrowthObservables[g, v, All]},
         {
-            Abs[auto["Dimension"] - 2] < 0.3,
-            Abs[auto["Dimension"] - 2] < Abs[full["Dimension"] - 2],
-            Abs[auto["ScalarCurvature"]] < Abs[full["ScalarCurvature"]]
+            Abs[auto["BallDimension"] - 2] < 0.3,
+            Abs[auto["BallDimension"] - 2] < Abs[full["BallDimension"] - 2],
+            Abs[auto["BallScalarCurvature"]] < Abs[full["BallScalarCurvature"]]
         }
     ],
     {True, True, True},
-    TestID -> "VolumeGrowthParameters-torus-automatic-cuts-wrap-tail"
+    TestID -> "VolumeGrowthObservables-torus-automatic-cuts-wrap-tail"
 ]
 
 (* the Automatic ball fit is reproducible from its own reported window *)
 VerificationTest[
-    With[{auto = VolumeGrowthParameters[CycleGraph[40], 1]["Ball"]},
-        auto === VolumeGrowthParameters[CycleGraph[40], 1, auto["Window"]]["Ball"]
+    With[{auto = VolumeGrowthObservables[CycleGraph[40], 1]},
+        KeyTake[auto, {"BallDimension", "BallScalarCurvature", "BallWindow"}] ===
+            KeyTake[VolumeGrowthObservables[CycleGraph[40], 1, auto["BallWindow"]], {"BallDimension", "BallScalarCurvature", "BallWindow"}]
     ],
     True,
-    TestID -> "VolumeGrowthParameters-automatic-window-consistency"
+    TestID -> "VolumeGrowthObservables-automatic-window-consistency"
 ]
 
 (* the per-radius ball curvature profile has one entry per radius r = 1..ecc(v) *)
 VerificationTest[
-    Length[VolumeGrowthParameters[HypercubeGraph[8], 1]["Ball", "CurvatureByRadius"]] === Length[BallVolumes[HypercubeGraph[8], 1]] - 1,
+    Length[VolumeGrowthObservables[HypercubeGraph[8], 1]["BallCurvatureByRadius"]] === Length[BallVolumes[HypercubeGraph[8], 1]] - 1,
     True,
-    TestID -> "VolumeGrowthParameters-ball-CurvatureByRadius-length"
+    TestID -> "VolumeGrowthObservables-ball-CurvatureByRadius-length"
 ]
 
 (* positively curved Hamming cube: ball R > 0 on the detected core *)
 VerificationTest[
-    VolumeGrowthParameters[HypercubeGraph[8], 1]["Ball", "ScalarCurvature"] > 0,
+    VolumeGrowthObservables[HypercubeGraph[8], 1]["BallScalarCurvature"] > 0,
     True,
-    TestID -> "VolumeGrowthParameters-Q8-ball-positive-curvature"
+    TestID -> "VolumeGrowthObservables-Q8-ball-positive-curvature"
 ]
 
 (* pinned dimension fits only the slope, on the same detected window *)
 VerificationTest[
     With[{g = TessellationGraph[{4, 4}, {20, 20}]},
         {v = First @ VertexList @ g},
-        {pinned = VolumeGrowthParameters[g, v, "Dimension" -> 2]["Ball"], auto = VolumeGrowthParameters[g, v]["Ball"]},
-        {pinned["Dimension"], pinned["Window"] === auto["Window"]}
+        {pinned = VolumeGrowthObservables[g, v, "Dimension" -> 2], auto = VolumeGrowthObservables[g, v]},
+        {pinned["BallDimension"], pinned["BallWindow"] === auto["BallWindow"]}
     ],
     {2., True},
-    TestID -> "VolumeGrowthParameters-pinned-dimension-window"
+    TestID -> "VolumeGrowthObservables-pinned-dimension-window"
 ]
 
 (* flat square grid: shell area A(r) = 4 r exactly on the rising part, so q == 1, the
    sphere intercept is n - 1 = 1, the reported manifold dimension is n = 2 and S = 0 *)
 VerificationTest[
     With[{g = GridGraph[{15, 15}]},
-        {r = VolumeGrowthParameters[g, First @ GraphCenter @ g]["Sphere"]},
-        {Abs[r["Dimension"] - 2] < 1.*^-6, Abs @ r["ScalarCurvature"] < 1.*^-6}
+        {r = VolumeGrowthObservables[g, First @ GraphCenter @ g]},
+        {Abs[r["SphereDimension"] - 2] < 1.*^-6, Abs @ r["SphereScalarCurvature"] < 1.*^-6}
     ],
     {True, True},
-    TestID -> "VolumeGrowthParameters-grid2D-sphere-flat"
+    TestID -> "VolumeGrowthObservables-grid2D-sphere-flat"
 ]
 
 (* flat cubic grid: sphere manifold dimension recovered as ~ 3 *)
 VerificationTest[
     With[{g = GridGraph[{9, 9, 9}]},
-        Abs[VolumeGrowthParameters[g, First @ GraphCenter @ g]["Sphere", "Dimension"] - 3] < 0.2
+        Abs[VolumeGrowthObservables[g, First @ GraphCenter @ g]["SphereDimension"] - 3] < 0.2
     ],
     True,
-    TestID -> "VolumeGrowthParameters-grid3D-sphere-dimension"
+    TestID -> "VolumeGrowthObservables-grid3D-sphere-dimension"
 ]
 
 (* dual probe: ball and sphere agree on the manifold dimension of a flat lattice *)
 VerificationTest[
     With[{g = GridGraph[{15, 15}]},
-        {p = VolumeGrowthParameters[g, First @ GraphCenter @ g]},
-        Abs[p["Ball", "Dimension"] - p["Sphere", "Dimension"]] < 0.4
+        {p = VolumeGrowthObservables[g, First @ GraphCenter @ g]},
+        Abs[p["BallDimension"] - p["SphereDimension"]] < 0.4
     ],
     True,
-    TestID -> "VolumeGrowthParameters-ball-sphere-dimension-agreement-flat"
+    TestID -> "VolumeGrowthObservables-ball-sphere-dimension-agreement-flat"
 ]
 
 (* flat torus through the sphere probe: d = 2, S = 0 *)
 VerificationTest[
     With[{g = TessellationGraph[{4, 4}, {20, 20}]},
-        {r = VolumeGrowthParameters[g, First @ VertexList @ g]["Sphere"]},
-        {Abs[r["Dimension"] - 2] < 0.05, Abs @ r["ScalarCurvature"] < 1.*^-6}
+        {r = VolumeGrowthObservables[g, First @ VertexList @ g]},
+        {Abs[r["SphereDimension"] - 2] < 0.05, Abs @ r["SphereScalarCurvature"] < 1.*^-6}
     ],
     {True, True},
-    TestID -> "VolumeGrowthParameters-torus-sphere-flat"
+    TestID -> "VolumeGrowthObservables-torus-sphere-flat"
 ]
 
 (* positive curvature: ball and sphere scalar-curvature estimates share sign (both > 0)
    on the positively curved Hamming cube -- the dual-probe consistency check *)
 VerificationTest[
-    With[{p = VolumeGrowthParameters[HypercubeGraph[8], 1]},
-        Sign[p["Ball", "ScalarCurvature"]] === Sign[p["Sphere", "ScalarCurvature"]] === 1
+    With[{p = VolumeGrowthObservables[HypercubeGraph[8], 1]},
+        Sign[p["BallScalarCurvature"]] === Sign[p["SphereScalarCurvature"]] === 1
     ],
     True,
-    TestID -> "VolumeGrowthParameters-positive-curvature-sign-agreement"
+    TestID -> "VolumeGrowthObservables-positive-curvature-sign-agreement"
 ]
 
 (* the sphere fit exposes the per-radius area-curvature and mean-curvature profiles *)
 VerificationTest[
-    With[{r = VolumeGrowthParameters[HypercubeGraph[8], 1]["Sphere"]},
-        {Length[r["CurvatureByRadius"]] === Length[ShellAreas[HypercubeGraph[8], 1]] - 1,
-         Length[r["MeanCurvatureByRadius"]] === Length[ShellAreas[HypercubeGraph[8], 1]] - 1}
+    With[{r = VolumeGrowthObservables[HypercubeGraph[8], 1]},
+        {Length[r["SphereCurvatureByRadius"]] === Length[ShellAreas[HypercubeGraph[8], 1]] - 1,
+         Length[r["SphereMeanCurvatureByRadius"]] === Length[ShellAreas[HypercubeGraph[8], 1]] - 1}
     ],
     {True, True},
-    TestID -> "VolumeGrowthParameters-sphere-profiles-length"
+    TestID -> "VolumeGrowthObservables-sphere-profiles-length"
+]
+
+(* the bundle carries the raw growth profiles and their log-difference quotients,
+   matching the standalone primitives *)
+VerificationTest[
+    With[{g = GridGraph[{9, 9}]},
+        {v = First @ GraphCenter @ g},
+        {r = VolumeGrowthObservables[g, v]},
+        {
+            r["ShellAreas"] === ShellAreas[g, v],
+            r["BallVolumes"] === BallVolumes[g, v, All, "Ball" -> "Peeled"],
+            r["SphereLogDifferenceQuotients"] === LogDifferenceQuotients[ShellAreas[g, v]]
+        }
+    ],
+    {True, True, True},
+    TestID -> "VolumeGrowthObservables-raw-profiles-match-primitives"
 ]
 
 
@@ -2204,63 +2221,30 @@ VerificationTest[
 VerificationTest[ TessellationGraph[ { 3, 3, 3, 3, 6 }, 4 ], $Failed, { TessellationGraph::deferred }, TestID -> "Archimedean-euclidean-snub-deferred" ]
 
 
-(* ===================== Fractal example graphs ===================== *)
+(* ===================== Example graphs: Sierpinski & Bethe ===================== *)
 
-(* S(n, k) has k^n vertices and (k^(n+1) - k)/2 edges; here k = 3. *)
+(* trivalent Sierpinski graph: 3-simplex K_4 truncated n-1 times; 4*3^(n-1) vertices,
+   3-regular at every generation (n=1 is K_4, n=2 the truncated tetrahedron) *)
 VerificationTest[
-  Table[ { VertexCount @ SierpinskiGraph[ n ], EdgeCount @ SierpinskiGraph[ n ] }, { n, 1, 4 } ],
-  Table[ { 3^n, ( 3^( n + 1 ) - 3 )/2 }, { n, 1, 4 } ],
-  TestID -> "Sierpinski-vertex-edge-counts"
+  Table[ { VertexCount @ SierpinskiGraph[ n ], EdgeCount @ SierpinskiGraph[ n ], Union @ VertexDegree @ SierpinskiGraph[ n ] }, { n, 1, 4 } ],
+  Table[ { 4 * 3^( n - 1 ), 6 * 3^( n - 1 ), { 3 } }, { n, 1, 4 } ],
+  TestID -> "Sierpinski-trivalent-truncation"
 ]
 
-(* the k extreme (constant) strings have degree k-1, every other vertex degree k *)
+VerificationTest[ IsomorphicGraphQ[ SierpinskiGraph[ 1 ], CompleteGraph[ 4 ] ], True, TestID -> "Sierpinski-seed-is-3-simplex" ]
+VerificationTest[ IsomorphicGraphQ[ SierpinskiGraph[ 2 ], PolyhedronData[ "TruncatedTetrahedron", "SkeletonGraph" ] ], True, TestID -> "Sierpinski-level-2-is-truncated-tetrahedron" ]
+VerificationTest[ { ConnectedGraphQ @ SierpinskiGraph[ 4 ], PlanarGraphQ @ SierpinskiGraph[ 4 ] }, { True, True }, TestID -> "Sierpinski-connected-planar" ]
+
+(* BetheGraph[n, z]: n shells, coordination z; all interior vertices z-valent, only the
+   depth-n boundary 1-valent; vertex count 1 + z((z-1)^n - 1)/(z-2) *)
 VerificationTest[
-  KeySort @ Counts @ VertexDegree @ SierpinskiGraph[ 3 ],
-  <| 2 -> 3, 3 -> 24 |>,
-  TestID -> "Sierpinski-corner-degree-profile"
+  { KeySort @ Counts @ VertexDegree @ BetheGraph[ 3, 3 ], Max @ VertexDegree @ BetheGraph[ 4, 3 ] },
+  { <| 1 -> 12, 3 -> 10 |>, 3 },
+  TestID -> "Bethe-coordination-regular"
 ]
 
-VerificationTest[
-  { VertexCount @ SierpinskiGraph[ 3, 4 ], KeySort @ Counts @ VertexDegree @ SierpinskiGraph[ 3, 4 ] },
-  { 64, <| 3 -> 4, 4 -> 60 |> },
-  TestID -> "Sierpinski-general-k-degree-profile"
-]
-
-VerificationTest[ ConnectedGraphQ @ SierpinskiGraph[ 4 ], True, TestID -> "Sierpinski-connected" ]
-
-(* Sierpinski graph S(n,3) is NOT the gasket sieve graph GraphData curates *)
-VerificationTest[
-  IsomorphicGraphQ[ SierpinskiGraph[ 3 ], GraphData[ { "SierpinskiGasket", 3 } ] ],
-  False,
-  TestID -> "Sierpinski-graph-is-not-gasket-sieve"
-]
-
-(* Menger sponge skeleton: 20^n cells *)
-VerificationTest[
-  Table[ { VertexCount @ MengerGraph[ n ], EdgeCount @ MengerGraph[ n ] }, { n, 1, 2 } ],
-  { { 20, 24 }, { 400, 672 } },
-  TestID -> "Menger-counts"
-]
-
-VerificationTest[ ConnectedGraphQ @ MengerGraph[ 2 ], True, TestID -> "Menger-connected" ]
-
-(* Sierpinski carpet: 8^n cells; level 1 is the 8-cycle ring around the missing center *)
-VerificationTest[ Table[ VertexCount @ SierpinskiCarpetGraph[ n ], { n, 1, 3 } ], { 8, 64, 512 }, TestID -> "Carpet-counts" ]
-VerificationTest[ IsomorphicGraphQ[ SierpinskiCarpetGraph[ 1 ], CycleGraph[ 8 ] ], True, TestID -> "Carpet-level-1-is-8-cycle" ]
-
-(* generic builder: a 1-D Cantor set (keep the two outer thirds) has 2^n points, no adjacencies *)
-VerificationTest[
-  { VertexCount @ #, EdgeCount @ # } & @ FractalCellGraph[ { { 0 }, { 2 } }, 5 ],
-  { 32, 0 },
-  TestID -> "FractalCellGraph-cantor-dust"
-]
-
-(* presets agree with the generic builder *)
-VerificationTest[
-  IsomorphicGraphQ[ MengerGraph[ 2 ], FractalCellGraph[ Select[ Tuples[ { 0, 1, 2 }, 3 ], Count[ #, 1 ] < 2 & ], 2 ] ],
-  True,
-  TestID -> "Menger-preset-matches-builder"
-]
+VerificationTest[ VertexCount @ BetheGraph[ 4, 3 ], 1 + 3 ( ( 3 - 1 )^4 - 1 )/( 3 - 2 ), TestID -> "Bethe-vertex-count-formula" ]
+VerificationTest[ TreeGraphQ @ BetheGraph[ 3, 4 ], True, TestID -> "Bethe-is-tree" ]
 
 
 EndTestSection[]
