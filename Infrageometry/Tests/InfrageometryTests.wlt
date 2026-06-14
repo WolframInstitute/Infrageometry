@@ -1237,134 +1237,62 @@ VerificationTest[
 ]
 
 
-(* ===== WolframHausdorffDimension ===== *)
+(* ===== Synthetic invariants: BallVolumes / ShellVolumes / LogDifferenceQuotients ===== *)
 
+(* the closed ball volume is the cumulative shell-volume series *)
 VerificationTest[
-    ListQ @ WolframHausdorffDimension[GridGraph[{5, 5}]],
+    BallVolumes[CycleGraph[10], 1] === Accumulate[ShellVolumes[CycleGraph[10], 1]],
     True,
-    TestID -> "WolframHausdorffDimension-Grid5x5-list"
+    TestID -> "BallVolumes-accumulates-ShellVolumes"
 ]
 
+(* a fixed finite radius window over a vertex list is rectangular: every row has
+   length rmax - rmin + 1 (this is the contract that makes subset statistics Transpose) *)
 VerificationTest[
-    Length @ WolframHausdorffDimension[GridGraph[{5, 5}]],
-    25,
-    TestID -> "WolframHausdorffDimension-Grid5x5-all-vertices"
+    Dimensions[BallVolumes[GridGraph[{5, 5}], All, {0, 6}]],
+    {25, 7},
+    TestID -> "BallVolumes-fixed-window-rectangular"
 ]
 
+(* shells past eccentricity pad with 0 (empty sphere) *)
 VerificationTest[
-    WolframHausdorffDimension[PathGraph[Range[7]]],
-    WolframHausdorffDimension[PathGraph[Range[7]], #] & /@ Range[7],
-    TestID -> "WolframHausdorffDimension-P7-all-equals-per-vertex"
+    ShellVolumes[PathGraph[Range[5]], 1, {0, 8}],
+    {1, 1, 1, 1, 1, 0, 0, 0, 0},
+    TestID -> "ShellVolumes-pad-zero-past-ecc"
 ]
 
-(* d(v, r) = (Log V(r+1) - Log V(r)) / (Log(r+1) - Log r); on a cycle V(r) = 2r+1 *)
+(* the log-difference quotient of a clean power law r^d recovers the exponent d *)
 VerificationTest[
-    Chop[WolframHausdorffDimension[CycleGraph[40], 1, 10] - N[(Log[23] - Log[21]) / (Log[11] - Log[10])]],
-    0,
-    TestID -> "WolframHausdorffDimension-C40-single-radius-formula"
+    Round[Last @ LogDifferenceQuotients[N[Range[1, 20]^3]], 0.001],
+    3.,
+    TestID -> "LogDifferenceQuotients-power-law-exponent"
 ]
 
-(* a long cycle is 1-dimensional: volume-growth dimension -> 1 as r grows *)
+(* slope-of-mean: average the volume profiles over the vertex slot, then one slope.
+   On a vertex-transitive graph every profile is identical, so it equals the
+   single-vertex slope -- aggregation is caller-side composition, no option *)
 VerificationTest[
-    Abs[WolframHausdorffDimension[CycleGraph[60], 1, 15] - 1] < 0.1,
+    Max @ Abs[LogDifferenceQuotients[Mean /@ Transpose[BallVolumes[CycleGraph[40], All, {0, 18}]]]
+              - LogDifferenceQuotients[BallVolumes[CycleGraph[40], 1, {0, 18}]]] < 10.^-10,
     True,
-    TestID -> "WolframHausdorffDimension-C60-approaches-one"
+    TestID -> "LogDifferenceQuotients-slope-of-mean-vertex-transitive"
 ]
 
-(* radius slot is a selector: the integer radius is the matching element of the All profile *)
+(* averaging over a vertex SUBSET reproduces the single-vertex slope on a transitive graph *)
 VerificationTest[
-    WolframHausdorffDimension[CycleGraph[40], 1, 10] === WolframHausdorffDimension[CycleGraph[40], 1, All][[10]],
+    Max @ Abs[LogDifferenceQuotients[Mean /@ Transpose[BallVolumes[CycleGraph[40], {1, 5, 9}, {0, 18}]]]
+              - LogDifferenceQuotients[BallVolumes[CycleGraph[40], 1, {0, 18}]]] < 10.^-10,
     True,
-    TestID -> "WolframHausdorffDimension-C40-selector-consistency"
+    TestID -> "LogDifferenceQuotients-subset-aggregation"
 ]
 
-(* a span past ecc(v) - 1 selects no radii -> empty list *)
+(* MeanAround carries the per-vertex spread into Around; central values match Mean *)
 VerificationTest[
-    WolframHausdorffDimension[HypercubeGraph[3], 1, {5, 7}],
-    {},
-    TestID -> "WolframHausdorffDimension-Q3-empty-window-empty"
-]
-
-(* {"Skew", 1/2} is lattice-exact: on a cycle V(r) = 2r+1 = 2(r+1/2), so the
-   estimate is exactly 1 at every pre-saturation radius (here r = 1..18) *)
-VerificationTest[
-    Union @ Chop[WolframHausdorffDimension[CycleGraph[40], 1, {1, 18}, "DerivativeDiscretizationScheme" -> {"Skew", 1/2}] - 1],
-    {0},
-    TestID -> "WolframHausdorffDimension-Skew-half-lattice-exact"
-]
-
-(* {"Skew", 0} (Forward) undershoots the dimension from below on a lattice *)
-VerificationTest[
-    WolframHausdorffDimension[CycleGraph[40], 1, 10] < 1,
-    True,
-    TestID -> "WolframHausdorffDimension-Skew-zero-undershoots"
-]
-
-(* every scheme returns an index-aligned list over r = 1..ecc: Forward and
-   Backward have equal length, with Indeterminate where the stencil runs off an end *)
-VerificationTest[
-    With[{p = PathGraph[Range[7]]},
-        {
-            Length @ WolframHausdorffDimension[p, 1, All] === Length @ WolframHausdorffDimension[p, 1, All, "DerivativeDiscretizationScheme" -> "Backward"],
-            WolframHausdorffDimension[p, 1, 1, "DerivativeDiscretizationScheme" -> "Backward"],
-            Last @ WolframHausdorffDimension[p, 1, All]
-        }
-    ],
-    {True, Indeterminate, Indeterminate},
-    TestID -> "WolframHausdorffDimension-index-aligned-padding"
-]
-
-(* "Central" is the 2-point secant: the centred difference D0 = stencil {-1, 1} *)
-VerificationTest[
-    With[{g = GridGraph[{5, 5}]},
-        WolframHausdorffDimension[g, 1, All, "DerivativeDiscretizationScheme" -> "Central"] ===
-        WolframHausdorffDimension[g, 1, All, "DerivativeDiscretizationScheme" -> {"Stencil", {-1, 1}}]
+    With[{w = Transpose[BallVolumes[GridGraph[{5, 5}], All, {0, 6}]]},
+        Max @ Abs[(#[[1]] & /@ LogDifferenceQuotients[MeanAround /@ w]) - LogDifferenceQuotients[Mean /@ w]] < 10.^-10
     ],
     True,
-    TestID -> "WolframHausdorffDimension-Central-is-secant-stencil"
-]
-
-
-(* ===== WolframVolumeLogDifferenceQuotients: aggregation ===== *)
-
-(* default Aggregation -> None gives one slope list per vertex (list of lists) *)
-VerificationTest[
-    MatchQ[WolframVolumeLogDifferenceQuotients[CycleGraph[10], All], {__List}],
-    True,
-    TestID -> "WVLDQ-default-per-vertex"
-]
-
-(* "Mean" aggregation returns a single slope-of-mean list (flat, not per-vertex) *)
-VerificationTest[
-    MatchQ[WolframVolumeLogDifferenceQuotients[CycleGraph[40], All, "Aggregation" -> "Mean"], {__Real}],
-    True,
-    TestID -> "WVLDQ-Mean-aggregation-flat-list"
-]
-
-(* on a vertex-transitive graph every profile is identical, so slope-of-mean over
-   all vertices equals the single-vertex slope *)
-VerificationTest[
-    Max @ Abs[WolframVolumeLogDifferenceQuotients[CycleGraph[40], All, "Aggregation" -> "Mean"]
-              - WolframVolumeLogDifferenceQuotients[CycleGraph[40], 1]] < 10.^-10,
-    True,
-    TestID -> "WVLDQ-Mean-aggregation-vertex-transitive"
-]
-
-(* aggregating over a vertex SUBSET averages only those profiles; on a
-   vertex-transitive graph any subset reproduces the single-vertex slope *)
-VerificationTest[
-    Max @ Abs[WolframVolumeLogDifferenceQuotients[CycleGraph[40], {1, 5, 9}, "Aggregation" -> "Mean"]
-              - WolframVolumeLogDifferenceQuotients[CycleGraph[40], 1]] < 10.^-10,
-    True,
-    TestID -> "WVLDQ-subset-aggregation"
-]
-
-(* "MeanAround" carries the spread into Around; central values match "Mean" *)
-VerificationTest[
-    Max @ Abs[(#[[1]] & /@ WolframVolumeLogDifferenceQuotients[GridGraph[{5, 5}], All, "Aggregation" -> "MeanAround"])
-              - WolframVolumeLogDifferenceQuotients[GridGraph[{5, 5}], All, "Aggregation" -> "Mean"]] < 10.^-10,
-    True,
-    TestID -> "WVLDQ-MeanAround-central-equals-Mean"
+    TestID -> "LogDifferenceQuotients-MeanAround-central-equals-Mean"
 ]
 
 

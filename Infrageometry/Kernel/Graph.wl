@@ -7,21 +7,19 @@ PackageExport[GraphVertexWeights]
 PackageExport[GraphBoundary]
 PackageExport[GraphInterior]
 PackageExport[BallHull]
-PackageExport[BallVolumeProfile]
-PackageExport[CoordinationSequence]
+PackageExport[BallVolumes]
+PackageExport[ShellVolumes]
 PackageExport[CylinderVolumes]
 PackageScope[cylinderVolume]
 
 PackageExport[FormanRicciCurvature]
 PackageExport[OllivierRicciCurvature]
-PackageExport[WolframVolumeLogDifferenceQuotients]
+PackageExport[LogDifferenceQuotients]
 PackageExport[WolframDimensionCurvatureFit]
 PackageExport[WolframRicciCurvature]
-PackageExport[WolframHausdorffDimension]
 PackageExport[SectionalCurvatures]
 PackageScope[wasserstein1]
-PackageScope[volumeSequences]
-PackageScope[logDifferenceSlope]
+PackageScope[windowSaturate]
 
 PackageExport[EffectiveResistance]
 PackageExport[ResistanceQ]
@@ -280,88 +278,95 @@ wasserstein1[mu_List, nu_List, costs_List] := Module[{m = Length[mu], n = Length
 ]
 
 
-(* ===================== Ball-volume growth profile ===================== *)
+(* ===================== Ball volumes ===================== *)
 
-(* V(r) = |B_r(v)| as the List {V(0), V(1), ..., V(ecc(v))} (position i is radius
-   i - 1): the cumulative vertex count within each radius.  Distances from v in a
-   connected component are the contiguous run 0..ecc, so the radius labels are
-   positional and a List, not an Association, is the honest type.  The growth
-   profile feeding WolframHausdorffDimension and WolframRicciCurvature.  Same
-   calling convention as WolframHausdorffDimension: vertex slot 2 (single vertex,
-   list, or All), radius slot 3 (default All -> full profile; r_Integer -> the
-   scalar V(r), saturating at the reachable-vertex count past eccentricity;
-   {rmin, rmax} -> the sub-profile over that radius window). *)
+(* a radial invariant restricted to a radius range: All -> the full (ragged) sequence
+   {f(0), ..., f(ecc)}; r_Integer -> the scalar f(r); {rmin, rmax} -> a RECTANGULAR
+   window, saturating past the sequence end with pad (so a fixed window over a vertex
+   list Transposes cleanly for subset statistics).  pad defaults to the last value
+   (ball volumes saturate at the component size); ShellVolumes passes pad = 0. *)
+windowSaturate[c_, range_] := windowSaturate[c, range, Last[c]]
 
-BallVolumeProfile[g_Graph] := BallVolumeProfile[g, All, All]
+windowSaturate[c_, range_, pad_] := Switch[range,
+	All,                  c,
+	_Integer,             If[0 <= range < Length[c], c[[range + 1]], pad],
+	{_Integer, _Integer}, Table[If[0 <= r < Length[c], c[[r + 1]], pad], {r, range[[1]], range[[2]]}]
+]
+
+(* V(r) = |B_r(v)|, the cumulative vertex count within radius r, as the List
+   {V(0), ..., V(ecc(v))} (position i is radius i - 1).  Object slot 2 (single vertex,
+   list, or All), radius slot 3 (default All -> full profile; r_Integer -> the scalar
+   V(r); {rmin, rmax} -> the rectangular window).  Option "Ball" picks the counting
+   convention: "Closed" = |B_r| (default); "Peeled" = |B_{r-1}|; "Interior" =
+   |B_r| - |dB_r| = |GraphInterior[B_r]| (boundary-corrected, == "Peeled" in the bulk).
+   BallVolumes["Closed"] == Accumulate[ShellVolumes].  The growth invariant feeding
+   WolframDimensionCurvatureFit / WolframRicciCurvature. *)
+
+Options[BallVolumes] = {"Ball" -> "Closed"};
+
+BallVolumes[g_Graph, opts : OptionsPattern[]] := BallVolumes[g, All, All, opts]
+
+BallVolumes[g_Graph, pts : (All | _List | Except[_Rule | _RuleDelayed]), opts : OptionsPattern[]] :=
+	BallVolumes[g, pts, All, opts]
 
 (* the all/list form reads every vertex's distances off one GraphDistanceMatrix:
    one optimized all-pairs call is ~200x faster than V separate GraphDistance BFS
    calls (each carries a fixed graph-to-internal-rep overhead paid V times) *)
-BallVolumeProfile[g_Graph,
+BallVolumes[g_Graph,
 	vertices : (_List | All),
-	range : (_Integer | {_Integer, _Integer} | All) : All
+	range : (_Integer | {_Integer, _Integer} | All),
+	OptionsPattern[]
 ] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
-	With[{dm = GraphDistanceMatrix[g], idx = PositionIndex @ VertexList[g]},
-		With[{p = Accumulate @ Values @ KeySort @ Counts @ DeleteCases[dm[[idx[#][[1]]]], Infinity]},
-			Switch[range,
-				All,                  p,
-				_Integer,             If[0 <= range < Length[p], p[[range + 1]], Last[p]],
-				{_Integer, _Integer}, p[[Max[1, range[[1]] + 1] ;; Min[Length[p], range[[2]] + 1]]]
-			]
-		] & /@ If[vertices === All, VertexList[g], vertices]
+	With[
+		{conv = OptionValue["Ball"], dm = GraphDistanceMatrix[g], vs = VertexList[g]},
+		{idx = PositionIndex[vs], targets = If[vertices === All, vs, vertices]},
+		(windowSaturate[#, range] &) /@ Switch[conv,
+			"Closed",   (Accumulate @ Values @ KeySort @ Counts @ DeleteCases[dm[[idx[#][[1]]]], Infinity] &) /@ targets,
+			"Peeled",   (With[{c = Accumulate @ Values @ KeySort @ Counts @ DeleteCases[dm[[idx[#][[1]]]], Infinity]}, Join[{First[c]}, Most[c]]] &) /@ targets,
+			"Interior", (With[{row = dm[[idx[#][[1]]]]}, Table[Length @ GraphInterior[g, Pick[vs, Thread[row <= r]]], {r, 0, Max @ DeleteCases[row, Infinity]}]] &) /@ targets
+		]
 	]
 
-(* full profile {V(0), ..., V(ecc)} = running totals of the sphere sizes; r_Integer
-   saturates at the reachable-vertex count past ecc, {a, b} clips to that window *)
-BallVolumeProfile[g_Graph,
+BallVolumes[g_Graph,
 	vertex : Except[All | _Rule | _RuleDelayed],
-	range : (_Integer | {_Integer, _Integer} | All) : All
-] := With[{p = Accumulate @ Values @ KeySort @ Counts @ DeleteCases[GraphDistance[g, vertex], Infinity]},
-	Switch[range,
-		All,                  p,
-		_Integer,             If[0 <= range < Length[p], p[[range + 1]], Last[p]],
-		{_Integer, _Integer}, p[[Max[1, range[[1]] + 1] ;; Min[Length[p], range[[2]] + 1]]]
-	]
+	range : (_Integer | {_Integer, _Integer} | All),
+	OptionsPattern[]
+] := windowSaturate[
+	Switch[OptionValue["Ball"],
+		"Closed",   Accumulate @ Values @ KeySort @ Counts @ DeleteCases[GraphDistance[g, vertex], Infinity],
+		"Peeled",   With[{c = Accumulate @ Values @ KeySort @ Counts @ DeleteCases[GraphDistance[g, vertex], Infinity]}, Join[{First[c]}, Most[c]]],
+		"Interior", With[{vs = VertexList[g], row = GraphDistance[g, vertex]}, Table[Length @ GraphInterior[g, Pick[vs, Thread[row <= r]]], {r, 0, Max @ DeleteCases[row, Infinity]}]]
+	],
+	range
 ]
 
 
-(* ===================== Coordination sequence ===================== *)
+(* ===================== Shell volumes ===================== *)
 
-(* S(r) = |S_r(v)| = #{ w : d(v, w) == r } as the List {S(0), S(1), ..., S(ecc(v))}
-   (position i is radius i - 1): the sphere sizes, i.e. the discrete derivative of
-   BallVolumeProfile (BallVolumeProfile = Accumulate of CoordinationSequence; the
-   crystallography / OEIS coordination sequence, S(1) = the coordination number).
-   Same calling convention as WolframHausdorffDimension / BallVolumeProfile:
-   radius slot 3 default All -> full sequence; r_Integer -> the scalar S(r)
-   (0 past eccentricity); {rmin, rmax} -> the sub-sequence over that radius window. *)
+(* S(r) = |dB_r(v)| = #{ w : d(v, w) == r } as the List {S(0), ..., S(ecc(v))}: the
+   sphere sizes, the discrete derivative of BallVolumes (BallVolumes["Closed"] ==
+   Accumulate[ShellVolumes]; the crystallography / OEIS coordination sequence, S(1) =
+   the coordination number).  Same object/range convention as BallVolumes; a finite
+   {rmin, rmax} window is rectangular, padding past eccentricity with 0 (empty sphere). *)
 
-CoordinationSequence[g_Graph] := CoordinationSequence[g, All, All]
+ShellVolumes[g_Graph] := ShellVolumes[g, All, All]
+
+ShellVolumes[g_Graph, pts : (All | _List | Except[_Rule | _RuleDelayed])] := ShellVolumes[g, pts, All]
 
 (* all/list form: one GraphDistanceMatrix; single vertex stays on one GraphDistance *)
-CoordinationSequence[g_Graph,
+ShellVolumes[g_Graph,
 	vertices : (_List | All),
-	range : (_Integer | {_Integer, _Integer} | All) : All
+	range : (_Integer | {_Integer, _Integer} | All)
 ] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
-	With[{dm = GraphDistanceMatrix[g], idx = PositionIndex @ VertexList[g]},
-		With[{s = Values @ KeySort @ Counts @ DeleteCases[dm[[idx[#][[1]]]], Infinity]},
-			Switch[range,
-				All,                  s,
-				_Integer,             If[0 <= range < Length[s], s[[range + 1]], 0],
-				{_Integer, _Integer}, s[[Max[1, range[[1]] + 1] ;; Min[Length[s], range[[2]] + 1]]]
-			]
-		] & /@ If[vertices === All, VertexList[g], vertices]
+	With[{dm = GraphDistanceMatrix[g], vs = VertexList[g]},
+		{idx = PositionIndex[vs]},
+		(windowSaturate[Values @ KeySort @ Counts @ DeleteCases[dm[[idx[#][[1]]]], Infinity], range, 0] &) /@ If[vertices === All, vs, vertices]
 	]
 
-CoordinationSequence[g_Graph,
+ShellVolumes[g_Graph,
 	vertex : Except[All | _Rule | _RuleDelayed],
-	range : (_Integer | {_Integer, _Integer} | All) : All
-] := With[{s = Values @ KeySort @ Counts @ DeleteCases[GraphDistance[g, vertex], Infinity]},
-	Switch[range,
-		All,                  s,
-		_Integer,             If[0 <= range < Length[s], s[[range + 1]], 0],
-		{_Integer, _Integer}, s[[Max[1, range[[1]] + 1] ;; Min[Length[s], range[[2]] + 1]]]
-	]
-]
+	range : (_Integer | {_Integer, _Integer} | All)
+] := windowSaturate[Values @ KeySort @ Counts @ DeleteCases[GraphDistance[g, vertex], Infinity], range, 0]
 
 
 (* ===================== Cylinder volumes ===================== *)
@@ -391,54 +396,16 @@ cylinderVolume[dm_, pi_, qi_, s_] :=
 	]
 
 
-(* ===================== Volume-growth log-difference quotients ===================== *)
+(* ===================== Log-difference quotients ===================== *)
 
-(* q(r) = (log V(r) - log V(r-1)) / (log(r+1) - log r): the log-difference quotient of
-   the ball-volume sequence against the log-radius -- the discrete d log V / d log r,
-   == ResourceFunction["LogDifferences"][V] (default "Volume" -> "Count").  Returns the
-   full {q(1), ..., q(ecc)} (ecc values, the last being the approach to saturation);
-   "Abscissa" -> True returns {Sqrt[r (r+1)], q} pairs (the divided-difference midpoint
-   in log r, the ListPlot scatter feeding the fit).  Vertex slot 2 (single vertex, list,
-   or All); "Aggregation" averages the volume profiles before the slope (slope-of-mean). *)
-
-Options[WolframVolumeLogDifferenceQuotients] = {"Volume" -> "Count", "Abscissa" -> False, "Aggregation" -> None};
-
-(* log-log slope of a ball-volume sequence w = {V(0), ..., V(ecc)}:
-   Log[Ratios[Range[n]], Ratios[w]] == ResourceFunction["LogDifferences"][w], the
-   discrete d Log V / d Log r at each radius step.  n - 1 values, including the final
-   approach to saturation -- the estimator SW's dimension chapters plot. *)
-logDifferenceSlope[w_] := Log[Ratios[Range[Length[w]]], Ratios[N[w]]]
-
-WolframVolumeLogDifferenceQuotients[g_Graph, opts : OptionsPattern[]] :=
-	WolframVolumeLogDifferenceQuotients[g, All, opts]
-
-(* "Aggregation" -> "MeanAround" | "Mean": average the volume profiles over the
-   vertex slot first (truncate-to-min radius), then take one slope -- the
-   chapters' slope-of-mean estimator (MeanAround carries the spread into Around
-   error bars).  None (default): one slope list per vertex. *)
-WolframVolumeLogDifferenceQuotients[g_Graph,
-	vertices : (_List | All),
-	OptionsPattern[]
-] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
-	With[
-		{abscissa = TrueQ[OptionValue["Abscissa"]], agg = OptionValue["Aggregation"]},
-		{seqs = volumeSequences[g, vertices, OptionValue["Volume"]]},
-		{profiles = If[agg === None, seqs,
-			{(Switch[agg, "MeanAround", MeanAround, "Mean", Mean] /@ Transpose[(Take[#, Min[Length /@ seqs]] &) /@ seqs])}]},
-		{out = (With[{q = logDifferenceSlope[#]},
-				If[abscissa, Table[{Sqrt[r (r + 1)], q[[r]]}, {r, Length[q]}], q]
-			] &) /@ profiles},
-		If[agg === None, out, First[out]]
-	]
-
-WolframVolumeLogDifferenceQuotients[g_Graph,
-	vertex : Except[All | _Rule | _RuleDelayed],
-	OptionsPattern[]
-] := With[{w = volumeSequences[g, vertex, OptionValue["Volume"]], abscissa = TrueQ[OptionValue["Abscissa"]]},
-	With[{q = logDifferenceSlope[w]},
-		If[abscissa, Table[{Sqrt[r (r + 1)], q[[r]]}, {r, Length[q]}], q]
-	]
-]
+(* q(r) = (Log w(r) - Log w(r-1)) / (Log(r+1) - Log r): the discrete d Log w / d Log r
+   of any sequence w = {w(0), w(1), ...} against the log index, the log-log slope at
+   each step.  Log[Ratios[Range[n]], Ratios[w]] == ResourceFunction["LogDifferences"][w].
+   For a ball-volume sequence this is the volume-growth dimension estimator SW's
+   dimension chapters plot.  Accepts any numeric -- or Around -- sequence: feed it
+   BallVolumes[g, v], or aggregate first and let the spread propagate, e.g.
+   LogDifferenceQuotients[MeanAround /@ Transpose[BallVolumes[g, subset, {0, R}]]]. *)
+LogDifferenceQuotients[w_List] := Log[Ratios[Range[Length[w]]], Ratios[N[w]]]
 
 
 (* ===================== Bishop-Gromov dimension + curvature fit ===================== *)
@@ -456,7 +423,7 @@ WolframVolumeLogDifferenceQuotients[g_Graph,
    quartile of all 5-point-window errors), ties to the smallest rmin since the
    expansion is asymptotic at rho -> 0.  Vertex slot 2 (single, list, or All). *)
 
-Options[WolframDimensionCurvatureFit] = {"Volume" -> "PeeledBall", "Dimension" -> Automatic};
+Options[WolframDimensionCurvatureFit] = {"Ball" -> "Peeled", "Dimension" -> Automatic};
 
 WolframDimensionCurvatureFit[g_Graph, opts : OptionsPattern[]] :=
 	WolframDimensionCurvatureFit[g, All, Automatic, opts]
@@ -467,14 +434,14 @@ WolframDimensionCurvatureFit[g_Graph,
 	OptionsPattern[]
 ] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
 	With[{dim = OptionValue["Dimension"]},
-		(dimensionCurvature[#, window, dim] &) /@ volumeSequences[g, vertices, OptionValue["Volume"]]
+		(dimensionCurvature[#, window, dim] &) /@ BallVolumes[g, vertices, All, "Ball" -> OptionValue["Ball"]]
 	]
 
 WolframDimensionCurvatureFit[g_Graph,
 	vertex : Except[All | _Rule | _RuleDelayed],
 	window : ({_Integer, _Integer} | All | Automatic) : Automatic,
 	OptionsPattern[]
-] := dimensionCurvature[volumeSequences[g, vertex, OptionValue["Volume"]], window, OptionValue["Dimension"]]
+] := dimensionCurvature[BallVolumes[g, vertex, All, "Ball" -> OptionValue["Ball"]], window, OptionValue["Dimension"]]
 
 (* one fit on a volume sequence: q(r) on x = r (r+1) over the radius window;
    Automatic detects the linear core by exhaustive interval search (detection
@@ -520,42 +487,16 @@ dimensionCurvature[w_, window_, dimOpt_] := With[
 ]
 
 
-(* ===================== Wolfram-Hausdorff dimension ===================== *)
-
-(* Volume-growth (Hausdorff) dimension: the fitted intercept d of the Bishop-Gromov
-   regression, i.e. the "Dimension" projection of WolframDimensionCurvatureFit.
-   Window slot 3 ({rmin, rmax}, All, or Automatic (default), the linear core),
-   vertex slot 2 (single, list, or All). *)
-
-Options[WolframHausdorffDimension] = {"Volume" -> "PeeledBall"};
-
-WolframHausdorffDimension[g_Graph, opts : OptionsPattern[]] :=
-	WolframHausdorffDimension[g, All, Automatic, opts]
-
-WolframHausdorffDimension[g_Graph,
-	vertices : (_List | All),
-	window : ({_Integer, _Integer} | All | Automatic) : Automatic,
-	OptionsPattern[]
-] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
-	#["Dimension"] & /@ WolframDimensionCurvatureFit[g, vertices, window, "Volume" -> OptionValue["Volume"]]
-
-WolframHausdorffDimension[g_Graph,
-	vertex : Except[All | _Rule | _RuleDelayed],
-	window : ({_Integer, _Integer} | All | Automatic) : Automatic,
-	OptionsPattern[]
-] := WolframDimensionCurvatureFit[g, vertex, window, "Volume" -> OptionValue["Volume"]]["Dimension"]
-
-
 (* ===================== Wolfram-Ricci scalar curvature ===================== *)
 
 (* Volume-comparison Ricci scalar at vertex v: R(v, r) = 6 (d + 2)/r^2 (1 - v(r)/V_E(d, r)),
    V_E(d, r) = pi^(d/2) r^d / Gamma[d/2 + 1], one value per radius r = 1..ecc.
    Dimension d is supplied via "Dimension" -> d, or fitted once via
    WolframDimensionCurvatureFit when "Dimension" -> Automatic (default).  Volume
-   v(r) is the chosen "Volume" convention (default "PeeledBall").  Vertex slot 2
+   v(r) is the chosen "Ball" convention (default "Peeled").  Vertex slot 2
    (single, list, or All). *)
 
-Options[WolframRicciCurvature] = {"Dimension" -> Automatic, "Volume" -> "PeeledBall"};
+Options[WolframRicciCurvature] = {"Dimension" -> Automatic, "Ball" -> "Peeled"};
 
 WolframRicciCurvature[g_Graph, opts : OptionsPattern[]] :=
 	WolframRicciCurvature[g, All, opts]
@@ -564,11 +505,11 @@ WolframRicciCurvature[g_Graph,
 	vertices : (_List | All),
 	OptionsPattern[]
 ] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
-	With[{vol = OptionValue["Volume"], dimOpt = OptionValue["Dimension"]},
+	With[{conv = OptionValue["Ball"], dimOpt = OptionValue["Dimension"]},
 		With[{
-			seqs = volumeSequences[g, vertices, vol],
+			seqs = BallVolumes[g, vertices, All, "Ball" -> conv],
 			dims = If[dimOpt === Automatic,
-				#["Dimension"] & /@ WolframDimensionCurvatureFit[g, vertices, Automatic, "Volume" -> vol],
+				#["Dimension"] & /@ WolframDimensionCurvatureFit[g, vertices, Automatic, "Ball" -> conv],
 				ConstantArray[dimOpt, Length @ If[vertices === All, VertexList[g], vertices]]
 			]
 		},
@@ -584,41 +525,12 @@ WolframRicciCurvature[g_Graph,
 WolframRicciCurvature[g_Graph,
 	vertex : Except[All | _Rule | _RuleDelayed],
 	OptionsPattern[]
-] := With[{vol = OptionValue["Volume"], dimOpt = OptionValue["Dimension"]},
+] := With[{conv = OptionValue["Ball"], dimOpt = OptionValue["Dimension"]},
 	With[{
-		w = volumeSequences[g, vertex, vol],
-		d = If[dimOpt === Automatic, WolframDimensionCurvatureFit[g, vertex, Automatic, "Volume" -> vol]["Dimension"], dimOpt]
+		w = BallVolumes[g, vertex, All, "Ball" -> conv],
+		d = If[dimOpt === Automatic, WolframDimensionCurvatureFit[g, vertex, Automatic, "Ball" -> conv]["Dimension"], dimOpt]
 	},
 		Table[N[6 (d + 2) / r^2 (1 - w[[r + 1]] Gamma[d / 2 + 1] / (Pi^(d / 2) r^d))], {r, 1, Length[w] - 1}]
-	]
-]
-
-
-(* ===================== Volume conventions ===================== *)
-
-(* The ball-volume sequence v(0), v(1), ..., v(ecc) under one of three conventions:
-   "Count" = |B_r| (raw cumulative count); "PeeledBall" = |B_{r-1}| (outer shell
-   peeled -- SW's implicit convention, reproducing the LogDifferences shift);
-   "Interior" = |B_r| - |dB_r| = |GraphInterior[B_r]| (boundary-corrected; equals
-   "PeeledBall" in the bulk, differs near the eccentricity).  All/list form reads
-   one GraphDistanceMatrix; single-vertex form one GraphDistance. *)
-
-volumeSequences[g_Graph, vertices : (_List | All), vol_] /;
-	vertices === All || ! MemberQ[VertexList[g], vertices] := Switch[vol,
-	"Count",      BallVolumeProfile[g, vertices, All],
-	"PeeledBall", (Join[{First[#]}, Most[#]] &) /@ BallVolumeProfile[g, vertices, All],
-	"Interior",   With[{vs = VertexList[g], dm = GraphDistanceMatrix[g], idx = PositionIndex @ VertexList[g]},
-		(With[{row = dm[[idx[#][[1]]]]},
-			Table[Length @ GraphInterior[g, Pick[vs, Thread[row <= r]]], {r, 0, Max @ DeleteCases[row, Infinity]}]
-		] &) /@ If[vertices === All, vs, vertices]
-	]
-]
-
-volumeSequences[g_Graph, vertex_, vol_] := Switch[vol,
-	"Count",      BallVolumeProfile[g, vertex],
-	"PeeledBall", With[{c = BallVolumeProfile[g, vertex]}, Join[{First[c]}, Most[c]]],
-	"Interior",   With[{vs = VertexList[g], row = GraphDistance[g, vertex]},
-		Table[Length @ GraphInterior[g, Pick[vs, Thread[row <= r]]], {r, 0, Max @ DeleteCases[row, Infinity]}]
 	]
 ]
 

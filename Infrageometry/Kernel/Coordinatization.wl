@@ -94,15 +94,22 @@ resistanceEmbeddingMatrix[g_Graph, rescaling_, dimSpec_] :=
 
 (* ===================== Ball covers & domination ===================== *)
 
-(* a minimum r-ball cover: a smallest centre set (chosen from all of V) whose radius-r
-   balls cover the targets (every vertex by default, or a given subset) as a set-cover
-   integer program. targets restricts the covered rows; centres range over all of V. *)
-FindBallCover[g_Graph, r_ : 1, targets : (_List | All) : All] :=
+(* a minimum r-ball cover: a smallest centre set (chosen from all of V) whose radius-r balls
+   cover the targets (every vertex by default, or a given subset) as a set-cover integer program.
+   count = 1 (default) returns one cover as a centre list; n / UpTo[n] return up to n distinct
+   minimum covers; All returns every one. Enumerating all minimum covers is #P-hard (the count of
+   minimum set covers), so All / n>1 brute-force the size-k centre subsets and are cheap only for small g. *)
+FindBallCover[g_Graph, r_ : 1, targets : (_List | All) : All, count : (_Integer | All | UpTo[_Integer]) : 1] :=
     With[
         {vs = VertexList[g]},
         {rows = If[targets === All, Range[Length[vs]], Flatten[FirstPosition[vs, #] & /@ targets]]},
         {cover = Map[Boole[# <= r] &, GraphDistanceMatrix[g][[rows]], {2}], x = Array[\[FormalX], Length[vs]]},
-        vs[[ Flatten @ Position[Round[x /. LinearOptimization[Total[x], Join[Thread[cover . x >= 1], Thread[0 <= x <= 1]], x \[Element] Vectors[Length[vs], Integers]]], 1] ]]
+        {one = vs[[ Flatten @ Position[Round[x /. LinearOptimization[Total[x], Join[Thread[cover . x >= 1], Thread[0 <= x <= 1]], x \[Element] Vectors[Length[vs], Integers]]], 1] ]]},
+        If[count === 1, one,
+            With[{covers = Select[Subsets[vs, {Length[one]}], BallCoverQ[g, r, #, targets] &]},
+                Replace[count, {All -> covers, (n_Integer | UpTo[n_]) :> Take[covers, UpTo[n]]}]
+            ]
+        ]
     ]
 
 (* do the radius-r balls around the centres s cover the targets (all of V by default)? *)
