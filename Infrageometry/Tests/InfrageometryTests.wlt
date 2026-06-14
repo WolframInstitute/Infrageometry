@@ -1178,72 +1178,13 @@ VerificationTest[
 ]
 
 
-(* ===== WolframRicciCurvature ===== *)
+(* ===== Synthetic invariants: BallVolumes / ShellAreas / LogDifferenceQuotients ===== *)
 
-(* radius slot is a selector: integer -> scalar, span -> list of R(v, r) over the window *)
+(* the closed ball volume is the cumulative shell-area series *)
 VerificationTest[
-    WolframRicciCurvature[CycleGraph[12], 1, {1, 3}, "Dimension" -> 1],
-    {-9., -1.125, -1./3},
-    SameTest -> (Max[Abs[#1 - #2]] < 10^-8 &),
-    TestID -> "WolframRicciCurvature-C12-d1-window-list"
-]
-
-(* the integer radius is the matching element of the span / All profile *)
-VerificationTest[
-    WolframRicciCurvature[CycleGraph[12], 1, 2, "Dimension" -> 1] === Last @ WolframRicciCurvature[CycleGraph[12], 1, {1, 2}, "Dimension" -> 1],
+    BallVolumes[CycleGraph[10], 1] === Accumulate[ShellAreas[CycleGraph[10], 1]],
     True,
-    TestID -> "WolframRicciCurvature-C12-selector-consistency"
-]
-
-VerificationTest[
-    WolframRicciCurvature[CycleGraph[12], 1, 2, "Dimension" -> 1],
-    -1.125,
-    SameTest -> (Abs[#1 - #2] < 10^-8 &),
-    TestID -> "WolframRicciCurvature-C12-d1-single-radius"
-]
-
-(* All / no vertex arg gives a list over VertexList[g] *)
-VerificationTest[
-    ListQ @ WolframRicciCurvature[GridGraph[{5, 5}]],
-    True,
-    TestID -> "WolframRicciCurvature-Grid5x5-default-list"
-]
-
-VerificationTest[
-    Length @ WolframRicciCurvature[GridGraph[{5, 5}]],
-    25,
-    TestID -> "WolframRicciCurvature-Grid5x5-all-vertices"
-]
-
-(* the All-form is the single-vertex scalar form mapped over VertexList[g] *)
-VerificationTest[
-    WolframRicciCurvature[PathGraph[Range[7]]],
-    WolframRicciCurvature[PathGraph[Range[7]], #] & /@ Range[7],
-    TestID -> "WolframRicciCurvature-P7-all-equals-per-vertex"
-]
-
-(* a vertex list gives a list of matching length *)
-VerificationTest[
-    Length @ WolframRicciCurvature[GridGraph[{5, 5}], {1, 2, 3}],
-    3,
-    TestID -> "WolframRicciCurvature-Grid5x5-vertex-list"
-]
-
-(* a span past ecc(v) - 1 selects no radii -> empty list *)
-VerificationTest[
-    WolframRicciCurvature[HypercubeGraph[3], 1, {5, 7}, "Dimension" -> 3],
-    {},
-    TestID -> "WolframRicciCurvature-Q3-empty-window-empty"
-]
-
-
-(* ===== Synthetic invariants: BallVolumes / ShellVolumes / LogDifferenceQuotients ===== *)
-
-(* the closed ball volume is the cumulative shell-volume series *)
-VerificationTest[
-    BallVolumes[CycleGraph[10], 1] === Accumulate[ShellVolumes[CycleGraph[10], 1]],
-    True,
-    TestID -> "BallVolumes-accumulates-ShellVolumes"
+    TestID -> "BallVolumes-accumulates-ShellAreas"
 ]
 
 (* a fixed finite radius window over a vertex list is rectangular: every row has
@@ -1256,9 +1197,9 @@ VerificationTest[
 
 (* shells past eccentricity pad with 0 (empty sphere) *)
 VerificationTest[
-    ShellVolumes[PathGraph[Range[5]], 1, {0, 8}],
+    ShellAreas[PathGraph[Range[5]], 1, {0, 8}],
     {1, 1, 1, 1, 1, 0, 0, 0, 0},
-    TestID -> "ShellVolumes-pad-zero-past-ecc"
+    TestID -> "ShellAreas-pad-zero-past-ecc"
 ]
 
 (* the log-difference quotient of a clean power law r^d recovers the exponent d *)
@@ -1296,21 +1237,21 @@ VerificationTest[
 ]
 
 
-(* ===== WolframDimensionCurvatureFit: Bishop-Gromov fit + Automatic window ===== *)
+(* ===== VolumeGrowthParameters: joined ball + sphere growth fit ===== *)
 
-(* endpoint of a path: V(r) = r + 1 exactly, so q(r) == 1 and the fit is exact *)
+(* endpoint of a path: V(r) = r + 1 exactly, so q(r) == 1 and the ball fit is exact *)
 VerificationTest[
-    With[{r = WolframDimensionCurvatureFit[PathGraph[Range[5]], 1]},
+    With[{r = VolumeGrowthParameters[PathGraph[Range[5]], 1]["Ball"]},
         {Chop[r["Dimension"] - 1], Chop @ r["ScalarCurvature"]}
     ],
     {0, 0},
-    TestID -> "WolframDimensionCurvatureFit-P5-exact-line"
+    TestID -> "VolumeGrowthParameters-P5-ball-exact-line"
 ]
 
 (* cycle: d = 1, R = 0; the Automatic window drops the small-r preamble bias
    q(r) ~ 1 + 1/r and beats the full-range fit on both estimates *)
 VerificationTest[
-    With[{auto = WolframDimensionCurvatureFit[CycleGraph[40], 1], full = WolframDimensionCurvatureFit[CycleGraph[40], 1, All]},
+    With[{auto = VolumeGrowthParameters[CycleGraph[40], 1]["Ball"], full = VolumeGrowthParameters[CycleGraph[40], 1, All]["Ball"]},
         {
             Abs[auto["Dimension"] - 1] < 0.06,
             Abs[auto["Dimension"] - 1] < Abs[full["Dimension"] - 1],
@@ -1318,14 +1259,14 @@ VerificationTest[
         }
     ],
     {True, True, True},
-    TestID -> "WolframDimensionCurvatureFit-C40-automatic-beats-full"
+    TestID -> "VolumeGrowthParameters-C40-automatic-beats-full"
 ]
 
 (* flat 20x20 square torus: d = 2, R = 0; Automatic cuts the wrap-around tail *)
 VerificationTest[
     With[{g = TessellationGraph[{4, 4}, {20, 20}]},
         {v = First @ VertexList @ g},
-        {auto = WolframDimensionCurvatureFit[g, v], full = WolframDimensionCurvatureFit[g, v, All]},
+        {auto = VolumeGrowthParameters[g, v]["Ball"], full = VolumeGrowthParameters[g, v, All]["Ball"]},
         {
             Abs[auto["Dimension"] - 2] < 0.3,
             Abs[auto["Dimension"] - 2] < Abs[full["Dimension"] - 2],
@@ -1333,41 +1274,101 @@ VerificationTest[
         }
     ],
     {True, True, True},
-    TestID -> "WolframDimensionCurvatureFit-torus-automatic-cuts-wrap-tail"
+    TestID -> "VolumeGrowthParameters-torus-automatic-cuts-wrap-tail"
 ]
 
-(* the Automatic fit is reproducible from its own reported window *)
+(* the Automatic ball fit is reproducible from its own reported window *)
 VerificationTest[
-    With[{auto = WolframDimensionCurvatureFit[CycleGraph[40], 1]},
-        auto === WolframDimensionCurvatureFit[CycleGraph[40], 1, auto["Window"]]
+    With[{auto = VolumeGrowthParameters[CycleGraph[40], 1]["Ball"]},
+        auto === VolumeGrowthParameters[CycleGraph[40], 1, auto["Window"]]["Ball"]
     ],
     True,
-    TestID -> "WolframDimensionCurvatureFit-automatic-window-consistency"
+    TestID -> "VolumeGrowthParameters-automatic-window-consistency"
 ]
 
-(* fewer than 5 quotients: Automatic falls back to the full range *)
+(* the per-radius ball curvature profile has one entry per radius r = 1..ecc(v) *)
 VerificationTest[
-    WolframDimensionCurvatureFit[PathGraph[Range[5]], 1] === WolframDimensionCurvatureFit[PathGraph[Range[5]], 1, All],
+    Length[VolumeGrowthParameters[HypercubeGraph[8], 1]["Ball", "CurvatureByRadius"]] === Length[BallVolumes[HypercubeGraph[8], 1]] - 1,
     True,
-    TestID -> "WolframDimensionCurvatureFit-short-profile-fallback"
+    TestID -> "VolumeGrowthParameters-ball-CurvatureByRadius-length"
 ]
 
-(* positively curved Hamming cube: R > 0 on the detected core *)
+(* positively curved Hamming cube: ball R > 0 on the detected core *)
 VerificationTest[
-    WolframDimensionCurvatureFit[HypercubeGraph[8], 1]["ScalarCurvature"] > 0,
+    VolumeGrowthParameters[HypercubeGraph[8], 1]["Ball", "ScalarCurvature"] > 0,
     True,
-    TestID -> "WolframDimensionCurvatureFit-Q8-positive-curvature"
+    TestID -> "VolumeGrowthParameters-Q8-ball-positive-curvature"
 ]
 
 (* pinned dimension fits only the slope, on the same detected window *)
 VerificationTest[
     With[{g = TessellationGraph[{4, 4}, {20, 20}]},
         {v = First @ VertexList @ g},
-        {pinned = WolframDimensionCurvatureFit[g, v, "Dimension" -> 2], auto = WolframDimensionCurvatureFit[g, v]},
+        {pinned = VolumeGrowthParameters[g, v, "Dimension" -> 2]["Ball"], auto = VolumeGrowthParameters[g, v]["Ball"]},
         {pinned["Dimension"], pinned["Window"] === auto["Window"]}
     ],
     {2., True},
-    TestID -> "WolframDimensionCurvatureFit-pinned-dimension-window"
+    TestID -> "VolumeGrowthParameters-pinned-dimension-window"
+]
+
+(* flat square grid: shell area A(r) = 4 r exactly on the rising part, so q == 1, the
+   sphere intercept is n - 1 = 1, the reported manifold dimension is n = 2 and S = 0 *)
+VerificationTest[
+    With[{g = GridGraph[{15, 15}]},
+        {r = VolumeGrowthParameters[g, First @ GraphCenter @ g]["Sphere"]},
+        {Abs[r["Dimension"] - 2] < 1.*^-6, Abs @ r["ScalarCurvature"] < 1.*^-6}
+    ],
+    {True, True},
+    TestID -> "VolumeGrowthParameters-grid2D-sphere-flat"
+]
+
+(* flat cubic grid: sphere manifold dimension recovered as ~ 3 *)
+VerificationTest[
+    With[{g = GridGraph[{9, 9, 9}]},
+        Abs[VolumeGrowthParameters[g, First @ GraphCenter @ g]["Sphere", "Dimension"] - 3] < 0.2
+    ],
+    True,
+    TestID -> "VolumeGrowthParameters-grid3D-sphere-dimension"
+]
+
+(* dual probe: ball and sphere agree on the manifold dimension of a flat lattice *)
+VerificationTest[
+    With[{g = GridGraph[{15, 15}]},
+        {p = VolumeGrowthParameters[g, First @ GraphCenter @ g]},
+        Abs[p["Ball", "Dimension"] - p["Sphere", "Dimension"]] < 0.4
+    ],
+    True,
+    TestID -> "VolumeGrowthParameters-ball-sphere-dimension-agreement-flat"
+]
+
+(* flat torus through the sphere probe: d = 2, S = 0 *)
+VerificationTest[
+    With[{g = TessellationGraph[{4, 4}, {20, 20}]},
+        {r = VolumeGrowthParameters[g, First @ VertexList @ g]["Sphere"]},
+        {Abs[r["Dimension"] - 2] < 0.05, Abs @ r["ScalarCurvature"] < 1.*^-6}
+    ],
+    {True, True},
+    TestID -> "VolumeGrowthParameters-torus-sphere-flat"
+]
+
+(* positive curvature: ball and sphere scalar-curvature estimates share sign (both > 0)
+   on the positively curved Hamming cube -- the dual-probe consistency check *)
+VerificationTest[
+    With[{p = VolumeGrowthParameters[HypercubeGraph[8], 1]},
+        Sign[p["Ball", "ScalarCurvature"]] === Sign[p["Sphere", "ScalarCurvature"]] === 1
+    ],
+    True,
+    TestID -> "VolumeGrowthParameters-positive-curvature-sign-agreement"
+]
+
+(* the sphere fit exposes the per-radius area-curvature and mean-curvature profiles *)
+VerificationTest[
+    With[{r = VolumeGrowthParameters[HypercubeGraph[8], 1]["Sphere"]},
+        {Length[r["CurvatureByRadius"]] === Length[ShellAreas[HypercubeGraph[8], 1]] - 1,
+         Length[r["MeanCurvatureByRadius"]] === Length[ShellAreas[HypercubeGraph[8], 1]] - 1}
+    ],
+    {True, True},
+    TestID -> "VolumeGrowthParameters-sphere-profiles-length"
 ]
 
 
@@ -2201,6 +2202,65 @@ VerificationTest[
 ]
 
 VerificationTest[ TessellationGraph[ { 3, 3, 3, 3, 6 }, 4 ], $Failed, { TessellationGraph::deferred }, TestID -> "Archimedean-euclidean-snub-deferred" ]
+
+
+(* ===================== Fractal example graphs ===================== *)
+
+(* S(n, k) has k^n vertices and (k^(n+1) - k)/2 edges; here k = 3. *)
+VerificationTest[
+  Table[ { VertexCount @ SierpinskiGraph[ n ], EdgeCount @ SierpinskiGraph[ n ] }, { n, 1, 4 } ],
+  Table[ { 3^n, ( 3^( n + 1 ) - 3 )/2 }, { n, 1, 4 } ],
+  TestID -> "Sierpinski-vertex-edge-counts"
+]
+
+(* the k extreme (constant) strings have degree k-1, every other vertex degree k *)
+VerificationTest[
+  KeySort @ Counts @ VertexDegree @ SierpinskiGraph[ 3 ],
+  <| 2 -> 3, 3 -> 24 |>,
+  TestID -> "Sierpinski-corner-degree-profile"
+]
+
+VerificationTest[
+  { VertexCount @ SierpinskiGraph[ 3, 4 ], KeySort @ Counts @ VertexDegree @ SierpinskiGraph[ 3, 4 ] },
+  { 64, <| 3 -> 4, 4 -> 60 |> },
+  TestID -> "Sierpinski-general-k-degree-profile"
+]
+
+VerificationTest[ ConnectedGraphQ @ SierpinskiGraph[ 4 ], True, TestID -> "Sierpinski-connected" ]
+
+(* Sierpinski graph S(n,3) is NOT the gasket sieve graph GraphData curates *)
+VerificationTest[
+  IsomorphicGraphQ[ SierpinskiGraph[ 3 ], GraphData[ { "SierpinskiGasket", 3 } ] ],
+  False,
+  TestID -> "Sierpinski-graph-is-not-gasket-sieve"
+]
+
+(* Menger sponge skeleton: 20^n cells *)
+VerificationTest[
+  Table[ { VertexCount @ MengerGraph[ n ], EdgeCount @ MengerGraph[ n ] }, { n, 1, 2 } ],
+  { { 20, 24 }, { 400, 672 } },
+  TestID -> "Menger-counts"
+]
+
+VerificationTest[ ConnectedGraphQ @ MengerGraph[ 2 ], True, TestID -> "Menger-connected" ]
+
+(* Sierpinski carpet: 8^n cells; level 1 is the 8-cycle ring around the missing center *)
+VerificationTest[ Table[ VertexCount @ SierpinskiCarpetGraph[ n ], { n, 1, 3 } ], { 8, 64, 512 }, TestID -> "Carpet-counts" ]
+VerificationTest[ IsomorphicGraphQ[ SierpinskiCarpetGraph[ 1 ], CycleGraph[ 8 ] ], True, TestID -> "Carpet-level-1-is-8-cycle" ]
+
+(* generic builder: a 1-D Cantor set (keep the two outer thirds) has 2^n points, no adjacencies *)
+VerificationTest[
+  { VertexCount @ #, EdgeCount @ # } & @ FractalCellGraph[ { { 0 }, { 2 } }, 5 ],
+  { 32, 0 },
+  TestID -> "FractalCellGraph-cantor-dust"
+]
+
+(* presets agree with the generic builder *)
+VerificationTest[
+  IsomorphicGraphQ[ MengerGraph[ 2 ], FractalCellGraph[ Select[ Tuples[ { 0, 1, 2 }, 3 ], Count[ #, 1 ] < 2 & ], 2 ] ],
+  True,
+  TestID -> "Menger-preset-matches-builder"
+]
 
 
 EndTestSection[]

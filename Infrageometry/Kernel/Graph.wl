@@ -8,15 +8,14 @@ PackageExport[GraphBoundary]
 PackageExport[GraphInterior]
 PackageExport[BallHull]
 PackageExport[BallVolumes]
-PackageExport[ShellVolumes]
+PackageExport[ShellAreas]
 PackageExport[CylinderVolumes]
 PackageScope[cylinderVolume]
 
 PackageExport[FormanRicciCurvature]
 PackageExport[OllivierRicciCurvature]
 PackageExport[LogDifferenceQuotients]
-PackageExport[WolframDimensionCurvatureFit]
-PackageExport[WolframRicciCurvature]
+PackageExport[VolumeGrowthParameters]
 PackageExport[SectionalCurvatures]
 PackageScope[wasserstein1]
 PackageScope[windowSaturate]
@@ -284,7 +283,7 @@ wasserstein1[mu_List, nu_List, costs_List] := Module[{m = Length[mu], n = Length
    {f(0), ..., f(ecc)}; r_Integer -> the scalar f(r); {rmin, rmax} -> a RECTANGULAR
    window, saturating past the sequence end with pad (so a fixed window over a vertex
    list Transposes cleanly for subset statistics).  pad defaults to the last value
-   (ball volumes saturate at the component size); ShellVolumes passes pad = 0. *)
+   (ball volumes saturate at the component size); ShellAreas passes pad = 0. *)
 windowSaturate[c_, range_] := windowSaturate[c, range, Last[c]]
 
 windowSaturate[c_, range_, pad_] := Switch[range,
@@ -299,8 +298,8 @@ windowSaturate[c_, range_, pad_] := Switch[range,
    V(r); {rmin, rmax} -> the rectangular window).  Option "Ball" picks the counting
    convention: "Closed" = |B_r| (default); "Peeled" = |B_{r-1}|; "Interior" =
    |B_r| - |dB_r| = |GraphInterior[B_r]| (boundary-corrected, == "Peeled" in the bulk).
-   BallVolumes["Closed"] == Accumulate[ShellVolumes].  The growth invariant feeding
-   WolframDimensionCurvatureFit / WolframRicciCurvature. *)
+   BallVolumes["Closed"] == Accumulate[ShellAreas].  The growth invariant feeding
+   VolumeGrowthParameters. *)
 
 Options[BallVolumes] = {"Ball" -> "Closed"};
 
@@ -341,20 +340,20 @@ BallVolumes[g_Graph,
 ]
 
 
-(* ===================== Shell volumes ===================== *)
+(* ===================== Shell areas ===================== *)
 
-(* S(r) = |dB_r(v)| = #{ w : d(v, w) == r } as the List {S(0), ..., S(ecc(v))}: the
-   sphere sizes, the discrete derivative of BallVolumes (BallVolumes["Closed"] ==
-   Accumulate[ShellVolumes]; the crystallography / OEIS coordination sequence, S(1) =
+(* A(r) = |dB_r(v)| = #{ w : d(v, w) == r } as the List {A(0), ..., A(ecc(v))}: the
+   discrete geodesic-sphere areas, the radial derivative of BallVolumes (BallVolumes["Closed"]
+   == Accumulate[ShellAreas]; the crystallography / OEIS coordination sequence, A(1) =
    the coordination number).  Same object/range convention as BallVolumes; a finite
    {rmin, rmax} window is rectangular, padding past eccentricity with 0 (empty sphere). *)
 
-ShellVolumes[g_Graph] := ShellVolumes[g, All, All]
+ShellAreas[g_Graph] := ShellAreas[g, All, All]
 
-ShellVolumes[g_Graph, pts : (All | _List | Except[_Rule | _RuleDelayed])] := ShellVolumes[g, pts, All]
+ShellAreas[g_Graph, pts : (All | _List | Except[_Rule | _RuleDelayed])] := ShellAreas[g, pts, All]
 
 (* all/list form: one GraphDistanceMatrix; single vertex stays on one GraphDistance *)
-ShellVolumes[g_Graph,
+ShellAreas[g_Graph,
 	vertices : (_List | All),
 	range : (_Integer | {_Integer, _Integer} | All)
 ] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
@@ -363,7 +362,7 @@ ShellVolumes[g_Graph,
 		(windowSaturate[Values @ KeySort @ Counts @ DeleteCases[dm[[idx[#][[1]]]], Infinity], range, 0] &) /@ If[vertices === All, vs, vertices]
 	]
 
-ShellVolumes[g_Graph,
+ShellAreas[g_Graph,
 	vertex : Except[All | _Rule | _RuleDelayed],
 	range : (_Integer | {_Integer, _Integer} | All)
 ] := windowSaturate[Values @ KeySort @ Counts @ DeleteCases[GraphDistance[g, vertex], Infinity], range, 0]
@@ -408,47 +407,61 @@ cylinderVolume[dm_, pi_, qi_, s_] :=
 LogDifferenceQuotients[w_List] := Log[Ratios[Range[Length[w]]], Ratios[N[w]]]
 
 
-(* ===================== Bishop-Gromov dimension + curvature fit ===================== *)
+(* ===================== Volume-growth parameters ===================== *)
 
-(* Bishop-Gromov fit at a vertex: regress the log-difference quotient q(r) on
-   x = r (r+1), the squared geometric-mean radius.  The expansion
-   E V(rho) = d - R/(3(d+2)) rho^2 gives intercept = dimension d and
-   slope = -R/(3(d+2)), so scalar curvature R = -3 (d + 2) slope.  Returns
-   <|"Dimension" -> d, "ScalarCurvature" -> R, "Window" -> {rmin, rmax}|> with
-   the radius window the fit actually used.
-   "Dimension" -> d_Integer pins the intercept and fits only the slope.  Window
-   slot 3: {rmin, rmax} radii fed to the regression, All, or Automatic (default),
-   the linear core of the (x, q) scatter -- the longest radius window whose
-   least-squares residual error stays within twice the noise floor (the lower
-   quartile of all 5-point-window errors), ties to the smallest rmin since the
-   expansion is asymptotic at rho -> 0.  Vertex slot 2 (single, list, or All). *)
+(* The fitted growth parameters at a vertex -- dimension and scalar curvature -- read off
+   the Bishop-Gromov regression of the log-difference quotient q(r) on x = r (r+1) (the
+   squared geometric-mean radius), for BOTH growth probes:
+     Ball volume V(r):  q -> d - R/(3(d+2)) x   (intercept d, R = -3(d+2) slope);
+     Sphere area A(r) = ShellAreas (Gray: Area(S_r) = sigma_{n-1} r^(n-1)(1 - S/(6 n) r^2)):
+                        q -> (n-1) - S/(3 n) x  (intercept n-1, manifold n = intercept+1, S = -3 n slope).
+   Returns the nested association
+     <|"Ball"   -> <|"Dimension", "ScalarCurvature", "CurvatureByRadius", "Window"|>,
+       "Sphere" -> <|"Dimension", "ScalarCurvature", "CurvatureByRadius",
+                     "MeanCurvatureByRadius", "Window"|>|>,
+   where "Dimension"/"ScalarCurvature" are the single regressed parameters, "CurvatureByRadius"
+   the per-radius comparison profile (ball R(v,r) = 6(d+2)/r^2 (1 - V(r)/V_E(d,r)); sphere
+   S(v,r) = 6 n/r^2 (1 - A(r)/A_E(n,r))), and the sphere's "MeanCurvatureByRadius" the discrete
+   geodesic-sphere mean curvature d Log A/dr (Raychaudhuri expansion theta).  The two probes
+   give independent (n, S) readouts -- their agreement is the consistency check.
+   Window slot 3: {rmin, rmax}, All, or Automatic (default), the linear core of the (x, q)
+   scatter -- the longest radius window whose least-squares residual stays within twice the
+   noise floor; the sphere's Automatic window is taken on the rising part of A(r) only (it is
+   non-monotonic on a finite graph).  "Dimension" -> d_Integer pins the intercept; "Ball"
+   ("Peeled" (default) | "Closed" | "Interior") picks the ball-volume convention.  Vertex
+   slot 2 (single, list, or All). *)
 
-Options[WolframDimensionCurvatureFit] = {"Ball" -> "Peeled", "Dimension" -> Automatic};
+Options[VolumeGrowthParameters] = {"Ball" -> "Peeled", "Dimension" -> Automatic};
 
-WolframDimensionCurvatureFit[g_Graph, opts : OptionsPattern[]] :=
-	WolframDimensionCurvatureFit[g, All, Automatic, opts]
+VolumeGrowthParameters[g_Graph, opts : OptionsPattern[]] :=
+	VolumeGrowthParameters[g, All, Automatic, opts]
 
-WolframDimensionCurvatureFit[g_Graph,
+VolumeGrowthParameters[g_Graph,
 	vertices : (_List | All),
 	window : ({_Integer, _Integer} | All | Automatic) : Automatic,
 	OptionsPattern[]
 ] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
 	With[{dim = OptionValue["Dimension"]},
-		(dimensionCurvature[#, window, dim] &) /@ BallVolumes[g, vertices, All, "Ball" -> OptionValue["Ball"]]
+		MapThread[growthParams[#1, #2, window, dim] &,
+			{BallVolumes[g, vertices, All, "Ball" -> OptionValue["Ball"]], ShellAreas[g, vertices, All]}]
 	]
 
-WolframDimensionCurvatureFit[g_Graph,
+VolumeGrowthParameters[g_Graph,
 	vertex : Except[All | _Rule | _RuleDelayed],
 	window : ({_Integer, _Integer} | All | Automatic) : Automatic,
 	OptionsPattern[]
-] := dimensionCurvature[BallVolumes[g, vertex, All, "Ball" -> OptionValue["Ball"]], window, OptionValue["Dimension"]]
+] := growthParams[
+	BallVolumes[g, vertex, All, "Ball" -> OptionValue["Ball"]], ShellAreas[g, vertex, All], window, OptionValue["Dimension"]]
 
-(* one fit on a volume sequence: q(r) on x = r (r+1) over the radius window;
+(* one fit on a growth sequence: q(r) on x = r (r+1) over the radius window;
    Automatic detects the linear core by exhaustive interval search (detection
    always uses the free 2-parameter line, independent of a pinned dimension);
-   prefix sums give each interval's residual error in O(1) *)
-dimensionCurvature[w_, window_, dimOpt_] := With[
-	{lw = Log[N[w]], n = Length[w]},
+   prefix sums give each interval's residual error in O(1).  probe = "Ball" (q
+   intercept = dimension d, slope = -R/(3(d+2))) or "Sphere" (intercept = d - 1
+   since Area ~ r^(d-1), slope = -R/(3 d)): manifold dim = intercept + shift,
+   slope coefficient = intercept + 2 - shift, shift = {"Ball" -> 0, "Sphere" -> 1}. *)
+dimensionCurvature[w_, window_, dimOpt_, probe_ : "Ball"] := With[
+	{lw = Log[N[w]], n = Length[w], shift = If[probe === "Sphere", 1, 0]},
 	{qAll = Table[(lw[[r + 2]] - lw[[r + 1]]) / (Log[r + 1.] - Log[r]), {r, 1, n - 2}]},
 	{rs = Which[
 		window === All, Range[1, n - 2],
@@ -478,60 +491,32 @@ dimensionCurvature[w_, window_, dimOpt_] := With[
 	{x = N[rs (rs + 1)], q = qAll[[rs]]},
 	If[dimOpt === Automatic,
 		With[{c = LeastSquares[Transpose[{ConstantArray[1., Length[x]], x}], q]},
-			<|"Dimension" -> c[[1]], "ScalarCurvature" -> -3 (c[[1]] + 2) c[[2]], "Window" -> MinMax[rs]|>
+			<|"Dimension" -> c[[1]] + shift, "ScalarCurvature" -> -3 (c[[1]] + 2 - shift) c[[2]], "Window" -> MinMax[rs]|>
 		],
-		With[{m = First @ LeastSquares[Transpose[{x}], q - dimOpt]},
-			<|"Dimension" -> N[dimOpt], "ScalarCurvature" -> -3 (dimOpt + 2) m, "Window" -> MinMax[rs]|>
+		With[{m = First @ LeastSquares[Transpose[{x}], q - (dimOpt - shift)]},
+			<|"Dimension" -> N[dimOpt], "ScalarCurvature" -> -3 (dimOpt + 2 - 2 shift) m, "Window" -> MinMax[rs]|>
 		]
 	]
 ]
 
 
-(* ===================== Wolfram-Ricci scalar curvature ===================== *)
-
-(* Volume-comparison Ricci scalar at vertex v: R(v, r) = 6 (d + 2)/r^2 (1 - v(r)/V_E(d, r)),
-   V_E(d, r) = pi^(d/2) r^d / Gamma[d/2 + 1], one value per radius r = 1..ecc.
-   Dimension d is supplied via "Dimension" -> d, or fitted once via
-   WolframDimensionCurvatureFit when "Dimension" -> Automatic (default).  Volume
-   v(r) is the chosen "Ball" convention (default "Peeled").  Vertex slot 2
-   (single, list, or All). *)
-
-Options[WolframRicciCurvature] = {"Dimension" -> Automatic, "Ball" -> "Peeled"};
-
-WolframRicciCurvature[g_Graph, opts : OptionsPattern[]] :=
-	WolframRicciCurvature[g, All, opts]
-
-WolframRicciCurvature[g_Graph,
-	vertices : (_List | All),
-	OptionsPattern[]
-] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
-	With[{conv = OptionValue["Ball"], dimOpt = OptionValue["Dimension"]},
-		With[{
-			seqs = BallVolumes[g, vertices, All, "Ball" -> conv],
-			dims = If[dimOpt === Automatic,
-				#["Dimension"] & /@ WolframDimensionCurvatureFit[g, vertices, Automatic, "Ball" -> conv],
-				ConstantArray[dimOpt, Length @ If[vertices === All, VertexList[g], vertices]]
-			]
-		},
-			MapThread[
-				Function[{w, d},
-					Table[N[6 (d + 2) / r^2 (1 - w[[r + 1]] Gamma[d / 2 + 1] / (Pi^(d / 2) r^d))], {r, 1, Length[w] - 1}]
-				],
-				{seqs, dims}
-			]
-		]
-	]
-
-WolframRicciCurvature[g_Graph,
-	vertex : Except[All | _Rule | _RuleDelayed],
-	OptionsPattern[]
-] := With[{conv = OptionValue["Ball"], dimOpt = OptionValue["Dimension"]},
-	With[{
-		w = BallVolumes[g, vertex, All, "Ball" -> conv],
-		d = If[dimOpt === Automatic, WolframDimensionCurvatureFit[g, vertex, Automatic, "Ball" -> conv]["Dimension"], dimOpt]
-	},
-		Table[N[6 (d + 2) / r^2 (1 - w[[r + 1]] Gamma[d / 2 + 1] / (Pi^(d / 2) r^d))], {r, 1, Length[w] - 1}]
-	]
+(* both probes' fitted parameters + per-radius profiles on one vertex's (ball volume,
+   sphere area) pair; the sphere fit uses the rising part of A(r) for an Automatic window
+   since A(r) is non-monotonic on a finite graph (it peaks near the eccentricity) *)
+growthParams[w_, a_, window_, dimOpt_] := With[
+	{ballFit = dimensionCurvature[w, window, dimOpt, "Ball"]},
+	{bd = ballFit["Dimension"], rising = If[window === Automatic, Take[a, First @ Ordering[a, -1]], a]},
+	{shellFit = dimensionCurvature[rising, window, dimOpt, "Sphere"]},
+	{sd = shellFit["Dimension"]},
+	<|
+		"Ball" -> Append[ballFit, "CurvatureByRadius" ->
+			Table[N[6 (bd + 2) / r^2 (1 - w[[r + 1]] Gamma[bd / 2 + 1] / (Pi^(bd / 2) r^bd))], {r, 1, Length[w] - 1}]],
+		"Sphere" -> Join[shellFit, <|
+			"CurvatureByRadius" ->
+				Table[N[6 sd / r^2 (1 - a[[r + 1]] Gamma[sd / 2 + 1] / (sd Pi^(sd / 2) r^(sd - 1)))], {r, 1, Length[a] - 1}],
+			"MeanCurvatureByRadius" -> Differences[Log[N[a]]]
+		|>]
+	|>
 ]
 
 
