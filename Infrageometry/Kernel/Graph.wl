@@ -295,13 +295,13 @@ windowSaturate[c_, range_, pad_] := Switch[range,
 (* V(r) = |B_r(v)|, the cumulative vertex count within radius r, as the List
    {V(0), ..., V(ecc(v))} (position i is radius i - 1).  Object slot 2 (single vertex,
    list, or All), radius slot 3 (default All -> full profile; r_Integer -> the scalar
-   V(r); {rmin, rmax} -> the rectangular window).  Option "Ball" picks the counting
-   convention: "Closed" = |B_r| (default); "Peeled" = |B_{r-1}|; "Interior" =
-   |B_r| - |dB_r| = |GraphInterior[B_r]| (boundary-corrected, == "Peeled" in the bulk).
-   BallVolumes["Closed"] == Accumulate[ShellAreas].  The growth invariant feeding
-   VolumeGrowthObservables. *)
+   V(r); {rmin, rmax} -> the rectangular window).  Option "Measure" picks the counting
+   convention: "Counting" = |B_r| (default); "Hausdorff" = |B_r| - |dB_r| =
+   |GraphInterior[B_r]| (boundary-corrected, == the counting measure in the bulk).
+   BallVolumes (default "Counting") == Accumulate[ShellAreas].  The growth invariant
+   feeding VolumeGrowthObservables. *)
 
-Options[BallVolumes] = {"Ball" -> "Closed"};
+Options[BallVolumes] = {"Measure" -> "Counting"};
 
 BallVolumes[g_Graph, opts : OptionsPattern[]] := BallVolumes[g, All, All, opts]
 
@@ -317,12 +317,11 @@ BallVolumes[g_Graph,
 	OptionsPattern[]
 ] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
 	With[
-		{conv = OptionValue["Ball"], dm = GraphDistanceMatrix[g], vs = VertexList[g]},
+		{conv = OptionValue["Measure"], dm = GraphDistanceMatrix[g], vs = VertexList[g]},
 		{idx = PositionIndex[vs], targets = If[vertices === All, vs, vertices]},
 		(windowSaturate[#, range] &) /@ Switch[conv,
-			"Closed",   (Accumulate @ Values @ KeySort @ Counts @ DeleteCases[dm[[idx[#][[1]]]], Infinity] &) /@ targets,
-			"Peeled",   (With[{c = Accumulate @ Values @ KeySort @ Counts @ DeleteCases[dm[[idx[#][[1]]]], Infinity]}, Join[{First[c]}, Most[c]]] &) /@ targets,
-			"Interior", (With[{row = dm[[idx[#][[1]]]]}, Table[Length @ GraphInterior[g, Pick[vs, Thread[row <= r]]], {r, 0, Max @ DeleteCases[row, Infinity]}]] &) /@ targets
+			"Counting",  (Accumulate @ Values @ KeySort @ Counts @ DeleteCases[dm[[idx[#][[1]]]], Infinity] &) /@ targets,
+			"Hausdorff", (With[{row = dm[[idx[#][[1]]]]}, Table[Length @ GraphInterior[g, Pick[vs, Thread[row <= r]]], {r, 0, Max @ DeleteCases[row, Infinity]}]] &) /@ targets
 		]
 	]
 
@@ -331,10 +330,9 @@ BallVolumes[g_Graph,
 	range : (_Integer | {_Integer, _Integer} | All),
 	OptionsPattern[]
 ] := windowSaturate[
-	Switch[OptionValue["Ball"],
-		"Closed",   Accumulate @ Values @ KeySort @ Counts @ DeleteCases[GraphDistance[g, vertex], Infinity],
-		"Peeled",   With[{c = Accumulate @ Values @ KeySort @ Counts @ DeleteCases[GraphDistance[g, vertex], Infinity]}, Join[{First[c]}, Most[c]]],
-		"Interior", With[{vs = VertexList[g], row = GraphDistance[g, vertex]}, Table[Length @ GraphInterior[g, Pick[vs, Thread[row <= r]]], {r, 0, Max @ DeleteCases[row, Infinity]}]]
+	Switch[OptionValue["Measure"],
+		"Counting",  Accumulate @ Values @ KeySort @ Counts @ DeleteCases[GraphDistance[g, vertex], Infinity],
+		"Hausdorff", With[{vs = VertexList[g], row = GraphDistance[g, vertex]}, Table[Length @ GraphInterior[g, Pick[vs, Thread[row <= r]]], {r, 0, Max @ DeleteCases[row, Infinity]}]]
 	],
 	range
 ]
@@ -343,7 +341,7 @@ BallVolumes[g_Graph,
 (* ===================== Shell areas ===================== *)
 
 (* A(r) = |dB_r(v)| = #{ w : d(v, w) == r } as the List {A(0), ..., A(ecc(v))}: the
-   discrete geodesic-sphere areas, the radial derivative of BallVolumes (BallVolumes["Closed"]
+   discrete geodesic-sphere areas, the radial derivative of BallVolumes (default "Counting"
    == Accumulate[ShellAreas]; the crystallography / OEIS coordination sequence, A(1) =
    the coordination number).  Same object/range convention as BallVolumes; a finite
    {rmin, rmax} window is rectangular, padding past eccentricity with 0 (empty sphere). *)
@@ -431,11 +429,13 @@ LogDifferenceQuotients[w_List] := Log[Ratios[Range[Length[w]]], Ratios[N[w]]]
    the rising part of A(r) since it is non-monotonic on a finite graph).
    Window slot 3: {rmin, rmax}, All, or Automatic (default), the linear core of the (x, q)
    scatter -- the longest radius window whose least-squares residual stays within twice the
-   noise floor.  "Dimension" -> d_Integer pins the intercept; "Ball" ("Peeled" (default) |
-   "Closed" | "Interior") picks the ball-volume convention.  Vertex slot 2 (single, list,
-   or All). *)
+   noise floor.  "Dimension" -> d_Integer pins the intercept; "Measure" ("Counting"
+   (default) | "Hausdorff") picks the ball-volume convention.  The ball dimension /
+   curvature fit internally shifts the profile by one radius (B_{r-1}) so flat lattices
+   read exact integer dimensions; "BallVolumes" still exposes the raw profile.  Vertex
+   slot 2 (single, list, or All). *)
 
-Options[VolumeGrowthObservables] = {"Ball" -> "Peeled", "Dimension" -> Automatic};
+Options[VolumeGrowthObservables] = {"Measure" -> "Counting", "Dimension" -> Automatic};
 
 VolumeGrowthObservables[g_Graph, opts : OptionsPattern[]] :=
 	VolumeGrowthObservables[g, All, Automatic, opts]
@@ -447,7 +447,7 @@ VolumeGrowthObservables[g_Graph,
 ] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
 	With[{dim = OptionValue["Dimension"]},
 		MapThread[growthParams[#1, #2, window, dim] &,
-			{BallVolumes[g, vertices, All, "Ball" -> OptionValue["Ball"]], ShellAreas[g, vertices, All]}]
+			{BallVolumes[g, vertices, All, "Measure" -> OptionValue["Measure"]], ShellAreas[g, vertices, All]}]
 	]
 
 VolumeGrowthObservables[g_Graph,
@@ -455,7 +455,7 @@ VolumeGrowthObservables[g_Graph,
 	window : ({_Integer, _Integer} | All | Automatic) : Automatic,
 	OptionsPattern[]
 ] := growthParams[
-	BallVolumes[g, vertex, All, "Ball" -> OptionValue["Ball"]], ShellAreas[g, vertex, All], window, OptionValue["Dimension"]]
+	BallVolumes[g, vertex, All, "Measure" -> OptionValue["Measure"]], ShellAreas[g, vertex, All], window, OptionValue["Dimension"]]
 
 (* one fit on a growth sequence: q(r) on x = r (r+1) over the radius window;
    Automatic detects the linear core by exhaustive interval search (detection
@@ -507,22 +507,26 @@ dimensionCurvature[w_, window_, dimOpt_, probe_ : "Ball"] := With[
 (* both probes' fitted parameters + per-radius profiles on one vertex's (ball volume,
    sphere area) pair; the sphere fit uses the rising part of A(r) for an Automatic window
    since A(r) is non-monotonic on a finite graph (it peaks near the eccentricity) *)
+(* the ball fit runs on the boundary-shifted volumes B_{r-1} (one right shift of the
+   counting profile -- the convention that makes flat lattices read exact integer
+   dimensions), recovered internally; the bundle still exposes the raw counting profile
+   as "BallVolumes" *)
 growthParams[w_, a_, window_, dimOpt_] := With[
-	{ballFit = dimensionCurvature[w, window, dimOpt, "Ball"]},
-	{bd = ballFit["Dimension"], rising = If[window === Automatic, Take[a, First @ Ordering[a, -1]], a]},
-	{shellFit = dimensionCurvature[rising, window, dimOpt, "Sphere"]},
+	{pw = Join[{First[w]}, Most[w]]},
+	{ballFit = dimensionCurvature[pw, window, dimOpt, "Ball"], rising = If[window === Automatic, Take[a, First @ Ordering[a, -1]], a]},
+	{bd = ballFit["Dimension"], shellFit = dimensionCurvature[rising, window, dimOpt, "Sphere"]},
 	{sd = shellFit["Dimension"]},
 	<|
 		"BallVolumes" -> w,
 		"ShellAreas" -> a,
-		"BallLogDifferenceQuotients" -> LogDifferenceQuotients[w],
+		"BallLogDifferenceQuotients" -> LogDifferenceQuotients[pw],
 		"SphereLogDifferenceQuotients" -> LogDifferenceQuotients[a],
 		"BallDimension" -> bd,
 		"SphereDimension" -> sd,
 		"BallScalarCurvature" -> ballFit["ScalarCurvature"],
 		"SphereScalarCurvature" -> shellFit["ScalarCurvature"],
 		"BallCurvatureByRadius" ->
-			Table[N[6 (bd + 2) / r^2 (1 - w[[r + 1]] Gamma[bd / 2 + 1] / (Pi^(bd / 2) r^bd))], {r, 1, Length[w] - 1}],
+			Table[N[6 (bd + 2) / r^2 (1 - pw[[r + 1]] Gamma[bd / 2 + 1] / (Pi^(bd / 2) r^bd))], {r, 1, Length[pw] - 1}],
 		"SphereCurvatureByRadius" ->
 			Table[N[6 sd / r^2 (1 - a[[r + 1]] Gamma[sd / 2 + 1] / (sd Pi^(sd / 2) r^(sd - 1)))], {r, 1, Length[a] - 1}],
 		"SphereMeanCurvatureByRadius" -> Differences[Log[N[a]]],

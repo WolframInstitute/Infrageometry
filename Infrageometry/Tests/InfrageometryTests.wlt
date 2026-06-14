@@ -1380,7 +1380,7 @@ VerificationTest[
         {r = VolumeGrowthObservables[g, v]},
         {
             r["ShellAreas"] === ShellAreas[g, v],
-            r["BallVolumes"] === BallVolumes[g, v, All, "Ball" -> "Peeled"],
+            r["BallVolumes"] === BallVolumes[g, v, All, "Measure" -> "Counting"],
             r["SphereLogDifferenceQuotients"] === LogDifferenceQuotients[ShellAreas[g, v]]
         }
     ],
