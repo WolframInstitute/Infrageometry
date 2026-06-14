@@ -6,6 +6,7 @@ PackageExport[GraphEdgeWeights]
 PackageExport[GraphVertexWeights]
 PackageExport[GraphBoundary]
 PackageExport[GraphInterior]
+PackageExport[InteriorGraph]
 PackageExport[BallHull]
 PackageExport[BallVolumes]
 PackageExport[ShellAreas]
@@ -86,6 +87,23 @@ GraphInterior[g_Graph, h_Graph] :=
 
 GraphInterior[g_Graph, subset_List] :=
 	Complement[subset, GraphBoundary[g, subset]]
+
+(* InteriorGraph[g]: strip the degree-boundary -- delete every edge both of whose
+   endpoints have below-average degree (the thin rim of a mesh), then keep the
+   largest connected component, carrying the original vertex coordinates over.
+   The geometric "remove the boundary layer" companion to the combinatorial
+   GraphInterior. *)
+InteriorGraph[g_Graph] :=
+	With[
+		{deg = AssociationThread[VertexList[g], VertexDegree[g]],
+		 coords = AssociationThread[VertexList[g], GraphEmbedding[g]]},
+		{avg = Mean[N @ Values @ deg]},
+		{h = First @ MaximalBy[
+			ConnectedGraphComponents @ EdgeDelete[g,
+				Select[EdgeList[g], deg[#[[1]]] < avg && deg[#[[2]]] < avg &]],
+			VertexCount]},
+		Graph[h, VertexCoordinates -> Lookup[coords, VertexList[h]]]
+	]
 
 (* ===================== Ball hull ===================== *)
 
@@ -435,7 +453,7 @@ LogDifferenceQuotients[w_List] := Log[Ratios[Range[Length[w]]], Ratios[N[w]]]
    read exact integer dimensions; "BallVolumes" still exposes the raw profile.  Vertex
    slot 2 (single, list, or All). *)
 
-Options[VolumeGrowthObservables] = {"Measure" -> "Counting", "Dimension" -> Automatic};
+Options[VolumeGrowthObservables] = {"Measure" -> "Hausdorff", "Dimension" -> Automatic};
 
 VolumeGrowthObservables[g_Graph, opts : OptionsPattern[]] :=
 	VolumeGrowthObservables[g, All, Automatic, opts]
@@ -504,29 +522,33 @@ dimensionCurvature[w_, window_, dimOpt_, probe_ : "Ball"] := With[
 ]
 
 
+(* q(r) = (Log f(r) - Log f(r-1)) / (Log r - Log(r-1)) sampled on the radius interval
+   [r, r+1]: the radius-consistent log-log slope (matches dimensionCurvature's qAll, the
+   sequence the fit regresses -- distinct from the index-based LogDifferenceQuotients) *)
+radialQuotients[f_] :=
+	Table[(Log[N @ f[[r + 2]]] - Log[N @ f[[r + 1]]]) / (Log[r + 1.] - Log[r]), {r, 1, Length[f] - 2}]
+
 (* both probes' fitted parameters + per-radius profiles on one vertex's (ball volume,
    sphere area) pair; the sphere fit uses the rising part of A(r) for an Automatic window
-   since A(r) is non-monotonic on a finite graph (it peaks near the eccentricity) *)
-(* the ball fit runs on the boundary-shifted volumes B_{r-1} (one right shift of the
-   counting profile -- the convention that makes flat lattices read exact integer
-   dimensions), recovered internally; the bundle still exposes the raw counting profile
-   as "BallVolumes" *)
+   since A(r) is non-monotonic on a finite graph (it peaks near the eccentricity).  No
+   boundary shift: the ball fit runs directly on the supplied volume (default Hausdorff,
+   the boundary-corrected |GraphInterior[B_r]| = B_{r-1} on a regular lattice), so the
+   returned "BallVolumes" and "BallLogDifferenceQuotients" are exactly what was fitted *)
 growthParams[w_, a_, window_, dimOpt_] := With[
-	{pw = Join[{First[w]}, Most[w]]},
-	{ballFit = dimensionCurvature[pw, window, dimOpt, "Ball"], rising = If[window === Automatic, Take[a, First @ Ordering[a, -1]], a]},
+	{ballFit = dimensionCurvature[w, window, dimOpt, "Ball"], rising = If[window === Automatic, Take[a, First @ Ordering[a, -1]], a]},
 	{bd = ballFit["Dimension"], shellFit = dimensionCurvature[rising, window, dimOpt, "Sphere"]},
 	{sd = shellFit["Dimension"]},
 	<|
 		"BallVolumes" -> w,
 		"ShellAreas" -> a,
-		"BallLogDifferenceQuotients" -> LogDifferenceQuotients[pw],
-		"SphereLogDifferenceQuotients" -> LogDifferenceQuotients[a],
+		"BallLogDifferenceQuotients" -> radialQuotients[w],
+		"SphereLogDifferenceQuotients" -> radialQuotients[a],
 		"BallDimension" -> bd,
 		"SphereDimension" -> sd,
 		"BallScalarCurvature" -> ballFit["ScalarCurvature"],
 		"SphereScalarCurvature" -> shellFit["ScalarCurvature"],
 		"BallCurvatureByRadius" ->
-			Table[N[6 (bd + 2) / r^2 (1 - pw[[r + 1]] Gamma[bd / 2 + 1] / (Pi^(bd / 2) r^bd))], {r, 1, Length[pw] - 1}],
+			Table[N[6 (bd + 2) / r^2 (1 - w[[r + 1]] Gamma[bd / 2 + 1] / (Pi^(bd / 2) r^bd))], {r, 1, Length[w] - 1}],
 		"SphereCurvatureByRadius" ->
 			Table[N[6 sd / r^2 (1 - a[[r + 1]] Gamma[sd / 2 + 1] / (sd Pi^(sd / 2) r^(sd - 1)))], {r, 1, Length[a] - 1}],
 		"SphereMeanCurvatureByRadius" -> Differences[Log[N[a]]],
