@@ -2246,5 +2246,23 @@ VerificationTest[
 VerificationTest[ VertexCount @ BetheGraph[ 4, 3 ], 1 + 3 ( ( 3 - 1 )^4 - 1 )/( 3 - 2 ), TestID -> "Bethe-vertex-count-formula" ]
 VerificationTest[ TreeGraphQ @ BetheGraph[ 3, 4 ], True, TestID -> "Bethe-is-tree" ]
 
+(* BranchingSequenceTree[b]: spherically symmetric tree, b[[l+1]] children at depth l;
+   shell sizes are FoldList[Times, 1, b], constant b is CompleteKaryTree *)
+VerificationTest[
+  Values @ KeySort @ Counts[ First /@ VertexList @ BranchingSequenceTree[ { 2, 3, 2 } ] ],
+  FoldList[ Times, 1, { 2, 3, 2 } ],
+  TestID -> "BranchingSequenceTree-shell-sizes"
+]
+
+VerificationTest[ IsomorphicGraphQ[ BranchingSequenceTree[ { 2, 2, 2 } ], CompleteKaryTree[ 4, 2 ] ], True, TestID -> "BranchingSequenceTree-constant-is-CompleteKaryTree" ]
+
+(* radial symmetry: every vertex at a given depth has the same degree *)
+VerificationTest[
+  With[ { g = BranchingSequenceTree[ { 3, 2, 2 } ] },
+    AllTrue[ GroupBy[ VertexList @ g, First, Union[ VertexDegree[ g, # ] & /@ # ] & ], Length @ # == 1 & ] ],
+  True,
+  TestID -> "BranchingSequenceTree-radial"
+]
+
 
 EndTestSection[]
