@@ -122,7 +122,7 @@ TopologyGraph::usage = "TopologyGraph[g, topo] draws the graph g overlaid with t
 ComplexEmbedding::usage = "ComplexEmbedding[g,d] numerically embeds complex g in R^d via energy minimization (d=2 or 3).";
 ComplexMesh::usage = "ComplexMesh[g,d] builds a MeshRegion from complex g (with optional explicit coordinates).";
 GraphMesh::usage = "GraphMesh[g] builds a MeshRegion from graph g using its embedding + cliques up to size 4.";
-InteriorMeshGraph::usage = "InteriorMeshGraph[mr] returns the 1-skeleton of mr with every edge between two boundary (surface) vertices deleted, keeping edges incident to an interior vertex. Option \"KeepCoordinates\" (False (default) drops the mesh coordinates, True attaches them as VertexCoordinates).";
+InteriorMeshGraph::usage = "InteriorMeshGraph[mr] returns the 1-skeleton of mr with every edge between two boundary (surface) vertices deleted, keeping edges incident to an interior vertex. Option \"KeepCoordinates\" (True (default) attaches the mesh coordinates as VertexCoordinates, False drops them).";
 MeshComplex::usage = "MeshComplex[mr] returns the simplicial complex induced by MeshRegion mr.";
 MeshIncidenceMatrix::usage = "MeshIncidenceMatrix[mr,k] gives oriented incidence matrix between (k-1)- and k-cells.";
 CellOrientation::usage = "CellOrientation[cell] gives orientation sign (+/-1) of a mesh cell.";
