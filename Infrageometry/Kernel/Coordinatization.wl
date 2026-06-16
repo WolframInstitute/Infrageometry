@@ -96,17 +96,30 @@ resistanceEmbeddingMatrix[g_Graph, rescaling_, dimSpec_] :=
 
 (* a minimum r-ball cover: a smallest centre set (chosen from all of V) whose radius-r balls
    cover the targets (every vertex by default, or a given subset) as a set-cover integer program.
+   For a target subset the candidate centres are pruned to B_r(targets) -- a centre outside it covers
+   no target, so the minimum is unchanged -- and the cover relation is read off bounded depth-r
+   neighbourhoods, so the full GraphDistanceMatrix is never formed (the slow part for a small subset
+   of a large graph).
    count = 1 (default) returns one cover as a centre list; n / UpTo[n] return up to n distinct
    minimum covers; All returns every one. Enumerating all minimum covers is #P-hard (the count of
    minimum set covers), so All / n>1 brute-force the size-k centre subsets and are cheap only for small g. *)
 FindBallCover[g_Graph, r_ : 1, targets : (_List | All) : All, count : (_Integer | All | UpTo[_Integer]) : 1] :=
     With[
         {vs = VertexList[g]},
-        {rows = If[targets === All, Range[Length[vs]], Flatten[FirstPosition[vs, #] & /@ targets]]},
-        {cover = Map[Boole[# <= r] &, GraphDistanceMatrix[g][[rows]], {2}], x = Array[\[FormalX], Length[vs]]},
-        {one = vs[[ Flatten @ Position[Round[x /. LinearOptimization[Total[x], Join[Thread[cover . x >= 1], Thread[0 <= x <= 1]], x \[Element] Vectors[Length[vs], Integers]]], 1] ]]},
+        {candmat = If[targets === All,
+            {vs, Map[Boole[# <= r] &, GraphDistanceMatrix[g], {2}]},
+            With[
+                {balls = VertexList[NeighborhoodGraph[g, #, r]] & /@ targets},
+                {cc = Union @@ balls},
+                {ix = AssociationThread[cc, Range @ Length[cc]]},
+                {cc, SparseArray[Join @@ MapIndexed[{ball, i} |-> ({First[i], ix[#]} -> 1 & /@ ball), balls], {Length[targets], Length[cc]}]}
+            ]
+        ]},
+        {cand = candmat[[1]], mat = candmat[[2]]},
+        {x = Array[\[FormalX], Length[cand]]},
+        {one = cand[[ Flatten @ Position[Round[x /. LinearOptimization[Total[x], Join[Thread[mat . x >= 1], Thread[0 <= x <= 1]], x \[Element] Vectors[Length[cand], Integers]]], 1] ]]},
         If[count === 1, one,
-            With[{covers = Select[Subsets[vs, {Length[one]}], BallCoverQ[g, r, #, targets] &]},
+            With[{covers = Select[Subsets[cand, {Length[one]}], BallCoverQ[g, r, #, targets] &]},
                 Replace[count, {All -> covers, (n_Integer | UpTo[n_]) :> Take[covers, UpTo[n]]}]
             ]
         ]
