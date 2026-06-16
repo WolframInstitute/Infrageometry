@@ -14,11 +14,15 @@ SimplexList::usage = "SimplexList[g, k] lists all simplices of dimension <= k (o
 ComplexBones::usage = "ComplexBones[g] returns interior (d-2)-faces (\"bones\") of a pure d-dimensional complex.";
 ComplexWalls::usage = "ComplexWalls[g] returns codimension-1 faces (\"walls\") of a pure complex (potential boundary facets).";
 ComplexFacets::usage = "ComplexFacets[g] returns all maximal simplices (facets) of g.";
+ComplexFrames::usage = "ComplexFrames[g] returns the ordered facets (frames) of g: every permutation of each maximal simplex.";
+ComplexHypergraph::usage = "ComplexHypergraph[g] returns the maximal simplices of g as a hypergraph, peeling top-down by dimension so faces already contained in a higher simplex are dropped.";
 ComplexVertexList::usage = "ComplexVertexList[g] returns the sorted list of vertices in g.";
 SimplexCardinality::usage = "SimplexCardinality[g, k] gives the number of k-dimensional simplices in g.";
 SimplexCardinalities::usage = "SimplexCardinalities[g] gives counts of simplices in each dimension (f-vector without the leading 1).";
 SimplexStar::usage = "SimplexStar[g, s] gives the star: all simplices containing s.";
+SimplexStarSphere::usage = "SimplexStarSphere[g, s] gives the star of s with s itself removed (the simplices strictly containing s).";
 SimplexCore::usage = "SimplexCore[g, s] gives all simplices contained in s.";
+SimplexCoreSphere::usage = "SimplexCoreSphere[s] gives the proper faces of s: its closure with s itself removed.";
 SimplexUnitSphere::usage = "SimplexUnitSphere[g, s] gives the unit sphere (link) around simplex s (its star minus interior).";
 SimplexMirror::usage = "SimplexMirror[g, s] returns the \"mirror\" simplex made by the first vertex absent from each coface in the star boundary (used for geodesic continuation).";
 SimplexBoundary::usage = "SimplexBoundary[s] lists codimension-1 faces of simplex s.";
@@ -55,6 +59,7 @@ AlexandrovTopology::usage = "AlexandrovTopology[g] returns the specialization/Al
 
 IndexMatrix::usage = "IndexMatrix[g,k] returns signed incidence between (k+1)- and k-simplices; IndexMatrix[g] defaults to full complex.";
 SignMatrix::usage = "SignMatrix[g,k] returns orientation sign incidence matrix between (k+1)- and k-simplices.";
+FaceMatrix::usage = "FaceMatrix[i][g, x, y] gives the Boolean matrix of the i-th face map between simplex lists x and y (entry 1 when deleting vertex i of a y-simplex yields the x-simplex).";
 ComplexIncidenceMatrix::usage = "ComplexIncidenceMatrix[g,k] returns the oriented incidence matrix at dimension k.";
 ConnectionMatrix::usage = "ConnectionMatrix[g] returns Euler-characteristic based connection matrix among simplices.";
 GreenFunctionMatrix::usage = "GreenFunctionMatrix[g] returns the inverse of ConnectionMatrix[g] in closed form via star-intersection Euler characteristics (Knill's unimodularity theorem). Distinct from GreenOperatorMatrix.";
@@ -121,6 +126,7 @@ TopologyGraph::usage = "TopologyGraph[g, topo] draws the graph g overlaid with t
 (* Mesh.wl *)
 ComplexEmbedding::usage = "ComplexEmbedding[g,d] numerically embeds complex g in R^d via energy minimization (d=2 or 3).";
 ComplexMesh::usage = "ComplexMesh[g,d] builds a MeshRegion from complex g (with optional explicit coordinates).";
+HighlightComplex::usage = "HighlightComplex[g, h] renders the mesh of complex g with the simplices in h highlighted (each h entry a vertex list, optionally wrapped in Style).";
 GraphMesh::usage = "GraphMesh[g] builds a MeshRegion from graph g using its embedding + cliques up to size 4.";
 InteriorMeshGraph::usage = "InteriorMeshGraph[mr] returns the 1-skeleton of mr with every edge between two boundary (surface) vertices deleted, keeping edges incident to an interior vertex. Option \"KeepCoordinates\" (True (default) attaches the mesh coordinates as VertexCoordinates, False drops them).";
 MeshComplex::usage = "MeshComplex[mr] returns the simplicial complex induced by MeshRegion mr.";
