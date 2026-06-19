@@ -21,12 +21,14 @@ PackageScope[sphericalReflect]
    quotient). One ring-growth skeleton, dispatched by curvature (p-2)(q-2): the
    Euclidean plane (== 4), the hyperbolic plane (> 4), or the closing-up sphere (< 4);
    interior vertices have degree q, the cut boundary fewer. *)
-TessellatedDiskGraph[{p_Integer, q_Integer}, r_Integer : 3] :=
-  With[{c = (p - 2) (q - 2)},
-    Which[c < 4, sphericalDisk[p, q, r], c == 4, euclideanDisk[p, q, r], True, hyperbolicDisk[p, q, r]]];
+TessellatedDiskGraph[{p_Integer, q_Integer}, r_Integer : 3, opts : OptionsPattern[Graph]] :=
+  withGraphOptions[
+    With[{c = (p - 2) (q - 2)},
+      Which[c < 4, sphericalDisk[p, q, r], c == 4, euclideanDisk[p, q, r], True, hyperbolicDisk[p, q, r]]],
+    opts];
 
-TessellatedDiskGraph[{p_Integer, q_Integer}, {m_Integer, n_Integer}] :=
-  If[(p - 2) (q - 2) == 4, euclideanRectangle[p, q, m, n],
+TessellatedDiskGraph[{p_Integer, q_Integer}, {m_Integer, n_Integer}, opts : OptionsPattern[Graph]] :=
+  If[(p - 2) (q - 2) == 4, withGraphOptions[euclideanRectangle[p, q, m, n], opts],
     Message[TessellatedDiskGraph::eucrect, {p, q}]; $Failed];
 
 TessellatedDiskGraph::eucrect =

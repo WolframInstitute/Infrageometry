@@ -7,6 +7,7 @@ PackageExport[GraphVertexWeights]
 PackageExport[GraphBoundary]
 PackageExport[GraphInterior]
 PackageExport[InteriorGraph]
+PackageScope[withGraphOptions]
 PackageExport[BallHull]
 PackageExport[BallVolumes]
 PackageExport[ShellAreas]
@@ -105,6 +106,10 @@ InteriorGraph[g_Graph, opts : OptionsPattern[Graph]] :=
 			VertexCount]},
 		Graph[h, opts, VertexCoordinates -> Lookup[coords, VertexList[h]]]
 	]
+
+(* apply forwarded Graph options to a constructed graph, passing a non-graph result
+   (e.g. $Failed from a deferred constructor) straight through *)
+withGraphOptions[g_, opts___] := If[GraphQ[g], Graph[g, Sequence @@ FilterRules[{opts}, Options[Graph]]], g]
 
 (* ===================== Ball hull ===================== *)
 

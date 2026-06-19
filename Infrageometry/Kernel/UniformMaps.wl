@@ -48,10 +48,14 @@ bevelMap[g_] := First @ truncateMapData @ rectifyMapData @ mapData @ g;
    an integer pair {m, n} gives a rectangular flat torus, and a finite group or an
    explicit (r, s) generation carries the coset graph directly. *)
 Options[TessellationGraph] = {Method -> Automatic};
-TessellationGraph[{p_Integer, q_Integer}, n_Integer : 1, opts : OptionsPattern[]] := SchlafliTessellation[{p, q}, n, opts];
-TessellationGraph[{p_Integer, q_Integer}, {m_Integer, n_Integer}] := TorusTessellation[{m, n}, shapeName[{p, q}]];
-TessellationGraph[{p_Integer, q_Integer}, grp_ /; ! MatchQ[grp, _Integer | {_Integer, _Integer} | _Rule | {___Rule}]] := RegularMap[{p, q}, grp];
-TessellationGraph[config_List /; Length[config] >= 3, n_Integer : 1, opts : OptionsPattern[]] := ArchimedeanTessellation[config, n];
+TessellationGraph[{p_Integer, q_Integer}, n_Integer : 1, opts : OptionsPattern[{TessellationGraph, Graph}]] :=
+  withGraphOptions[SchlafliTessellation[{p, q}, n, Sequence @@ FilterRules[{opts}, Options[SchlafliTessellation]]], opts];
+TessellationGraph[{p_Integer, q_Integer}, {m_Integer, n_Integer}, opts : OptionsPattern[{TessellationGraph, Graph}]] :=
+  withGraphOptions[TorusTessellation[{m, n}, shapeName[{p, q}]], opts];
+TessellationGraph[{p_Integer, q_Integer}, grp_ /; ! MatchQ[grp, _Integer | {_Integer, _Integer} | _Rule | {___Rule}], opts : OptionsPattern[{TessellationGraph, Graph}]] :=
+  withGraphOptions[RegularMap[{p, q}, grp], opts];
+TessellationGraph[config_List /; Length[config] >= 3, n_Integer : 1, opts : OptionsPattern[{TessellationGraph, Graph}]] :=
+  withGraphOptions[ArchimedeanTessellation[config, n], opts];
 
 TessellationGraph::deferred =
   "The uniform map `1` is not built by this constructor (snub, elongated, and other non-Conway families are not yet supported).";
