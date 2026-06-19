@@ -94,7 +94,7 @@ GraphInterior[g_Graph, subset_List] :=
    largest connected component, carrying the original vertex coordinates over.
    The geometric "remove the boundary layer" companion to the combinatorial
    GraphInterior. *)
-InteriorGraph[g_Graph] :=
+InteriorGraph[g_Graph, opts : OptionsPattern[Graph]] :=
 	With[
 		{deg = AssociationThread[VertexList[g], VertexDegree[g]],
 		 coords = AssociationThread[VertexList[g], GraphEmbedding[g]]},
@@ -103,7 +103,7 @@ InteriorGraph[g_Graph] :=
 			ConnectedGraphComponents @ EdgeDelete[g,
 				Select[EdgeList[g], deg[#[[1]]] < avg && deg[#[[2]]] < avg &]],
 			VertexCount]},
-		Graph[h, VertexCoordinates -> Lookup[coords, VertexList[h]]]
+		Graph[h, opts, VertexCoordinates -> Lookup[coords, VertexList[h]]]
 	]
 
 (* ===================== Ball hull ===================== *)

@@ -136,7 +136,7 @@ InteriorMeshGraph[mr_MeshRegion, opts : OptionsPattern[]] := With[
 	]},
 	{kept = Select[edges, ! SubsetQ[surface, List @@ #] &]},
 	{vertices = Union @@ (List @@@ kept)},
-	Graph[vertices, kept, Sequence @@ If[OptionValue["KeepCoordinates"], {VertexCoordinates -> coords[[vertices]]}, {}]]
+	Graph[vertices, kept, Sequence @@ FilterRules[{opts}, Options[Graph]], Sequence @@ If[OptionValue["KeepCoordinates"], {VertexCoordinates -> coords[[vertices]]}, {}]]
 ]
 
 
