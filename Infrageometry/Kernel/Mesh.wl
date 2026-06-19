@@ -128,7 +128,7 @@ GraphMesh[g_ ? GraphQ] := MeshRegion[
 Options[InteriorMeshGraph] = {"KeepCoordinates" -> True};
 
 (* surface vertices lie on a boundary face (a (d-1)-subset of a top simplex occurring in exactly one top cell); keep every edge with at least one interior endpoint, dropping surface vertices left with none (so components match the region's). "KeepCoordinates" -> True (default) attaches the mesh coordinates as VertexCoordinates; "KeepCoordinates" -> False drops them *)
-InteriorMeshGraph[mr_MeshRegion, opts : OptionsPattern[]] := With[
+InteriorMeshGraph[mr_MeshRegion, opts : OptionsPattern[{InteriorMeshGraph, Graph}]] := With[
 	{coords = MeshCoordinates[mr], d = RegionDimension[mr], edges = UndirectedEdge @@@ (First /@ MeshCells[mr, 1])},
 	{surface = If[d <= 1,
 		{},
