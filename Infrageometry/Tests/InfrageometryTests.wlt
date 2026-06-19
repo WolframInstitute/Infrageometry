@@ -2331,72 +2331,72 @@ VerificationTest[
 ]
 
 
-(* ===== TessellatedDiskGraph: unwrapped {p,q} patches ===== *)
+(* ===== TessellationNeighborhoodGraph: unwrapped {p,q} patches ===== *)
 
 (* Euclidean patches: interior degree q, exact ball counts, p-gon faces *)
 VerificationTest[
-  Max @ VertexDegree @ TessellatedDiskGraph[ { 4, 4 }, 3 ],
+  Max @ VertexDegree @ TessellationNeighborhoodGraph[ { 4, 4 }, 3 ],
   4,
   TestID -> "TessellatedDisk-44-interior-degree-4"
 ]
 
 VerificationTest[
-  Max @ VertexDegree @ TessellatedDiskGraph[ { 3, 6 }, 3 ],
+  Max @ VertexDegree @ TessellationNeighborhoodGraph[ { 3, 6 }, 3 ],
   6,
   TestID -> "TessellatedDisk-36-interior-degree-6"
 ]
 
 VerificationTest[
-  Max @ VertexDegree @ TessellatedDiskGraph[ { 6, 3 }, 3 ],
+  Max @ VertexDegree @ TessellationNeighborhoodGraph[ { 6, 3 }, 3 ],
   3,
   TestID -> "TessellatedDisk-63-interior-degree-3"
 ]
 
 (* triangular B_r ball: 1 + 3 r (r + 1) vertices *)
 VerificationTest[
-  VertexCount /@ ( TessellatedDiskGraph[ { 3, 6 }, # ] & /@ { 2, 3, 4 } ),
+  VertexCount /@ ( TessellationNeighborhoodGraph[ { 3, 6 }, # ] & /@ { 2, 3, 4 } ),
   { 19, 37, 61 },
   TestID -> "TessellatedDisk-36-ball-counts"
 ]
 
 (* the patch has a boundary -- unlike the torus, it is not vertex-transitive *)
 VerificationTest[
-  VertexTransitiveGraphQ @ TessellatedDiskGraph[ { 3, 6 }, 3 ],
+  VertexTransitiveGraphQ @ TessellationNeighborhoodGraph[ { 3, 6 }, 3 ],
   False,
   TestID -> "TessellatedDisk-36-not-vertex-transitive"
 ]
 
 VerificationTest[
-  FindCycle[ TessellatedDiskGraph[ { 4, 4 }, 3 ], { 4 }, 1 ] =!= {} &&
-   FindCycle[ TessellatedDiskGraph[ { 6, 3 }, 3 ], { 6 }, 1 ] =!= {},
+  FindCycle[ TessellationNeighborhoodGraph[ { 4, 4 }, 3 ], { 4 }, 1 ] =!= {} &&
+   FindCycle[ TessellationNeighborhoodGraph[ { 6, 3 }, 3 ], { 6 }, 1 ] =!= {},
   True,
   TestID -> "TessellatedDisk-euclidean-faces"
 ]
 
 (* Hyperbolic patches: connected, planar, max degree == q (dedup regression guard) *)
 VerificationTest[
-  With[ { g = TessellatedDiskGraph[ { 7, 3 }, 4 ] },
+  With[ { g = TessellationNeighborhoodGraph[ { 7, 3 }, 4 ] },
     { ConnectedGraphQ @ g, PlanarGraphQ @ g, Max @ VertexDegree @ g } ],
   { True, True, 3 },
   TestID -> "TessellatedDisk-73-connected-planar-degree3"
 ]
 
 VerificationTest[
-  With[ { g = TessellatedDiskGraph[ { 3, 7 }, 3 ] },
+  With[ { g = TessellationNeighborhoodGraph[ { 3, 7 }, 3 ] },
     { ConnectedGraphQ @ g, PlanarGraphQ @ g, Max @ VertexDegree @ g } ],
   { True, True, 7 },
   TestID -> "TessellatedDisk-37-connected-planar-degree7"
 ]
 
 VerificationTest[
-  FindCycle[ TessellatedDiskGraph[ { 7, 3 }, 4 ], { 7 }, 1 ] =!= {},
+  FindCycle[ TessellationNeighborhoodGraph[ { 7, 3 }, 4 ], { 7 }, 1 ] =!= {},
   True,
   TestID -> "TessellatedDisk-73-heptagon-faces"
 ]
 
 (* vertex count strictly increases with r *)
 VerificationTest[
-  With[ { c = VertexCount /@ ( TessellatedDiskGraph[ { 7, 3 }, # ] & /@ { 2, 3, 4 } ) },
+  With[ { c = VertexCount /@ ( TessellationNeighborhoodGraph[ { 7, 3 }, # ] & /@ { 2, 3, 4 } ) },
     OrderedQ @ c && DuplicateFreeQ @ c ],
   True,
   TestID -> "TessellatedDisk-73-monotone"
@@ -2404,19 +2404,19 @@ VerificationTest[
 
 (* Spherical patches: the combinatorics closes the tiling up into the finite Platonic graph *)
 VerificationTest[
-  VertexCount /@ ( TessellatedDiskGraph[ #, 9 ] & /@ { { 3, 3 }, { 4, 3 }, { 3, 4 }, { 5, 3 }, { 3, 5 } } ),
+  VertexCount /@ ( TessellationNeighborhoodGraph[ #, 9 ] & /@ { { 3, 3 }, { 4, 3 }, { 3, 4 }, { 5, 3 }, { 3, 5 } } ),
   { 4, 8, 6, 20, 12 },
   TestID -> "TessellatedDisk-spherical-closure-counts"
 ]
 
 VerificationTest[
-  Max @ VertexDegree @ TessellatedDiskGraph[ { 3, 5 }, 9 ],
+  Max @ VertexDegree @ TessellationNeighborhoodGraph[ { 3, 5 }, 9 ],
   5,
   TestID -> "TessellatedDisk-icosahedron-degree-5"
 ]
 
 VerificationTest[
-  With[ { cap = TessellatedDiskGraph[ { 3, 5 }, 1 ] },
+  With[ { cap = TessellationNeighborhoodGraph[ { 3, 5 }, 1 ] },
     ConnectedGraphQ @ cap && VertexCount @ cap < 12 ],
   True,
   TestID -> "TessellatedDisk-icosahedron-cap-open"

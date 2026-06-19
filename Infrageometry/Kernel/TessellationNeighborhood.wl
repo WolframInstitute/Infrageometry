@@ -1,6 +1,6 @@
 Package["WolframInstitute`Infrageometry`"]
 
-PackageExport[TessellatedDiskGraph]
+PackageExport[TessellationNeighborhoodGraph]
 
 PackageScope[growTessellation]
 PackageScope[tessellationFacesGraph]
@@ -15,23 +15,23 @@ PackageScope[sphericalReflect]
 
 (* ===================== Unwrapped tessellation patches ===================== *)
 
-(* TessellatedDiskGraph[{p, q}, r] is the radius-r graph-distance ball cut from the
+(* TessellationNeighborhoodGraph[{p, q}, r] is the radius-r graph-distance ball cut from the
    infinite regular {p, q} tessellation of its covering surface -- the non-compact
    companion to TessellationGraph (which wraps the tiling onto a compact torus / coset
    quotient). One ring-growth skeleton, dispatched by curvature (p-2)(q-2): the
    Euclidean plane (== 4), the hyperbolic plane (> 4), or the closing-up sphere (< 4);
    interior vertices have degree q, the cut boundary fewer. *)
-TessellatedDiskGraph[{p_Integer, q_Integer}, r_Integer : 3, opts : OptionsPattern[Graph]] :=
+TessellationNeighborhoodGraph[{p_Integer, q_Integer}, r_Integer : 3, opts : OptionsPattern[Graph]] :=
   withGraphOptions[
     With[{c = (p - 2) (q - 2)},
       Which[c < 4, sphericalDisk[p, q, r], c == 4, euclideanDisk[p, q, r], True, hyperbolicDisk[p, q, r]]],
     opts];
 
-TessellatedDiskGraph[{p_Integer, q_Integer}, {m_Integer, n_Integer}, opts : OptionsPattern[Graph]] :=
+TessellationNeighborhoodGraph[{p_Integer, q_Integer}, {m_Integer, n_Integer}, opts : OptionsPattern[Graph]] :=
   If[(p - 2) (q - 2) == 4, withGraphOptions[euclideanRectangle[p, q, m, n], opts],
-    Message[TessellatedDiskGraph::eucrect, {p, q}]; $Failed];
+    Message[TessellationNeighborhoodGraph::eucrect, {p, q}]; $Failed];
 
-TessellatedDiskGraph::eucrect =
+TessellationNeighborhoodGraph::eucrect =
   "The rectangular form is defined only for a Euclidean {p,q} ((p-2)(q-2)==4); `1` is not Euclidean -- use an integer radius.";
 
 
