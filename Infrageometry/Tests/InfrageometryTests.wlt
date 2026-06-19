@@ -1396,6 +1396,66 @@ VerificationTest[
 ]
 
 
+(* ===== DimensionCurvatureFit: windowed Bishop-Gromov regression of log-differences ===== *)
+
+(* the headline composition: the index-based LogDifferenceQuotients of the Counting ball volume,
+   regressed by DimensionCurvatureFit, reads the lattice dimension d = 2 (the off-by-one of the
+   index quotient on Counting is the Hausdorff boundary shift) *)
+VerificationTest[
+    With[{g = GridGraph[{21, 21}]},
+        {v = First @ GraphCenter @ g},
+        {q = LogDifferenceQuotients[BallVolumes[g, v, All, "Measure" -> "Counting"]]},
+        Abs[DimensionCurvatureFit[q, Range[Length[q]]]["Dimension"] - 2] < 0.4
+    ],
+    True,
+    TestID -> "DimensionCurvatureFit-counting-index-reads-lattice-dimension"
+]
+
+(* VolumeGrowthObservables is exactly DimensionCurvatureFit of the radius-consistent quotients:
+   feeding the same quotients (ball on Hausdorff, sphere on the rising area) reproduces both probes *)
+VerificationTest[
+    With[{g = GridGraph[{15, 15}]},
+        {v = First @ GraphCenter @ g,
+         rq = (f |-> Table[(Log[N @ f[[k + 2]]] - Log[N @ f[[k + 1]]]) / (Log[k + 1.] - Log[k]), {k, 1, Length[f] - 2}])},
+        {r = VolumeGrowthObservables[g, v],
+         vH = BallVolumes[g, v, All, "Measure" -> "Hausdorff"], a = ShellAreas[g, v]},
+        {qB = rq[vH], qS = rq[Take[a, First @ Ordering[a, -1]]]},
+        {fB = DimensionCurvatureFit[qB, Range[Length[qB]], "Probe" -> "Ball"],
+         fS = DimensionCurvatureFit[qS, Range[Length[qS]], "Probe" -> "Sphere"]},
+        {fB["Dimension"] === r["BallDimension"], fB["ScalarCurvature"] === r["BallScalarCurvature"],
+         fS["Dimension"] === r["SphereDimension"], fS["ScalarCurvature"] === r["SphereScalarCurvature"]}
+    ],
+    {True, True, True, True},
+    TestID -> "DimensionCurvatureFit-reproduces-VolumeGrowthObservables"
+]
+
+(* Around-valued quotients (the across-vertex spread of the averaged profile) carry through the
+   closed-form fit to Around dimension and curvature *)
+VerificationTest[
+    With[{g = GridGraph[{15, 15}]},
+        {rq = (f |-> Table[(Log[f[[k + 2]]] - Log[f[[k + 1]]]) / (Log[k + 1.] - Log[k]), {k, 1, Length[f] - 2}])},
+        {avg = Exp /@ (MeanAround /@ Transpose[Log[N[BallVolumes[g, All, {0, 8}, "Measure" -> "Hausdorff"]]]])},
+        {q = rq[avg]},
+        {fit = DimensionCurvatureFit[q, Range[Length[q]]]},
+        {Head[fit["Dimension"]], Head[fit["ScalarCurvature"]]}
+    ],
+    {Around, Around},
+    TestID -> "DimensionCurvatureFit-Around-propagates"
+]
+
+(* pinning the dimension fixes the intercept and fits the slope only *)
+VerificationTest[
+    With[{g = GridGraph[{15, 15}]},
+        {v = First @ GraphCenter @ g,
+         rq = (f |-> Table[(Log[N @ f[[k + 2]]] - Log[N @ f[[k + 1]]]) / (Log[k + 1.] - Log[k]), {k, 1, Length[f] - 2}])},
+        {q = rq[BallVolumes[g, v, All, "Measure" -> "Hausdorff"]]},
+        DimensionCurvatureFit[q, Range[Length[q]], "Dimension" -> 2]["Dimension"] == 2
+    ],
+    True,
+    TestID -> "DimensionCurvatureFit-pinned-dimension"
+]
+
+
 (* ===== GreenOperatorMatrix: Moore-Penrose pseudoinverse of the Hodge Laplacian ===== *)
 
 VerificationTest[

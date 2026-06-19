@@ -17,7 +17,7 @@ PackageExport[FormanRicciCurvature]
 PackageExport[OllivierRicciCurvature]
 PackageExport[LogDifferenceQuotients]
 PackageExport[VolumeGrowthObservables]
-PackageExport[VolumeGrowthFit]
+PackageExport[DimensionCurvatureFit]
 PackageExport[SectionalCurvatures]
 PackageScope[wasserstein1]
 PackageScope[windowSaturate]
@@ -476,35 +476,31 @@ VolumeGrowthObservables[g_Graph,
 ] := growthParams[
 	BallVolumes[g, vertex, All, "Measure" -> OptionValue["Measure"]], ShellAreas[g, vertex, All], window, OptionValue["Dimension"]]
 
-(* fit the dimension d and scalar curvature R to one precomputed growth profile
-   {f(0), f(1), ...} (the per-vertex fit core VolumeGrowthObservables averages over):
-   Bishop-Gromov regression of the radius-consistent log-difference quotient
-   q(r) = (Log f(r) - Log f(r-1))/(Log r - Log(r-1)) on x = r (r+1).  "Probe" -> "Ball"
-   (volume, intercept = d, slope = -R/(3(d+2))) or "Sphere" (area ~ r^(d-1), intercept
-   = d - 1, slope = -R/(3 d)): dimension = intercept + shift, slope coefficient
-   = intercept + 2 - shift, shift = {"Ball" -> 0, "Sphere" -> 1}.  window Automatic
-   detects the linear core by exhaustive interval search on the central values --
-   detection always uses the free 2-parameter line, independent of a pinned dimension,
-   prefix sums give each interval's residual in O(1) -- while the fit itself uses
-   closed-form normal equations (not LeastSquares) so an Around-valued profile carries
-   its spread through to Around dimension and curvature. *)
+(* DimensionCurvatureFit[q, radii]: fit dimension d and scalar curvature R to a sequence of
+   log-difference quotients q (each q_i the discrete d Log f / d Log r carried by radius radii_i)
+   by Bishop-Gromov regression on x = r (r+1) -- the squared geometric-mean radius Sqrt[r(r+1)]
+   at which a finite difference quotient lives.  "Probe" -> "Ball" (volume, intercept = d,
+   slope = -R/(3(d+2))) or "Sphere" (area ~ r^(d-1), intercept = d - 1, slope = -R/(3 d)):
+   dimension = intercept + shift, curvature factor = intercept + 2 - shift, shift = {Ball -> 0,
+   Sphere -> 1}.  window Automatic detects the linear core by exhaustive interval search on the
+   central values (Around stripped) -- the longest run within twice the noise floor, prefix sums
+   give each interval's residual in O(1) -- while the fit uses closed-form normal equations (not
+   LeastSquares) so Around-valued quotients carry their spread to Around dimension and curvature.
+   The caller supplies the quotients, so the convention is its choice: LogDifferenceQuotients
+   (index-based) of a Counting profile, radialQuotients of a Hausdorff profile, ... *)
 
-Options[VolumeGrowthFit] = {"Probe" -> "Ball", "Dimension" -> Automatic};
+Options[DimensionCurvatureFit] = {"Probe" -> "Ball", "Dimension" -> Automatic};
 
-VolumeGrowthFit[profiles : {_List ..}, window : ({_Integer, _Integer} | All | Automatic) : Automatic, opts : OptionsPattern[]] :=
-	VolumeGrowthFit[#, window, opts] & /@ profiles
-
-VolumeGrowthFit[profile_List, window : ({_Integer, _Integer} | All | Automatic) : Automatic, OptionsPattern[]] := With[
+DimensionCurvatureFit[q_List, radii_List, window : ({_Integer, _Integer} | All | Automatic) : Automatic, OptionsPattern[]] := With[
 	{probe = OptionValue["Probe"], dimOpt = OptionValue["Dimension"]},
-	{shift = If[probe === "Sphere", 1, 0], lw = Log[N[profile]], n = Length[profile]},
-	{qAll = Table[(lw[[r + 2]] - lw[[r + 1]]) / (Log[r + 1.] - Log[r]), {r, 1, n - 2}]},
-	{qc = Replace[qAll, Around[m_, _] :> m, {1}]},
-	{rs = Which[
-		window === All, Range[1, n - 2],
-		ListQ[window], Select[Range[1, n - 2], window[[1]] <= # <= window[[2]] &],
-		n - 2 < 5, Range[1, n - 2],
+	{shift = If[probe === "Sphere", 1, 0], xAll = N[radii (radii + 1)],
+	 qc = Replace[q, Around[m_, _] :> m, {1}], np = Length[q]},
+	{sel = Which[
+		window === All, Range[np],
+		ListQ[window], Select[Range[np], window[[1]] <= radii[[#]] <= window[[2]] &],
+		np < 5, Range[np],
 		True, With[
-			{k = n - 2, k0 = 5, xAll = N[Range[n - 2] (Range[n - 2] + 1)]},
+			{k = np, k0 = 5},
 			{sx = Prepend[Accumulate[xAll], 0.], sxx = Prepend[Accumulate[xAll^2], 0.],
 			 sq = Prepend[Accumulate[qc], 0.], sqq = Prepend[Accumulate[qc^2], 0.],
 			 sxq = Prepend[Accumulate[xAll qc], 0.]},
@@ -524,38 +520,19 @@ VolumeGrowthFit[profile_List, window : ({_Integer, _Integer} | All | Automatic) 
 			]
 		]
 	]},
-	{x = N[rs (rs + 1)], q = qAll[[rs]]},
+	{x = xAll[[sel]], qSel = q[[sel]]},
 	{dimScalar = If[dimOpt === Automatic,
-		With[{m = Length[x], sx = Total[x], sxx = Total[x^2], sq = Total[q], sxq = Total[x q]},
+		With[{m = Length[x], sx = Total[x], sxx = Total[x^2], sq = Total[qSel], sxq = Total[x qSel]},
 			{den = m sxx - sx^2},
 			{c2 = (m sxq - sx sq) / den, c1 = (sxx sq - sx sxq) / den},
 			{c1 + shift, -3 (c1 + 2 - shift) c2}
 		],
-		With[{sx = Total[x], sxx = Total[x^2], sxq = Total[x q]},
+		With[{sx = Total[x], sxx = Total[x^2], sxq = Total[x qSel]},
 			{slope = (sxq - (dimOpt - shift) sx) / sxx},
 			{N[dimOpt], -3 (dimOpt + 2 - 2 shift) slope}
 		]
 	]},
-	{d = dimScalar[[1]], scalar = dimScalar[[2]], win = MinMax[rs]},
-	If[probe === "Sphere",
-		<|
-			"ShellAreas" -> profile,
-			"SphereLogDifferenceQuotients" -> qAll,
-			"SphereDimension" -> d,
-			"SphereScalarCurvature" -> scalar,
-			"SphereCurvatureByRadius" -> Table[N[6 d / r^2 (1 - profile[[r + 1]] Gamma[d / 2 + 1] / (d Pi^(d / 2) r^(d - 1)))], {r, 1, n - 1}],
-			"SphereMeanCurvatureByRadius" -> Differences[Log[N[profile]]],
-			"SphereWindow" -> win
-		|>,
-		<|
-			"BallVolumes" -> profile,
-			"BallLogDifferenceQuotients" -> qAll,
-			"BallDimension" -> d,
-			"BallScalarCurvature" -> scalar,
-			"BallCurvatureByRadius" -> Table[N[6 (d + 2) / r^2 (1 - profile[[r + 1]] Gamma[d / 2 + 1] / (Pi^(d / 2) r^d))], {r, 1, n - 1}],
-			"BallWindow" -> win
-		|>
-	]
+	<|"Dimension" -> dimScalar[[1]], "ScalarCurvature" -> dimScalar[[2]], "Window" -> MinMax[radii[[sel]]]|>
 ]
 
 
@@ -566,27 +543,35 @@ radialQuotients[f_] :=
 	Table[(Log[N @ f[[r + 2]]] - Log[N @ f[[r + 1]]]) / (Log[r + 1.] - Log[r]), {r, 1, Length[f] - 2}]
 
 (* both probes' fitted parameters + per-radius profiles on one vertex's (ball volume,
-   sphere area) pair, sharing the VolumeGrowthFit core; the sphere fit uses the rising
-   part of A(r) for an Automatic window since A(r) is non-monotonic on a finite graph
-   (it peaks near the eccentricity), but the reported sphere profiles stay on the full
-   A(r).  No boundary shift: the ball fit runs directly on the supplied volume (default
-   Hausdorff, the boundary-corrected |GraphInterior[B_r]| = B_{r-1} on a regular
-   lattice), so the returned "BallVolumes"/"BallLogDifferenceQuotients" are what was fitted *)
+   sphere area) pair: take the radius-consistent quotients of each profile and hand them to
+   DimensionCurvatureFit.  The sphere fit uses the rising part of A(r) for an Automatic window
+   since A(r) is non-monotonic on a finite graph (it peaks near the eccentricity), but the
+   reported sphere profiles stay on the full A(r).  No boundary shift: the ball fit runs on the
+   supplied volume (default Hausdorff, the boundary-corrected |GraphInterior[B_r]| = B_{r-1} on a
+   regular lattice), so "BallVolumes"/"BallLogDifferenceQuotients" are exactly what was fitted *)
 growthParams[w_, a_, window_, dimOpt_] := With[
-	{ballFit = VolumeGrowthFit[w, window, "Probe" -> "Ball", "Dimension" -> dimOpt],
-	 rising = If[window === Automatic, Take[a, First @ Ordering[a, -1]], a]},
-	{sphereFit = VolumeGrowthFit[rising, window, "Probe" -> "Sphere", "Dimension" -> dimOpt]},
-	{sd = sphereFit["SphereDimension"]},
-	Join[ballFit, <|
+	{qBall = radialQuotients[w], rising = If[window === Automatic, Take[a, First @ Ordering[a, -1]], a]},
+	{ballFit = DimensionCurvatureFit[qBall, Range[Length[qBall]], window, "Probe" -> "Ball", "Dimension" -> dimOpt],
+	 qSph = radialQuotients[rising]},
+	{sphFit = DimensionCurvatureFit[qSph, Range[Length[qSph]], window, "Probe" -> "Sphere", "Dimension" -> dimOpt]},
+	{bd = ballFit["Dimension"], sd = sphFit["Dimension"]},
+	<|
+		"BallVolumes" -> w,
 		"ShellAreas" -> a,
+		"BallLogDifferenceQuotients" -> qBall,
 		"SphereLogDifferenceQuotients" -> radialQuotients[a],
+		"BallDimension" -> bd,
 		"SphereDimension" -> sd,
-		"SphereScalarCurvature" -> sphereFit["SphereScalarCurvature"],
+		"BallScalarCurvature" -> ballFit["ScalarCurvature"],
+		"SphereScalarCurvature" -> sphFit["ScalarCurvature"],
+		"BallCurvatureByRadius" ->
+			Table[N[6 (bd + 2) / r^2 (1 - w[[r + 1]] Gamma[bd / 2 + 1] / (Pi^(bd / 2) r^bd))], {r, 1, Length[w] - 1}],
 		"SphereCurvatureByRadius" ->
 			Table[N[6 sd / r^2 (1 - a[[r + 1]] Gamma[sd / 2 + 1] / (sd Pi^(sd / 2) r^(sd - 1)))], {r, 1, Length[a] - 1}],
 		"SphereMeanCurvatureByRadius" -> Differences[Log[N[a]]],
-		"SphereWindow" -> sphereFit["SphereWindow"]
-	|>]
+		"BallWindow" -> ballFit["Window"],
+		"SphereWindow" -> sphFit["Window"]
+	|>
 ]
 
 
