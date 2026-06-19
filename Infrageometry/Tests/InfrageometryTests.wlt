@@ -1396,37 +1396,40 @@ VerificationTest[
 ]
 
 
-(* ===== DimensionCurvatureFit: windowed Bishop-Gromov regression of log-differences ===== *)
+(* ===== DimensionCurvatureFit: Bishop-Gromov regression of log-differences ===== *)
+
+(* an exactly linear quotient sequence q(r) = d - R/(3(d+2)) r(r+1) is recovered exactly:
+   here d = 2, slope = -0.1 on x = r(r+1), so R = -3 (2 + 2) (-0.1) = 1.2 *)
+VerificationTest[
+    With[{pairs = Table[{r, 2 - 0.1 r (r + 1)}, {r, 1, 10}]},
+        {fit = DimensionCurvatureFit[pairs]},
+        {Chop[fit["Dimension"] - 2], Chop[fit["ScalarCurvature"] - 1.2]}
+    ],
+    {0, 0},
+    TestID -> "DimensionCurvatureFit-recovers-exact-line"
+]
+
+(* a bare quotient list defaults to radii 0, 1, 2, ... -- same as the explicit pairs form *)
+VerificationTest[
+    With[{q = {1.0, 0.92, 0.81, 0.63, 0.4}},
+        DimensionCurvatureFit[q] === DimensionCurvatureFit[Transpose[{Range[0, Length[q] - 1], q}]]
+    ],
+    True,
+    TestID -> "DimensionCurvatureFit-bare-list-radii-default"
+]
 
 (* the headline composition: the index-based LogDifferenceQuotients of the Counting ball volume,
-   regressed by DimensionCurvatureFit, reads the lattice dimension d = 2 (the off-by-one of the
-   index quotient on Counting is the Hausdorff boundary shift) *)
+   sliced to an inner window and regressed, reads the lattice dimension d = 2 (the off-by-one of
+   the index quotient on Counting is the Hausdorff boundary shift) *)
 VerificationTest[
     With[{g = GridGraph[{21, 21}]},
         {v = First @ GraphCenter @ g},
         {q = LogDifferenceQuotients[BallVolumes[g, v, All, "Measure" -> "Counting"]]},
-        Abs[DimensionCurvatureFit[q, Range[Length[q]]]["Dimension"] - 2] < 0.4
+        {pairs = Select[Transpose[{Range[0, Length[q] - 1], q}], 1 <= #[[1]] <= 7 &]},
+        Abs[DimensionCurvatureFit[pairs]["Dimension"] - 2] < 0.4
     ],
     True,
     TestID -> "DimensionCurvatureFit-counting-index-reads-lattice-dimension"
-]
-
-(* VolumeGrowthObservables is exactly DimensionCurvatureFit of the radius-consistent quotients:
-   feeding the same quotients (ball on Hausdorff, sphere on the rising area) reproduces both probes *)
-VerificationTest[
-    With[{g = GridGraph[{15, 15}]},
-        {v = First @ GraphCenter @ g,
-         rq = (f |-> Table[(Log[N @ f[[k + 2]]] - Log[N @ f[[k + 1]]]) / (Log[k + 1.] - Log[k]), {k, 1, Length[f] - 2}])},
-        {r = VolumeGrowthObservables[g, v],
-         vH = BallVolumes[g, v, All, "Measure" -> "Hausdorff"], a = ShellAreas[g, v]},
-        {qB = rq[vH], qS = rq[Take[a, First @ Ordering[a, -1]]]},
-        {fB = DimensionCurvatureFit[qB, Range[Length[qB]], "Probe" -> "Ball"],
-         fS = DimensionCurvatureFit[qS, Range[Length[qS]], "Probe" -> "Sphere"]},
-        {fB["Dimension"] === r["BallDimension"], fB["ScalarCurvature"] === r["BallScalarCurvature"],
-         fS["Dimension"] === r["SphereDimension"], fS["ScalarCurvature"] === r["SphereScalarCurvature"]}
-    ],
-    {True, True, True, True},
-    TestID -> "DimensionCurvatureFit-reproduces-VolumeGrowthObservables"
 ]
 
 (* Around-valued quotients (the across-vertex spread of the averaged profile) carry through the
@@ -1435,8 +1438,7 @@ VerificationTest[
     With[{g = GridGraph[{15, 15}]},
         {rq = (f |-> Table[(Log[f[[k + 2]]] - Log[f[[k + 1]]]) / (Log[k + 1.] - Log[k]), {k, 1, Length[f] - 2}])},
         {avg = Exp /@ (MeanAround /@ Transpose[Log[N[BallVolumes[g, All, {0, 8}, "Measure" -> "Hausdorff"]]]])},
-        {q = rq[avg]},
-        {fit = DimensionCurvatureFit[q, Range[Length[q]]]},
+        {fit = DimensionCurvatureFit[rq[avg]]},
         {Head[fit["Dimension"]], Head[fit["ScalarCurvature"]]}
     ],
     {Around, Around},
@@ -1445,11 +1447,8 @@ VerificationTest[
 
 (* pinning the dimension fixes the intercept and fits the slope only *)
 VerificationTest[
-    With[{g = GridGraph[{15, 15}]},
-        {v = First @ GraphCenter @ g,
-         rq = (f |-> Table[(Log[N @ f[[k + 2]]] - Log[N @ f[[k + 1]]]) / (Log[k + 1.] - Log[k]), {k, 1, Length[f] - 2}])},
-        {q = rq[BallVolumes[g, v, All, "Measure" -> "Hausdorff"]]},
-        DimensionCurvatureFit[q, Range[Length[q]], "Dimension" -> 2]["Dimension"] == 2
+    With[{pairs = Table[{r, 2.3 - 0.05 r (r + 1)}, {r, 1, 8}]},
+        DimensionCurvatureFit[pairs, "Dimension" -> 2]["Dimension"] == 2
     ],
     True,
     TestID -> "DimensionCurvatureFit-pinned-dimension"
