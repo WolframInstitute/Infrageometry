@@ -1567,57 +1567,57 @@ ulEdgeLengths[g_] := With[{p = GraphEmbedding[g]},
 ]
 
 VerificationTest[
-    With[{e = UnitLengthEmbedding[CycleGraph[6]]}, MatrixQ[e] && Dimensions[e] === {6, 3}],
+    With[{e = UniformLengthEmbedding[CycleGraph[6]]}, MatrixQ[e] && Dimensions[e] === {6, 3}],
     True,
-    TestID -> "UnitLengthEmbedding-matrix-shape"
+    TestID -> "UniformLengthEmbedding-matrix-shape"
 ]
 
 VerificationTest[
-    With[{g = CycleGraph[6], e = UnitLengthEmbedding[CycleGraph[6]]},
+    With[{g = CycleGraph[6], e = UniformLengthEmbedding[CycleGraph[6]]},
         Max @ Abs[(EuclideanDistance[e[[#[[1]]]], e[[#[[2]]]]] & /@ (List @@@ EdgeList[g])) - 1] < 0.01
     ],
     True,
-    TestID -> "UnitLengthEmbedding-unit-edges"
+    TestID -> "UniformLengthEmbedding-unit-edges"
 ]
 
 VerificationTest[
-    Dimensions @ UnitLengthEmbedding[GridGraph[{3, 3}], "Dimension" -> 2],
+    Dimensions @ UniformLengthEmbedding[GridGraph[{3, 3}], "Dimension" -> 2],
     {9, 2},
-    TestID -> "UnitLengthEmbedding-dimension-option"
+    TestID -> "UniformLengthEmbedding-dimension-option"
 ]
 
 VerificationTest[
-    With[{g = UnitLengthGraph[Sphere[], 40]},
+    With[{g = UniformLengthGraph[Sphere[], 40]},
         GraphQ[g] && VertexCount[g] == 40 && Mean[N @ VertexDegree[g]] >= 4
     ],
     True,
-    TestID -> "UnitLengthGraph-sphere-jammed"
+    TestID -> "UniformLengthGraph-sphere-jammed"
 ]
 
 VerificationTest[
-    With[{lens = ulEdgeLengths @ UnitLengthGraph[Sphere[], 40]}, Max[lens] / Min[lens] < 1.8],
+    With[{lens = ulEdgeLengths @ UniformLengthGraph[Sphere[], 40]}, Max[lens] / Min[lens] < 1.8],
     True,
-    TestID -> "UnitLengthGraph-sphere-edges-near-uniform"
+    TestID -> "UniformLengthGraph-sphere-edges-near-uniform"
 ]
 
 VerificationTest[
     Block[{}, SeedRandom[1];
-        With[{g = UnitLengthGraph[Circle[{0, 0}, 1], 20]},
+        With[{g = UniformLengthGraph[Circle[{0, 0}, 1], 20]},
             GraphQ[g] && VertexCount[g] == 20 && Mean[N @ VertexDegree[g]] > 1.8
         ]
     ],
     True,
-    TestID -> "UnitLengthGraph-circle-cycle"
+    TestID -> "UniformLengthGraph-circle-cycle"
 ]
 
 VerificationTest[
     Block[{}, SeedRandom[3];
-        With[{lens = ulEdgeLengths @ Quiet @ UnitLengthGraph[Circle[{0, 0}, 1], 12, Method -> "ConstrainedPacking"]},
+        With[{lens = ulEdgeLengths @ Quiet @ UniformLengthGraph[Circle[{0, 0}, 1], 12, Method -> "ConstrainedPacking"]},
             Max[lens] - Min[lens] < 0.05
         ]
     ],
     True,
-    TestID -> "UnitLengthGraph-constrained-uniform"
+    TestID -> "UniformLengthGraph-constrained-uniform"
 ]
 
 

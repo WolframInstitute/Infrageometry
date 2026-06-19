@@ -20,19 +20,19 @@ PackageExport[OrientableMeshRegionQ]
 PackageExport[MoebiusMesh]
 PackageExport[PathMesh]
 
-PackageExport[UnitLengthGraph]
-PackageExport[UnitLengthEmbedding]
+PackageExport[UniformLengthGraph]
+PackageExport[UniformLengthEmbedding]
 
 PackageScope[hardSphereFixup]
 PackageScope[fibonacciSeed]
-PackageScope[unitLengthSeed]
+PackageScope[uniformLengthSeed]
 PackageScope[packRetraction]
 PackageScope[packMeasure]
 PackageScope[contactGraph]
 PackageScope[contactEdgeLengths]
 PackageScope[iterativeProjectionPack]
 PackageScope[constrainedPack]
-PackageScope[unitLengthRepulsion]
+PackageScope[uniformLengthRepulsion]
 
 
 Options[ComplexEmbedding] = {"RepulsiveForcePower" -> 1.*^-2, "Scale" -> 1, "Epsilon" -> 1.*^-3}
@@ -281,8 +281,8 @@ MoebiusMesh[nu_Integer ? Positive, nv_Integer ? Positive, opts : OptionsPattern[
 
 (* The contact graph of a relaxed hard-sphere packing has all edges at exactly 2r:
    two touching spheres of radius r have centers at distance 2r by geometry, not by
-   force balance.  UnitLengthGraph packs a region as given -- filling a solid, meshing a
-   surface -- and returns that contact graph; UnitLengthEmbedding is the inverse, realising
+   force balance.  UniformLengthGraph packs a region as given -- filling a solid, meshing a
+   surface -- and returns that contact graph; UniformLengthEmbedding is the inverse, realising
    an abstract graph in R^d with every edge a unit segment (the iterative sibling of
    the declarative ComplexEmbedding). *)
 
@@ -314,9 +314,9 @@ fibonacciSeed[n_Integer] := Table[
 
 
 (* deterministic Fibonacci seed for a Sphere or ellipsoid shell; random sample inside/on any other region *)
-unitLengthSeed[Sphere[c : {_, _, _} : {0, 0, 0}, r_ : 1], n_] := (c + r # & ) /@ fibonacciSeed[n]
-unitLengthSeed[RegionBoundary[Ellipsoid[c : {_, _, _}, s : {_, _, _}]], n_] := (c + s # & ) /@ fibonacciSeed[n]
-unitLengthSeed[region_, n_] := RandomPoint[region, n]
+uniformLengthSeed[Sphere[c : {_, _, _} : {0, 0, 0}, r_ : 1], n_] := (c + r # & ) /@ fibonacciSeed[n]
+uniformLengthSeed[RegionBoundary[Ellipsoid[c : {_, _, _}, s : {_, _, _}]], n_] := (c + s # & ) /@ fibonacciSeed[n]
+uniformLengthSeed[region_, n_] := RandomPoint[region, n]
 
 
 (* retraction of a point list back into/onto the region: project onto a Sphere, radially confine
@@ -398,7 +398,7 @@ contactEdgeLengths[points_, radius_, tol_] :=
 	EuclideanDistance[points[[#[[1]]]], points[[#[[2]]]]] & /@ (List @@@ EdgeList[contactGraph[points, radius, tol]])
 
 
-Options[UnitLengthGraph] = {
+Options[UniformLengthGraph] = {
 	Method -> "IterativeProjection",
 	"Radius" -> Automatic,
 	"MaxIterations" -> 200,
@@ -415,7 +415,7 @@ Options[UnitLengthGraph] = {
    spaces the spheres to tile the region's content C in its own dimension d (2r = C/n on a curve,
    Sqrt[2 C / (n Sqrt[3])] hexagonally on a surface, 1.12 (C/n)^(1/3) in a solid), so the packing
    jams into contacts; "Overpack" > 1 tightens the contact shell *)
-UnitLengthGraph[region_ ? RegionQ, n_Integer, opts : OptionsPattern[]] := Module[{
+UniformLengthGraph[region_ ? RegionQ, n_Integer, opts : OptionsPattern[]] := Module[{
 	radius = OptionValue["Radius"],
 	dim = RegionDimension[region],
 	points
@@ -430,10 +430,10 @@ UnitLengthGraph[region_ ? RegionQ, n_Integer, opts : OptionsPattern[]] := Module
 	];
 	points = Switch[OptionValue[Method],
 		"ConstrainedPacking",
-			constrainedPack[unitLengthSeed[region, n], radius, region],
+			constrainedPack[uniformLengthSeed[region, n], radius, region],
 		_,
 			iterativeProjectionPack[
-				unitLengthSeed[region, n], radius, packRetraction[region],
+				uniformLengthSeed[region, n], radius, packRetraction[region],
 				OptionValue["ProjectionStep"], OptionValue["MaxIterations"], OptionValue["Tolerance"]
 			]
 	];
@@ -443,7 +443,7 @@ UnitLengthGraph[region_ ? RegionQ, n_Integer, opts : OptionsPattern[]] := Module
 ]
 
 
-Options[UnitLengthEmbedding] = {
+Options[UniformLengthEmbedding] = {
 	"Dimension" -> 3,
 	"MaxIterations" -> 500,
 	"Tolerance" -> 10.^-7,
@@ -455,7 +455,7 @@ Options[UnitLengthEmbedding] = {
 (* embedding f : V -> R^d realising every edge as a unit segment, by edge-spring relaxation
    from a spring-electrical start; returns coordinates in VertexList order (cf. GraphEmbedding).
    The declarative counterpart is ComplexEmbedding *)
-UnitLengthEmbedding[graph_ ? GraphQ, opts : OptionsPattern[]] := Module[{
+UniformLengthEmbedding[graph_ ? GraphQ, opts : OptionsPattern[]] := Module[{
 	dim = OptionValue["Dimension"],
 	maxIter = OptionValue["MaxIterations"],
 	tol = OptionValue["Tolerance"],
@@ -489,7 +489,7 @@ UnitLengthEmbedding[graph_ ? GraphQ, opts : OptionsPattern[]] := Module[{
 			],
 			{k, Length[edges]}
 		];
-		If[repulse > 0., d += unitLengthRepulsion[points, edges, repulse]];
+		If[repulse > 0., d += uniformLengthRepulsion[points, edges, repulse]];
 		(* clip per-vertex moves so long initial edges do not make the relaxation diverge *)
 		norms = Norm /@ d;
 		d = MapThread[If[#2 > maxStep, #1 (maxStep / #2), #1] &, {d, norms}];
@@ -502,7 +502,7 @@ UnitLengthEmbedding[graph_ ? GraphQ, opts : OptionsPattern[]] := Module[{
 
 
 (* soft repulsion between nearby non-adjacent pairs, preventing degenerate collapse *)
-unitLengthRepulsion[points_, edges_, strength_] := Module[{
+uniformLengthRepulsion[points_, edges_, strength_] := Module[{
 	n = Length[points], acc = 0. points,
 	es = AssociationThread[Sort /@ edges -> True],
 	neighbors = Nearest[points -> "Index"][points, {Infinity, 0.9}]
@@ -522,4 +522,3 @@ unitLengthRepulsion[points_, edges_, strength_] := Module[{
 	];
 	acc
 ]
-
