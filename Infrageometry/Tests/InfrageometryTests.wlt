@@ -2472,4 +2472,63 @@ VerificationTest[
 ]
 
 
+(* ===== TessellationNeighborhoodGraph: unwrapped uniform / Archimedean patches ===== *)
+
+(* the unwrapped ball of a uniform tiling equals the same-radius ball cut from its compact
+   torus quotient -- the construction-independent characterisation of B_r *)
+VerificationTest[
+  IsomorphicGraphQ[
+    TessellationNeighborhoodGraph[ { 4, 8, 8 }, 2 ],
+    With[ { g = TessellationGraph[ { 4, 8, 8 }, 5 ] }, NeighborhoodGraph[ g, First @ GraphCenter @ g, 2 ] ] ],
+  True,
+  TestID -> "TessellatedDisk-488-matches-torus-ball"
+]
+
+(* interior valence is the configuration length: degree 3 for the 3-valent uniform tilings *)
+VerificationTest[
+  Max @ VertexDegree @ TessellationNeighborhoodGraph[ { 4, 8, 8 }, 4 ],
+  3,
+  TestID -> "TessellatedDisk-488-degree-3"
+]
+
+(* and degree 4 for the 4-valent ones *)
+VerificationTest[
+  Max @ VertexDegree @ TessellationNeighborhoodGraph[ { 3, 6, 3, 6 }, 4 ],
+  4,
+  TestID -> "TessellatedDisk-3636-degree-4"
+]
+
+(* every face size in the configuration occurs as a girth-class cycle of the patch *)
+VerificationTest[
+  AllTrue[ { 3, 4, 6 }, FindCycle[ TessellationNeighborhoodGraph[ { 3, 4, 6, 4 }, 4 ], { # }, 1 ] =!= {} & ],
+  True,
+  TestID -> "TessellatedDisk-3464-face-types"
+]
+
+(* an all-equal configuration is a regular {p, q} symbol and forwards to the {p, q} engine *)
+VerificationTest[
+  IsomorphicGraphQ[
+    TessellationNeighborhoodGraph[ { 6, 6, 6 }, 3 ],
+    TessellationNeighborhoodGraph[ { 6, 3 }, 3 ] ],
+  True,
+  TestID -> "TessellatedDisk-regular-config-forwards"
+]
+
+(* a spherical configuration (defect > 0) is the finite Archimedean solid: cuboctahedron *)
+VerificationTest[
+  With[ { g = TessellationNeighborhoodGraph[ { 3, 4, 3, 4 }, 9 ] },
+    VertexCount @ g == 12 && Max @ VertexDegree @ g == 4 ],
+  True,
+  TestID -> "TessellatedDisk-cuboctahedron"
+]
+
+(* snub and hyperbolic uniform families are deferred *)
+VerificationTest[
+  TessellationNeighborhoodGraph[ { 3, 3, 3, 3, 6 }, 2 ],
+  $Failed,
+  { TessellationNeighborhoodGraph::deferred },
+  TestID -> "TessellatedDisk-snub-deferred"
+]
+
+
 EndTestSection[]

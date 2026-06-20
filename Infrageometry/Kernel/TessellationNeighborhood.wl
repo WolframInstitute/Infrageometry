@@ -12,6 +12,10 @@ PackageScope[euclideanRectangle]
 PackageScope[euclideanReflect]
 PackageScope[hyperbolicReflect]
 PackageScope[sphericalReflect]
+PackageScope[uniformDisk]
+PackageScope[growUniformTessellation]
+PackageScope[completeVertexCorona]
+PackageScope[regularLeftPolygon]
 
 (* ===================== Unwrapped tessellation patches ===================== *)
 
@@ -33,6 +37,30 @@ TessellationNeighborhoodGraph[{p_Integer, q_Integer}, {m_Integer, n_Integer}, op
 
 TessellationNeighborhoodGraph::eucrect =
   "The rectangular form is defined only for a Euclidean {p,q} ((p-2)(q-2)==4); `1` is not Euclidean -- use an integer radius.";
+
+(* a vertex configuration (longer than a {p, q} Schlafli symbol) cuts the radius-r ball from
+   the infinite uniform / Archimedean tiling of that configuration -- the same ball, now grown
+   one corona at a time rather than by single-polygon reflection. Dispatch on the angle defect
+   Sum 1/f_i - (k-2)/2: a regular (all-equal) configuration forwards to the {p, q} engine;
+   a Euclidean uniform tiling (defect 0) grows in the plane; a spherical one (defect > 0) is the
+   finite Archimedean solid, whose ball saturates to the whole solid. *)
+TessellationNeighborhoodGraph[config_List /; Length[config] >= 3, r_Integer : 3, opts : OptionsPattern[Graph]] :=
+  withGraphOptions[
+    With[{defect = Total[1 / config] - (Length[config] - 2) / 2},
+      Which[
+        Equal @@ config, TessellationNeighborhoodGraph[{First @ config, Length @ config}, r],
+        defect == 0 && MemberQ[$euclideanUniformConfigs, canonicalConfiguration @ config], uniformDisk[config, r],
+        defect > 0, With[{g = ArchimedeanTessellation[config]},
+          If[GraphQ[g], NeighborhoodGraph[g, First @ VertexList @ g, r], $Failed]],
+        True, Message[TessellationNeighborhoodGraph::deferred, config]; $Failed]],
+    opts];
+
+(* the Euclidean uniform tilings the corona-growth engine builds (canonical configurations);
+   the snub / elongated families are chiral and stay deferred, matching TessellationGraph *)
+$euclideanUniformConfigs = {{3, 6, 3, 6}, {3, 4, 6, 4}, {4, 6, 12}, {4, 8, 8}, {3, 12, 12}};
+
+TessellationNeighborhoodGraph::deferred =
+  "The unwrapped patch of the uniform tiling `1` is not built (hyperbolic uniform and snub / elongated families are not supported -- use TessellationGraph for their compact quotient).";
 
 
 (* ===================== The ring-growth engine ===================== *)
@@ -125,6 +153,67 @@ sphericalDisk[p_, q_, r_] :=
         growTessellation[seed, sphericalReflect, Round[Mean @ #, 10.^-5] &, True &],
         Identity, 10.^-3],
       {0, 0, 1}, r]];
+
+(* ===================== Uniform / Archimedean corona growth ===================== *)
+
+(* the Euclidean uniform disk: grow the plane tiling out to a margin past radius r (graph
+   distance >= Euclidean distance for unit edges, so B_r is contained), then cut B_r *)
+uniformDisk[config_, r_] :=
+  graphDistanceBall[
+    tessellationFacesGraph[
+      growUniformTessellation[config, Abs[#] <= r + 2.5 &], {Re @ #, Im @ #} &, 10.^-5],
+    {0, 0}, r];
+
+(* the regular f-gon (unit edges) sharing directed edge a -> b and lying to its left: each
+   successive corner turns left by the exterior angle 2 Pi / f *)
+regularLeftPolygon[a_, b_, f_] :=
+  Module[{pts = {a, b}},
+    Do[pts = Append[pts, pts[[-1]] + (pts[[-1]] - pts[[-2]]) Exp[I 2. Pi / f]], f - 2];
+    pts];
+
+(* grow the uniform tiling corona by corona: seed the full corona of the origin vertex (the
+   k polygons of config in CCW order, interior angles summing to 2 Pi), then repeatedly complete
+   every boundary vertex whose partial corona pins its configuration, keeping only faces whose
+   centroid lies in the region so the growth self-terminates *)
+growUniformTessellation[config_, inRegion_] :=
+  Module[{cumAngle, faces, seen, growing = True, added},
+    cumAngle = Most @ Prepend[Accumulate[(# - 2) Pi / # & /@ config], 0.];
+    faces = Select[MapThread[regularLeftPolygon[0, Exp[I #2], #1] &, {config, cumAngle}], inRegion[Mean @ #] &];
+    seen = Association[(Round[Mean @ #, 10.^-5] -> True) & /@ faces];
+    While[growing, growing = False;
+      Do[added = completeVertexCorona[corner[[1, 1]], corner, config, inRegion, seen];
+        If[added =!= {},
+          faces = Join[faces, added]; (seen[Round[Mean @ #, 10.^-5]] = True) & /@ added; growing = True],
+        {corner, Values @ GroupBy[
+          Flatten[(poly |-> With[{n = Length @ poly},
+            Table[With[{v = poly[[i]], nxt = poly[[Mod[i, n] + 1]], prv = poly[[Mod[i - 2, n] + 1]]},
+              {Round[{Re @ v, Im @ v}, 10.^-5], v, n, Arg[nxt - v], Arg[prv - v]}], {i, n}]]) /@ faces, 1],
+          First -> Rest]}]];
+    faces];
+
+(* fill the angular gap around vertex v: `corner` lists {v, faceSize, startAngle, endAngle}
+   for each placed face (each face sweeps CCW from startAngle to endAngle). When the placed sizes,
+   read CCW from the open boundary, match a unique rotation/reflection of config, the remaining
+   sizes of that rotation are placed CCW from the exposed edge; an ambiguous or complete corona
+   adds nothing *)
+completeVertexCorona[v_, corner_, config_, inRegion_, seen_] :=
+  With[{sizes = corner[[All, 2]], starts = corner[[All, 3]], ends = corner[[All, 4]]},
+    If[2 Pi - Total[(# - 2) Pi / # & /@ sizes] < 0.01, {},
+      With[
+        {begin = SelectFirst[starts, angle |-> NoneTrue[ends, Abs[Mod[angle - # + Pi, 2 Pi] - Pi] < 10.^-3 &]]},
+        {order = SortBy[Range @ Length @ sizes, Mod[starts[[#]] - begin, 2 Pi] &]},
+        {endAngle = ends[[Last @ order]],
+         remaining = DeleteDuplicates @ Cases[
+           Join @@ (Table[RotateLeft[#, i], {i, 0, Length @ config - 1}] & /@ {config, Reverse @ config}),
+           seq_ /; Take[seq, Length @ order] === sizes[[order]] :> Drop[seq, Length @ order]]},
+        If[Length @ remaining != 1, {},
+          Last @ Fold[
+            {state, size} |-> With[{poly = regularLeftPolygon[v, First @ state, size]},
+              {poly[[-1]],
+               If[! KeyExistsQ[seen, Round[Mean @ poly, 10.^-5]] && inRegion[Mean @ poly],
+                 Append[Last @ state, poly], Last @ state]}],
+            {v + Exp[I endAngle], {}}, First @ remaining]]]]];
+
 
 (* m x n rectangular patch of the Euclidean {p,q} tiling: the flat-torus construction with the
    wrap-around identifications dropped, so the patch has a boundary; dangling degree-1 hexagonal
