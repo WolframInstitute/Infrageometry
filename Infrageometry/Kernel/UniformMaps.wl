@@ -1,8 +1,13 @@
 Package["WolframInstitute`Infrageometry`"]
 
 PackageExport[TessellationGraph]
+PackageExport[TessellationCurvature]
+PackageExport[TessellationEulerCharacteristic]
+PackageExport[TessellationGenus]
 
 PackageScope[ArchimedeanTessellation]
+PackageScope[vertexFaceSizes]
+PackageScope[detectRegularConfig]
 PackageScope[mapFaces]
 PackageScope[rectifyMapData]
 PackageScope[truncateMapData]
@@ -59,6 +64,41 @@ TessellationGraph[config_List /; Length[config] >= 3, n_Integer : 1, opts : Opti
 
 TessellationGraph::deferred =
   "The uniform map `1` is not built by this constructor (snub, elongated, and other non-Conway families are not yet supported).";
+
+
+(* ===================== Map invariants: curvature, Euler characteristic, genus ===================== *)
+
+(* the per-vertex face-size list: a Schlafli {p, q} has q p-gons around each vertex; a
+   uniform configuration already is that cyclic list. Matches TessellationGraph's own
+   dispatch (2-list = regular symbol, longer list = vertex configuration). *)
+vertexFaceSizes[{p_Integer, q_Integer}] := ConstantArray[p, q];
+vertexFaceSizes[config_List /; Length[config] >= 3] := config;
+
+(* the face sizes read off the graph, assuming a REGULAR map: uniform degree q and every
+   face the girth p, so the configuration is q copies of p. The default when no spec is
+   passed. Mixed-face (Archimedean) maps are not recoverable from the abstract graph --
+   the girth only sees their smallest face -- so pass their configuration explicitly. *)
+detectRegularConfig[g_Graph] :=
+  ConstantArray[First @ Select[Range[3, 100], FindCycle[g, {#}, 1] =!= {} &, 1], First @ Union @ VertexDegree @ g];
+
+(* combinatorial (angle-defect) Gaussian curvature at a vertex of the map:
+   kappa = Sum 1/f_i - (k - 2)/2; sign is spherical / flat / hyperbolic and the geometric
+   angle defect is 2 Pi kappa. Depends only on the local configuration, not the realisation.
+   With a graph and no spec, the regular configuration is detected from the graph. *)
+TessellationCurvature[spec_List] := uniformDefect[vertexFaceSizes[spec]];
+TessellationCurvature[g_Graph] := TessellationCurvature[detectRegularConfig[g]];
+
+(* Euler characteristic of the closed map, V - E + F read off the realised graph: each
+   f-gon owns f of the V*k vertex-face corners, so F = V Sum 1/f_i (works for the mixed
+   faces of an Archimedean map). Discrete Gauss-Bonnet gives the same value as V kappa.
+   The spec defaults to the regular configuration detected from the graph. *)
+TessellationEulerCharacteristic[graph_Graph, spec_List] :=
+  VertexCount[graph] - EdgeCount[graph] + VertexCount[graph] Total[1 / vertexFaceSizes[spec]];
+TessellationEulerCharacteristic[graph_Graph] := TessellationEulerCharacteristic[graph, detectRegularConfig[graph]];
+
+(* orientable genus from the Euler characteristic: g = (2 - chi)/2 *)
+TessellationGenus[graph_Graph, spec_List] := (2 - TessellationEulerCharacteristic[graph, spec]) / 2;
+TessellationGenus[graph_Graph] := (2 - TessellationEulerCharacteristic[graph]) / 2;
 
 
 (* ===================== Archimedean tessellations ===================== *)

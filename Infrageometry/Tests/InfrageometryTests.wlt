@@ -2287,6 +2287,55 @@ VerificationTest[
 VerificationTest[ TessellationGraph[ { 3, 3, 3, 3, 6 }, 4 ], $Failed, { TessellationGraph::deferred }, TestID -> "Archimedean-euclidean-snub-deferred" ]
 
 
+(* ===================== Map invariants: curvature, Euler characteristic, genus ===================== *)
+
+(* combinatorial Gaussian curvature classifies the geometry by sign: flat / hyperbolic / spherical *)
+VerificationTest[
+  Sign @ { TessellationCurvature[ { 3, 6 } ], TessellationCurvature[ { 3, 7 } ], TessellationCurvature[ { 3, 5 } ] },
+  { 0, -1, 1 },
+  TestID -> "TessellationCurvature-flat-hyperbolic-spherical"
+]
+
+(* every Euclidean uniform (Archimedean) tiling is flat *)
+VerificationTest[
+  { TessellationCurvature[ { 4, 8, 8 } ], TessellationCurvature[ { 3, 4, 6, 4 } ], TessellationCurvature[ { 3, 6, 3, 6 } ] },
+  { 0, 0, 0 },
+  TestID -> "TessellationCurvature-archimedean-flat"
+]
+
+(* icosahedron {3,5} is a sphere: chi = 2, genus 0 *)
+VerificationTest[
+  With[ { g = TessellationGraph[ { 3, 5 } ] }, { TessellationEulerCharacteristic[ g, { 3, 5 } ], TessellationGenus[ g, { 3, 5 } ] } ],
+  { 2, 0 },
+  TestID -> "TessellationGenus-icosahedron-sphere"
+]
+
+(* Euclidean tilings (regular and Archimedean) on the torus have genus 1 *)
+VerificationTest[
+  { TessellationGenus[ TessellationGraph[ { 4, 4 }, { 12, 12 } ], { 4, 4 } ],
+    TessellationGenus[ TessellationGraph[ { 4, 8, 8 }, 5 ], { 4, 8, 8 } ] },
+  { 1, 1 },
+  TestID -> "TessellationGenus-torus-genus-1"
+]
+
+(* hyperbolic quotient: chi agrees with the discrete Gauss-Bonnet sum V*kappa, genus > 1 *)
+VerificationTest[
+  With[ { g = TessellationGraph[ { 3, 7 }, 2 ] },
+    TessellationEulerCharacteristic[ g, { 3, 7 } ] == VertexCount[ g ] TessellationCurvature[ { 3, 7 } ] && TessellationGenus[ g, { 3, 7 } ] > 1 ],
+  True,
+  TestID -> "TessellationGenus-hyperbolic-gauss-bonnet"
+]
+
+(* spec-free forms detect a regular configuration (uniform degree, girth face) from the graph *)
+VerificationTest[
+  { TessellationGenus[ TessellationGraph[ { 3, 5 } ] ],
+    TessellationGenus[ TessellationGraph[ { 4, 4 }, { 12, 12 } ] ],
+    TessellationGenus[ TessellationGraph[ { 3, 7 }, 2 ] ] },
+  { 0, 1, 14 },
+  TestID -> "TessellationGenus-spec-free-regular-detection"
+]
+
+
 (* ===================== Example graphs: Sierpinski & Bethe ===================== *)
 
 (* trivalent Sierpinski graph: 3-simplex K_4 truncated n-1 times; 4*3^(n-1) vertices,
