@@ -93,7 +93,7 @@ HypergraphDegree[edges_List] := Counts[Flatten[DeleteDuplicates /@ edges]]
 HypergraphMaximalEdges[edges_List] := Module[{u = DeleteDuplicates[edges]}, Select[u, Function[ed, ! AnyTrue[DeleteCases[u, ed], SubsetQ[#, ed] &]]]]
 HypergraphComplex[edges_List] := DeleteDuplicates @ Catenate[Subsets[#, {1, All}] & /@ edges]
 HypergraphLineGraph[edges_List] := Module[{u = Range[Length[edges]], ints}, ints = Select[Subsets[u, {2}], Intersection @@ (edges[[#]]&) =!= {} &]; Graph[UndirectedEdge @@@ ints]]
-Hypergraph2Section[edges_List] := Module[{pairs}, pairs = DeleteDuplicates @ Sort /@ Catenate[Subsets[#, {2}] & /@ Select[edges, Length[#] >= 2 &]]; Graph[UndirectedEdge @@@ pairs]]
+Hypergraph2Section[edges_List] := Module[{pairs}, pairs = DeleteDuplicates[Sort /@ Catenate[Subsets[#, {2}] & /@ Select[edges, Length[#] >= 2 &]]]; Graph[UndirectedEdge @@@ pairs]]
 Weighted2SectionGraph[edges_List, minSupport_ : 1] := Module[{assoc = <||>}, Do[If[Length[ed] >= 2, Scan[(assoc[#] = Lookup[assoc, #, 0] + 1) &, Subsets[ed, {2}]]], {ed, edges}];
     With[{kept = Select[assoc, # >= minSupport &]}, Graph[UndirectedEdge @@@ Keys[kept], EdgeWeight -> Values[kept]]]]
 HypergraphSummary[edges_List] := Module[{v = HypergraphVertexSet[edges], sizes = HyperedgeSizes[edges], deg = HypergraphDegree[edges]}, <|
