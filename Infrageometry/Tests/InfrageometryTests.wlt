@@ -2154,6 +2154,35 @@ VerificationTest[
     TestID -> "FindBallCover-subset-covers-targets"
 ]
 
+(* Method -> "Greedy" always returns a valid cover ... *)
+VerificationTest[
+    With[{g = GraphData["CuboctahedralGraph"]},
+        BallCoverQ[g, 1, FindBallCover[g, 1, All, 1, Method -> "Greedy"]]
+    ],
+    True,
+    TestID -> "FindBallCover-greedy-covers"
+]
+
+(* ... but is not minimum in general: the cuboctahedron is vertex-transitive with gamma = 3,
+   yet every greedy run returns 4 *)
+VerificationTest[
+    With[{g = GraphData["CuboctahedralGraph"]},
+        {Length @ FindBallCover[g, 1], Length @ FindBallCover[g, 1, All, 1, Method -> "Greedy"]}
+    ],
+    {3, 4},
+    TestID -> "FindBallCover-greedy-suboptimal-cuboctahedron"
+]
+
+(* Method -> "Symmetric" recovers the orbit-shaped minimum cover greedy misses: the
+   cuboctahedron's gamma = 3 is a single Aut-orbit, so the symmetric search finds 3, not 4 *)
+VerificationTest[
+    With[{g = GraphData["CuboctahedralGraph"]}, {s = FindBallCover[g, 1, All, 1, Method -> "Symmetric"]},
+        {Length[s], BallCoverQ[g, 1, s]}
+    ],
+    {3, True},
+    TestID -> "FindBallCover-symmetric-cuboctahedron"
+]
+
 (* nerve of chosen graph-metric centres: B(2),B(4),B(6) at r=1 on the path meet
    consecutively (shared vertices 3, 5) but the ends miss, giving the path complex *)
 VerificationTest[
@@ -2554,12 +2583,35 @@ VerificationTest[
   TestID -> "TessellatedDisk-cuboctahedron"
 ]
 
-(* snub and hyperbolic uniform families are deferred *)
+(* the Euclidean snub / elongated families are chiral and deferred *)
 VerificationTest[
   TessellationNeighborhoodGraph[ { 3, 3, 3, 3, 6 }, 2 ],
   $Failed,
   { TessellationNeighborhoodGraph::deferred },
   TestID -> "TessellatedDisk-snub-deferred"
+]
+
+(* a hyperbolic uniform tiling (defect < 0) grows in the Poincare disk: interior valence is the
+   configuration length, both face sizes occur, and the patch is genuinely hyperbolic (K = -1) *)
+VerificationTest[
+  With[ { g = TessellationNeighborhoodGraph[ { 3, 7, 3, 7 }, 3 ] },
+    Max @ VertexDegree @ g == 4 && FindCycle[ g, { 3 }, 1 ] =!= {} && FindCycle[ g, { 7 }, 1 ] =!= {} ],
+  True,
+  TestID -> "TessellatedDisk-hyperbolic-3737"
+]
+
+(* a hyperbolic uniform tiling with three distinct face sizes, including a large polygon *)
+VerificationTest[
+  Max @ VertexDegree @ TessellationNeighborhoodGraph[ { 4, 6, 14 }, 3 ],
+  3,
+  TestID -> "TessellatedDisk-hyperbolic-4-6-14"
+]
+
+(* the curvature parameter solved from the angle defect has the sign of the defect *)
+VerificationTest[
+  Sign /@ { TessellationCurvature[ { 4, 8, 8 } ], TessellationCurvature[ { 3, 7, 3, 7 } ], TessellationCurvature[ { 3, 5 } ] },
+  { 0, -1, 1 },
+  TestID -> "TessellatedDisk-defect-signs"
 ]
 
 

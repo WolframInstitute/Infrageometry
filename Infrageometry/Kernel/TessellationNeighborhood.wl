@@ -13,9 +13,15 @@ PackageScope[euclideanReflect]
 PackageScope[hyperbolicReflect]
 PackageScope[sphericalReflect]
 PackageScope[uniformDisk]
+PackageScope[uniformDiskHyperbolic]
 PackageScope[growUniformTessellation]
 PackageScope[completeVertexCorona]
 PackageScope[regularLeftPolygon]
+PackageScope[placeRegularPolygon]
+PackageScope[uniformInteriorAngle]
+PackageScope[solveUniformEdge]
+PackageScope[mobiusDisk]
+PackageScope[invMobiusDisk]
 
 (* ===================== Unwrapped tessellation patches ===================== *)
 
@@ -39,17 +45,19 @@ TessellationNeighborhoodGraph::eucrect =
   "The rectangular form is defined only for a Euclidean {p,q} ((p-2)(q-2)==4); `1` is not Euclidean -- use an integer radius.";
 
 (* a vertex configuration (longer than a {p, q} Schlafli symbol) cuts the radius-r ball from
-   the infinite uniform / Archimedean tiling of that configuration -- the same ball, now grown
-   one corona at a time rather than by single-polygon reflection. Dispatch on the angle defect
-   Sum 1/f_i - (k-2)/2: a regular (all-equal) configuration forwards to the {p, q} engine;
-   a Euclidean uniform tiling (defect 0) grows in the plane; a spherical one (defect > 0) is the
-   finite Archimedean solid, whose ball saturates to the whole solid. *)
+   the infinite uniform / Archimedean tiling of that configuration -- the same ball, grown one
+   corona at a time. One corona engine for both flat and curved cases (see growUniformTessellation),
+   dispatched on the angle defect Sum 1/f_i - (k-2)/2: a regular (all-equal) configuration forwards
+   to the {p, q} engine; a Euclidean uniform tiling (defect 0) grows in the plane; a hyperbolic one
+   (defect < 0) grows in the Poincare disk; a spherical one (defect > 0) is the finite Archimedean
+   solid, whose ball saturates to the whole solid. *)
 TessellationNeighborhoodGraph[config_List /; Length[config] >= 3, r_Integer : 3, opts : OptionsPattern[Graph]] :=
   withGraphOptions[
     With[{defect = Total[1 / config] - (Length[config] - 2) / 2},
       Which[
         Equal @@ config, TessellationNeighborhoodGraph[{First @ config, Length @ config}, r],
         defect == 0 && MemberQ[$euclideanUniformConfigs, canonicalConfiguration @ config], uniformDisk[config, r],
+        defect < 0, uniformDiskHyperbolic[config, r],
         defect > 0, With[{g = ArchimedeanTessellation[config]},
           If[GraphQ[g], NeighborhoodGraph[g, First @ VertexList @ g, r], $Failed]],
         True, Message[TessellationNeighborhoodGraph::deferred, config]; $Failed]],
@@ -60,7 +68,7 @@ TessellationNeighborhoodGraph[config_List /; Length[config] >= 3, r_Integer : 3,
 $euclideanUniformConfigs = {{3, 6, 3, 6}, {3, 4, 6, 4}, {4, 6, 12}, {4, 8, 8}, {3, 12, 12}};
 
 TessellationNeighborhoodGraph::deferred =
-  "The unwrapped patch of the uniform tiling `1` is not built (hyperbolic uniform and snub / elongated families are not supported -- use TessellationGraph for their compact quotient).";
+  "The unwrapped patch of the uniform tiling `1` is not built (the Euclidean snub / elongated families are chiral -- use TessellationGraph for their compact quotient).";
 
 
 (* ===================== The ring-growth engine ===================== *)
@@ -156,38 +164,79 @@ sphericalDisk[p_, q_, r_] :=
 
 (* ===================== Uniform / Archimedean corona growth ===================== *)
 
-(* the Euclidean uniform disk: grow the plane tiling out to a margin past radius r (graph
-   distance >= Euclidean distance for unit edges, so B_r is contained), then cut B_r *)
+(* One corona engine for the uniform tilings of all three constant-curvature model geometries,
+   in the conformal planar picture: distances live in the plane (curvature parameter u = 1, unit
+   edges) or the Poincare disk (u = cosh(s/2) > 1, edge length s). Angles are veridical in either,
+   so the corona combinatorics are identical; only the polygon placement, the direction at a
+   vertex, and the edge step are geometry-specific (keyed on u). The interior angle of a regular
+   f-gon is the single formula 2 ArcSin[Cos[Pi/f] / u] (u = 1 recovers the Euclidean (f-2) Pi / f),
+   and the shared edge length solves Sum_i interior(f_i) = 2 Pi. *)
+
+(* Euclidean uniform disk: grow to a margin past radius r (graph distance >= Euclidean distance
+   for unit edges, so B_r is contained), then cut B_r *)
 uniformDisk[config_, r_] :=
   graphDistanceBall[
     tessellationFacesGraph[
-      growUniformTessellation[config, Abs[#] <= r + 2.5 &], {Re @ #, Im @ #} &, 10.^-5],
+      growUniformTessellation[config, 1, Abs[#] <= r + 2.5 &], {Re @ #, Im @ #} &, 10.^-5],
     {0, 0}, r];
 
-(* the regular f-gon (unit edges) sharing directed edge a -> b and lying to its left: each
-   successive corner turns left by the exterior angle 2 Pi / f *)
+(* hyperbolic uniform disk: solve the common edge length, grow in the Poincare disk to a margin
+   past hyperbolic radius r * s (edges have hyperbolic length s), then cut B_r *)
+uniformDiskHyperbolic[config_, r_] :=
+  With[{u = solveUniformEdge[config]}, {s = 2 ArcCosh[u]},
+    graphDistanceBall[
+      tessellationFacesGraph[
+        growUniformTessellation[config, u, Abs[#] < 1 && 2 ArcTanh[Abs[#]] <= (r + 2) s &], {Re @ #, Im @ #} &, 10.^-5],
+      {0, 0}, r]];
+
+(* interior angle of a regular f-gon of edge length s in curvature -1 / 0 / +1, u = cosh(s/2) /
+   1 / cos(s/2); the common edge length of the tiling makes the corners sum to 2 Pi *)
+uniformInteriorAngle[f_, u_] := 2 ArcSin[Cos[Pi / f] / u];
+solveUniformEdge[config_] := Re[u /. FindRoot[Total[uniformInteriorAngle[#, u] & /@ config] == 2 Pi, {u, 1.3}]];
+
+(* disk isometries (0 <-> a) used by the hyperbolic placement and direction *)
+mobiusDisk[a_, z_] := (z + a) / (1 + Conjugate[a] z);
+invMobiusDisk[a_, z_] := (z - a) / (1 - Conjugate[a] z);
+
+(* the regular f-gon (edge length set by u) sharing directed edge a -> b and lying to its left.
+   Euclidean (u = 1): each corner turns left by the exterior angle 2 Pi / f. Hyperbolic: transport
+   a standard origin-centred f-gon (circumradius from sinh R = sinh(s/2) / sin(Pi/f)) by the disk
+   isometry carrying its first edge onto a -> b. *)
 regularLeftPolygon[a_, b_, f_] :=
   Module[{pts = {a, b}},
     Do[pts = Append[pts, pts[[-1]] + (pts[[-1]] - pts[[-2]]) Exp[I 2. Pi / f]], f - 2];
     pts];
+placeRegularPolygon[a_, b_, f_, 1] := regularLeftPolygon[a, b, f];
+placeRegularPolygon[a_, b_, f_, u_] :=
+  With[{rho = Tanh[ArcSinh[Sinh[ArcCosh[u]] / Sin[Pi / f]] / 2]},
+    {std = Table[rho Exp[I 2. Pi j / f], {j, 0, f - 1}]},
+    {theta = Arg[invMobiusDisk[a, b]] - Arg[invMobiusDisk[std[[1]], std[[2]]]]},
+    Table[mobiusDisk[a, Exp[I theta] invMobiusDisk[std[[1]], std[[j]]]], {j, 1, f}]];
+
+(* direction of the edge v -> w and the neighbour one edge-step from v in direction dir:
+   Euclidean tangents are differences; hyperbolic ones are read through the isometry sending v -> 0 *)
+vertexDirection[v_, w_, 1] := Arg[w - v];
+vertexDirection[v_, w_, u_] := Arg[invMobiusDisk[v, w]];
+edgeStep[v_, dir_, 1, s_] := v + Exp[I dir];
+edgeStep[v_, dir_, u_, s_] := mobiusDisk[v, Tanh[s / 2] Exp[I dir]];
 
 (* grow the uniform tiling corona by corona: seed the full corona of the origin vertex (the
    k polygons of config in CCW order, interior angles summing to 2 Pi), then repeatedly complete
    every boundary vertex whose partial corona pins its configuration, keeping only faces whose
    centroid lies in the region so the growth self-terminates *)
-growUniformTessellation[config_, inRegion_] :=
-  Module[{cumAngle, faces, seen, growing = True, added},
-    cumAngle = Most @ Prepend[Accumulate[(# - 2) Pi / # & /@ config], 0.];
-    faces = Select[MapThread[regularLeftPolygon[0, Exp[I #2], #1] &, {config, cumAngle}], inRegion[Mean @ #] &];
+growUniformTessellation[config_, u_, inRegion_] :=
+  Module[{s = If[u === 1, 1, 2 ArcCosh[u]], cumAngle, faces, seen, growing = True, added},
+    cumAngle = Most @ Prepend[Accumulate[uniformInteriorAngle[#, u] & /@ config], 0.];
+    faces = Select[MapThread[placeRegularPolygon[0, edgeStep[0, #2, u, s], #1, u] &, {config, cumAngle}], inRegion[Mean @ #] &];
     seen = Association[(Round[Mean @ #, 10.^-5] -> True) & /@ faces];
     While[growing, growing = False;
-      Do[added = completeVertexCorona[corner[[1, 1]], corner, config, inRegion, seen];
+      Do[added = completeVertexCorona[corner[[1, 1]], corner, config, u, s, inRegion, seen];
         If[added =!= {},
           faces = Join[faces, added]; (seen[Round[Mean @ #, 10.^-5]] = True) & /@ added; growing = True],
         {corner, Values @ GroupBy[
           Flatten[(poly |-> With[{n = Length @ poly},
             Table[With[{v = poly[[i]], nxt = poly[[Mod[i, n] + 1]], prv = poly[[Mod[i - 2, n] + 1]]},
-              {Round[{Re @ v, Im @ v}, 10.^-5], v, n, Arg[nxt - v], Arg[prv - v]}], {i, n}]]) /@ faces, 1],
+              {Round[{Re @ v, Im @ v}, 10.^-5], v, n, vertexDirection[v, nxt, u], vertexDirection[v, prv, u]}], {i, n}]]) /@ faces, 1],
           First -> Rest]}]];
     faces];
 
@@ -196,9 +245,9 @@ growUniformTessellation[config_, inRegion_] :=
    read CCW from the open boundary, match a unique rotation/reflection of config, the remaining
    sizes of that rotation are placed CCW from the exposed edge; an ambiguous or complete corona
    adds nothing *)
-completeVertexCorona[v_, corner_, config_, inRegion_, seen_] :=
+completeVertexCorona[v_, corner_, config_, u_, s_, inRegion_, seen_] :=
   With[{sizes = corner[[All, 2]], starts = corner[[All, 3]], ends = corner[[All, 4]]},
-    If[2 Pi - Total[(# - 2) Pi / # & /@ sizes] < 0.01, {},
+    If[2 Pi - Total[uniformInteriorAngle[#, u] & /@ sizes] < 0.01, {},
       With[
         {begin = SelectFirst[starts, angle |-> NoneTrue[ends, Abs[Mod[angle - # + Pi, 2 Pi] - Pi] < 10.^-3 &]]},
         {order = SortBy[Range @ Length @ sizes, Mod[starts[[#]] - begin, 2 Pi] &]},
@@ -208,11 +257,11 @@ completeVertexCorona[v_, corner_, config_, inRegion_, seen_] :=
            seq_ /; Take[seq, Length @ order] === sizes[[order]] :> Drop[seq, Length @ order]]},
         If[Length @ remaining != 1, {},
           Last @ Fold[
-            {state, size} |-> With[{poly = regularLeftPolygon[v, First @ state, size]},
+            {state, size} |-> With[{poly = placeRegularPolygon[v, First @ state, size, u]},
               {poly[[-1]],
                If[! KeyExistsQ[seen, Round[Mean @ poly, 10.^-5]] && inRegion[Mean @ poly],
                  Append[Last @ state, poly], Last @ state]}],
-            {v + Exp[I endAngle], {}}, First @ remaining]]]]];
+            {edgeStep[v, endAngle, u, s], {}}, First @ remaining]]]]];
 
 
 (* m x n rectangular patch of the Euclidean {p,q} tiling: the flat-torus construction with the
