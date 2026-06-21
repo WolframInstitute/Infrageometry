@@ -316,6 +316,38 @@ windowSaturate[c_, range_, pad_] := Switch[range,
 	{_Integer, _Integer}, Table[If[0 <= r < Length[c], c[[r + 1]], pad], {r, range[[1]], range[[2]]}]
 ]
 
+(* bouncing advancing front from a source set src: the foliation {S_0, ..., S_steps}
+   of a momentum-carrying wavefront.  Each vertex of S_i steps one shell OUTWARD from
+   the previous front S_{i-1} (to neighbours v with d(S_{i-1}, v) == d(S_{i-1}, u) + 1)
+   and reflects inward where there is none, so the front turns around at a boundary or
+   focus and propagates past the eccentricity -- unlike the metric sphere, which dies
+   there.  State is the pair (S_{i-1}, S_i): the discrete wave-equation form, momentum
+   carried as the trailing front.  (SyntheticInfrageometry`FindAdvancingInfraFront is
+   the InfraSet-wrapped view of this same recurrence.) *)
+advancingFront[g_Graph, src_List, steps_Integer] :=
+	With[{adj = AssociationMap[AdjacencyList[g, #] &, VertexList[g]], dm = GraphDistanceMatrix[g], vl = VertexList[g]},
+		{vidx = AssociationThread[vl, Range[Length[vl]]]},
+		NestList[
+			pair |-> With[{prev = pair[[1]], cur = pair[[2]]},
+				{dp = AssociationThread[vl, Min /@ Transpose[dm[[Lookup[vidx, prev]]]]]},
+				{cur, DeleteDuplicates @ Catenate[
+					(u |-> With[{out = Select[adj[u], dp[#] == dp[u] + 1 &], in = Select[adj[u], dp[#] == dp[u] - 1 &]},
+						Which[out =!= {}, out, in =!= {}, in, True, {u}]]) /@ cur]}],
+			{src, src}, steps][[All, 2]]
+	]
+
+(* horizon for the "Front" ball-volume measure: a step count, not a radius.  All has no
+   natural end (the front never stops), so default to 2 ecc(v) -- one out-and-back. *)
+frontHorizon[g_, v_, range_] := Switch[range,
+	All,                  2 Max[DeleteCases[GraphDistance[g, v], Infinity]],
+	_Integer,             range,
+	{_Integer, _Integer}, Last[range]
+]
+
+(* V(t) = sum_{s<=t} |S_s(v)| -- the cumulative passage count of the advancing front,
+   the "ball volume" the front sweeps through time t (grows past eccentricity). *)
+frontVolumeProfile[g_, v_, range_] := Accumulate[Length /@ advancingFront[g, {v}, frontHorizon[g, v, range]]]
+
 (* V(r) = |B_r(v)|, the cumulative vertex count within radius r, as the List
    {V(0), ..., V(ecc(v))} (position i is radius i - 1).  Object slot 2 (single vertex,
    list, or All), radius slot 3 (default All -> full profile; r_Integer -> the scalar
@@ -345,7 +377,8 @@ BallVolumes[g_Graph,
 		{idx = PositionIndex[vs], targets = If[vertices === All, vs, vertices]},
 		(windowSaturate[#, range] &) /@ Switch[conv,
 			"Counting",  (Accumulate @ Values @ KeySort @ Counts @ DeleteCases[dm[[idx[#][[1]]]], Infinity] &) /@ targets,
-			"Hausdorff", (With[{row = dm[[idx[#][[1]]]]}, Table[Length @ GraphInterior[g, Pick[vs, Thread[row <= r]]], {r, 0, Max @ DeleteCases[row, Infinity]}]] &) /@ targets
+			"Hausdorff", (With[{row = dm[[idx[#][[1]]]]}, Table[Length @ GraphInterior[g, Pick[vs, Thread[row <= r]]], {r, 0, Max @ DeleteCases[row, Infinity]}]] &) /@ targets,
+			"Front",     (frontVolumeProfile[g, #, range] &) /@ targets
 		]
 	]
 
@@ -356,7 +389,8 @@ BallVolumes[g_Graph,
 ] := windowSaturate[
 	Switch[OptionValue["Measure"],
 		"Counting",  Accumulate @ Values @ KeySort @ Counts @ DeleteCases[GraphDistance[g, vertex], Infinity],
-		"Hausdorff", With[{vs = VertexList[g], row = GraphDistance[g, vertex]}, Table[Length @ GraphInterior[g, Pick[vs, Thread[row <= r]]], {r, 0, Max @ DeleteCases[row, Infinity]}]]
+		"Hausdorff", With[{vs = VertexList[g], row = GraphDistance[g, vertex]}, Table[Length @ GraphInterior[g, Pick[vs, Thread[row <= r]]], {r, 0, Max @ DeleteCases[row, Infinity]}]],
+		"Front",     frontVolumeProfile[g, vertex, range]
 	],
 	range
 ]

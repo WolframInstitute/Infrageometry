@@ -1209,6 +1209,38 @@ VerificationTest[
     TestID -> "LogDifferenceQuotients-power-law-exponent"
 ]
 
+(* "Front" measure: V(t) = sum_{s<=t} |S_s(v)|.  On a path from an endpoint the front
+   is a single vertex marching out and reflecting, so |S_s| == 1 and V(t) == t + 1 *)
+VerificationTest[
+    BallVolumes[PathGraph[Range[7]], 1, {0, 12}, "Measure" -> "Front"],
+    Range[1, 13],
+    TestID -> "BallVolumes-Front-single-vertex-on-path"
+]
+
+(* the front starts as the origin alone, so V(0) == 1 for any graph *)
+VerificationTest[
+    BallVolumes[GridGraph[{4, 4}], 5, 0, "Measure" -> "Front"],
+    1,
+    TestID -> "BallVolumes-Front-V0-is-one"
+]
+
+(* unlike the metric ball (which saturates at the component size past eccentricity),
+   the momentum front keeps sweeping, so V(2 ecc) strictly exceeds |component| *)
+VerificationTest[
+    Last[BallVolumes[CycleGraph[8], 1, All, "Measure" -> "Front"]] > VertexCount[CycleGraph[8]],
+    True,
+    TestID -> "BallVolumes-Front-propagates-past-ecc"
+]
+
+(* V is the running total of the front sizes, which are >= 1 (the front never empties):
+   the step differences are exactly the foliation cardinalities, all positive *)
+VerificationTest[
+    With[{v = BallVolumes[CycleGraph[10], 1, {0, 15}, "Measure" -> "Front"]},
+        Min[Differences[v]] >= 1 && OrderedQ[v]],
+    True,
+    TestID -> "BallVolumes-Front-monotone-never-empties"
+]
+
 (* slope-of-mean: average the volume profiles over the vertex slot, then one slope.
    On a vertex-transitive graph every profile is identical, so it equals the
    single-vertex slope -- aggregation is caller-side composition, no option *)
