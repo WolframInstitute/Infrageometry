@@ -13,6 +13,8 @@ PackageExport[BallVolumes]
 PackageExport[ShellAreas]
 PackageExport[CylinderVolumes]
 PackageScope[cylinderVolume]
+PackageExport[GeodesicIntervalGraph]
+PackageExport[GeodesicOccupation]
 
 PackageExport[FormanRicciCurvature]
 PackageExport[OllivierRicciCurvature]
@@ -449,6 +451,58 @@ cylinderVolume[dm_, pi_, qi_, s_] :=
 			]
 		]
 	]
+
+
+(* ===================== Geodesic interval graph ===================== *)
+
+(* GeodesicIntervalGraph[g, u, v]: the metric interval I(u, v) as a directed
+   acyclic graph -- vertices { w : d(u, w) + d(w, v) == d(u, v) } (= the
+   CylinderVolumes support, the union of all u-v geodesics), edges w -> x for
+   adjacent w, x in the interval with d(u, x) == d(u, w) + 1.  Directed paths
+   u -> v are exactly the u-v geodesics.  Built from two distance fields, never
+   enumerating paths, so it is polynomial even when the geodesic count is not. *)
+
+GeodesicIntervalGraph[g_Graph, u_, v_] :=
+	Module[{du = AssociationThread[VertexList[g], GraphDistance[g, u]],
+			dv = AssociationThread[VertexList[g], GraphDistance[g, v]], duv, interval, inSet},
+		duv = du[v];
+		If[duv === Infinity, Graph[{}, {}],
+			interval = Select[VertexList[g], du[#] + dv[#] == duv &];
+			inSet = AssociationThread[interval, True];
+			Graph[interval,
+				Catenate @ Map[
+					w |-> DirectedEdge[w, #] & /@ Select[AdjacencyList[g, w], TrueQ[inSet[#]] && du[#] == du[w] + 1 &],
+					interval
+				]
+			]
+		]
+	]
+
+
+(* ===================== Geodesic occupation ===================== *)
+
+(* GeodesicOccupation[dag]: the per-vertex geodesic occupation c(w) =
+   sigma_in(w) * sigma_out(w) over a geodesic DAG, where sigma_in(w) is the
+   number of source -> w directed paths and sigma_out(w) the number of w -> sink
+   paths (the Brandes shortest-path-count decomposition).  c(w) is the number of
+   maximal directed paths through w; the family size M = Max c (attained at the
+   endpoints).  Two topological-order DP sweeps, never enumerating the paths.
+   GeodesicOccupation[g, u, v] builds the u-v geodesic DAG first. *)
+
+GeodesicOccupation[dag_Graph] :=
+	Module[{order = TopologicalSort[dag],
+			inNbr = GroupBy[EdgeList[dag], Last -> First],
+			outNbr = GroupBy[EdgeList[dag], First -> Last], sigmaIn, sigmaOut},
+		sigmaIn = Fold[
+			{acc, w} |-> Append[acc, w -> With[{p = Lookup[inNbr, w, {}]}, If[p === {}, 1, Total[acc /@ p]]]],
+			<||>, order];
+		sigmaOut = Fold[
+			{acc, w} |-> Append[acc, w -> With[{q = Lookup[outNbr, w, {}]}, If[q === {}, 1, Total[acc /@ q]]]],
+			<||>, Reverse[order]];
+		AssociationMap[sigmaIn[#] sigmaOut[#] &, VertexList[dag]]
+	]
+
+GeodesicOccupation[g_Graph, u_, v_] := GeodesicOccupation[GeodesicIntervalGraph[g, u, v]]
 
 
 (* ===================== Log-difference quotients ===================== *)

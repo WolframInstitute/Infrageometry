@@ -2615,4 +2615,55 @@ VerificationTest[
 ]
 
 
+(* ===== GeodesicIntervalGraph / GeodesicOccupation ===== *)
+
+(* the interval graph is a directed acyclic graph whose vertices are the metric interval (= the CylinderVolumes support) *)
+VerificationTest[
+    With[{g = GridGraph[{3, 3}], ig = GeodesicIntervalGraph[GridGraph[{3, 3}], 1, 9]},
+        {AcyclicGraphQ[ig], DirectedGraphQ[ig],
+         Sort[VertexList[ig]] === Sort @ Flatten @ Position[GraphDistance[g, 1] + GraphDistance[g, 9], GraphDistance[g, 1, 9]]}
+    ],
+    {True, True, True},
+    TestID -> "GeodesicIntervalGraph-dag-interval"
+]
+
+(* per-vertex occupation equals brute-force enumeration of every geodesic *)
+VerificationTest[
+    With[{g = GridGraph[{3, 3}]},
+        KeySort @ GeodesicOccupation[g, 1, 9] === KeySort @ Counts @ Catenate @ FindPath[g, 1, 9, {GraphDistance[g, 1, 9]}, All]
+    ],
+    True,
+    TestID -> "GeodesicOccupation-matches-bruteforce"
+]
+
+(* family size = Max occupation = number of geodesics; the 3x3 grid center lies on 4 of the 6 *)
+VerificationTest[
+    With[{occ = GeodesicOccupation[GridGraph[{3, 3}], 1, 9]}, {Max[Values[occ]], occ[5]}],
+    {6, 4},
+    TestID -> "GeodesicOccupation-grid-counts"
+]
+
+(* the DAG-form accessor agrees with the (g, u, v) form *)
+VerificationTest[
+    With[{g = GridGraph[{4, 4}]},
+        GeodesicOccupation[GeodesicIntervalGraph[g, 1, 16]] === GeodesicOccupation[g, 1, 16]
+    ],
+    True,
+    TestID -> "GeodesicOccupation-dag-form-agrees"
+]
+
+(* path: unique geodesic; cycle: antipodal points have two geodesics *)
+VerificationTest[
+    {Max[Values @ GeodesicOccupation[PathGraph[Range[5]], 1, 5]], Max[Values @ GeodesicOccupation[CycleGraph[6], 1, 4]]},
+    {1, 2},
+    TestID -> "GeodesicOccupation-path-cycle"
+]
+
+(* disconnected endpoints: the interval graph is empty *)
+VerificationTest[
+    VertexCount @ GeodesicIntervalGraph[Graph[{1, 2, 3}, {1 <-> 2}], 1, 3],
+    0,
+    TestID -> "GeodesicIntervalGraph-disconnected-empty"
+]
+
 EndTestSection[]
