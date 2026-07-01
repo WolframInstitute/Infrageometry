@@ -53,7 +53,7 @@ TessellationNeighborhoodGraph::eucrect =
    solid, whose ball saturates to the whole solid. *)
 TessellationNeighborhoodGraph[config_List /; Length[config] >= 3, r_Integer : 3, opts : OptionsPattern[Graph]] :=
   withGraphOptions[
-    With[{defect = Total[1 / config] - (Length[config] - 2) / 2},
+    With[{defect = uniformDefect @ config},
       Which[
         Equal @@ config, TessellationNeighborhoodGraph[{First @ config, Length @ config}, r],
         defect == 0 && MemberQ[$euclideanUniformConfigs, canonicalConfiguration @ config], uniformDisk[config, r],
@@ -91,17 +91,17 @@ growTessellation[seed_, reflect_, centKey_, inRegion_] :=
    corners agree to ~1e-12, distinct ones are separated by >> tol), so equal vertices
    merge; vertices keep their (averaged) geometric coordinates *)
 tessellationFacesGraph[faces_, toVec_, tol_] :=
-  Module[{corners = Flatten[faces, 1], keys, uniq, idOf, off = 0, fids, edges, cmean},
-    keys = Round[toVec /@ corners, tol];
-    uniq = DeleteDuplicates @ keys;
-    idOf = AssociationThread[uniq -> Range @ Length @ uniq];
-    fids = (off += Length @ #; Lookup[idOf, Round[toVec /@ #, tol]]) & /@ faces;
-    edges = DeleteCases[
-      DeleteDuplicates @ Flatten[
-        (fc |-> UndirectedEdge @@ Sort[#] & /@ Partition[Append[fc, First @ fc], 2, 1]) /@ fids],
-      _?(Apply[SameQ])];
-    cmean = GroupBy[Transpose[{keys, toVec /@ corners}], First -> Last, Mean];
-    Graph[Range @ Length @ uniq, edges, VertexCoordinates -> Lookup[cmean, uniq]]];
+  With[{vecs = toVec /@ Flatten[faces, 1]},
+    {keys = Round[vecs, tol]},
+    {uniq = DeleteDuplicates @ keys},
+    {idOf = AssociationThread[uniq -> Range @ Length @ uniq]},
+    {fids = Lookup[idOf, #] & /@ TakeList[keys, Length /@ faces]},
+    {edges = DeleteCases[
+       DeleteDuplicates @ Flatten[
+         (fc |-> UndirectedEdge @@ Sort[#] & /@ Partition[Append[fc, First @ fc], 2, 1]) /@ fids],
+       _?(Apply[SameQ])]},
+    Graph[Range @ Length @ uniq, edges,
+      VertexCoordinates -> Lookup[GroupBy[Transpose[{keys, vecs}], First -> Last, Mean], uniq]]];
 
 (* the graph-distance-r ball around the vertex closest to ref *)
 graphDistanceBall[g_, ref_, r_] :=
@@ -203,9 +203,7 @@ invMobiusDisk[a_, z_] := (z - a) / (1 - Conjugate[a] z);
    a standard origin-centred f-gon (circumradius from sinh R = sinh(s/2) / sin(Pi/f)) by the disk
    isometry carrying its first edge onto a -> b. *)
 regularLeftPolygon[a_, b_, f_] :=
-  Module[{pts = {a, b}},
-    Do[pts = Append[pts, pts[[-1]] + (pts[[-1]] - pts[[-2]]) Exp[I 2. Pi / f]], f - 2];
-    pts];
+  FoldList[Plus, a, Table[(b - a) Exp[I 2. Pi k / f], {k, 0, f - 2}]];
 placeRegularPolygon[a_, b_, f_, 1] := regularLeftPolygon[a, b, f];
 placeRegularPolygon[a_, b_, f_, u_] :=
   With[{rho = Tanh[ArcSinh[Sinh[ArcCosh[u]] / Sin[Pi / f]] / 2]},
