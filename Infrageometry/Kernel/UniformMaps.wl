@@ -12,6 +12,7 @@ PackageScope[mapFaces]
 PackageScope[rectifyMapData]
 PackageScope[truncateMapData]
 PackageScope[canonicalConfiguration]
+PackageScope[uniformDefect]
 PackageScope[archimedeanSolidName]
 PackageScope[rectifyMap]
 PackageScope[truncateMap]
@@ -78,8 +79,7 @@ vertexFaceSizes[config_List /; Length[config] >= 3] := config;
    face the girth p, so the configuration is q copies of p. The default when no spec is
    passed. Mixed-face (Archimedean) maps are not recoverable from the abstract graph --
    the girth only sees their smallest face -- so pass their configuration explicitly. *)
-detectRegularConfig[g_Graph] :=
-  ConstantArray[First @ Select[Range[3, 100], FindCycle[g, {#}, 1] =!= {} &, 1], First @ Union @ VertexDegree @ g];
+detectRegularConfig[g_Graph] := ConstantArray[mapGirth @ g, First @ Union @ VertexDegree @ g];
 
 (* combinatorial (angle-defect) Gaussian curvature at a vertex of the map:
    kappa = Sum 1/f_i - (k - 2)/2; sign is spherical / flat / hyperbolic and the geometric
@@ -177,12 +177,12 @@ mapData[g_] := {g, mapFaces[g]};
 (* the faces of a regular-map 1-skeleton: all shortest (girth-length) cycles *)
 mapFaces[g_] := cycleVertices /@ FindCycle[g, {mapGirth[g]}, All];
 
-mapGirth[g_] := First @ Select[Range[3, EdgeCount[g] + 1], FindCycle[g, {#}, 1] =!= {} &];
+mapGirth[g_] := First @ Select[Range[3, EdgeCount[g] + 1], FindCycle[g, {#}, 1] =!= {} &, 1];
 
 cycleVertices[es_] :=
   With[{vs = List @@@ es},
     {start = If[MemberQ[vs[[2]], vs[[1, 2]]], vs[[1, 1]], vs[[1, 2]]]},
-    Most @ FoldList[Function[{prev, e}, First @ Complement[e, {prev}]], start, vs]];
+    Most @ FoldList[{prev, e} |-> First @ Complement[e, {prev}], start, vs]];
 
 edgeKey[a_, b_] := Sort[{a, b}];
 
