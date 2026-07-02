@@ -6,7 +6,7 @@
 
 ## ✨ Install
 
-Install from the Wolfram Cloud:
+Install the actively developed version from the Wolfram Cloud:
 
 ```wolfram
 PacletInstall["https://www.wolframcloud.com/obj/hajek_pavel/Infrageometry.paclet", ForceVersionInstall -> True]
