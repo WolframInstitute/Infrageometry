@@ -102,8 +102,17 @@ resistanceEmbeddingMatrix[g_Graph, rescaling_, dimSpec_] :=
    of a large graph).
    count = 1 (default) returns one cover as a centre list; n / UpTo[n] return up to n distinct
    minimum covers; All returns every one. Enumerating all minimum covers is #P-hard (the count of
-   minimum set covers), so All / n>1 brute-force the size-k centre subsets and are cheap only for small g. *)
-FindBallCover[g_Graph, r_ : 1, targets : (_List | All) : All, count : (_Integer | All | UpTo[_Integer]) : 1] :=
+   minimum set covers), so All / n>1 brute-force the size-k centre subsets and are cheap only for small g.
+   Method -> "Exhaustive" (default) is the exact integer program; "Greedy" repeatedly takes the centre
+   covering the most still-uncovered targets -- O(gamma) ball lookups, but NOT minimum in general (it
+   over-counts even on vertex-transitive graphs: the cuboctahedron has gamma = 3 yet every greedy run
+   returns 4). "Symmetric" returns the smallest Aut(g)-symmetric cover -- a minimum-size union of
+   automorphism orbits whose balls cover the targets; exact when a minimum cover is orbit-shaped (a
+   perfect / near-perfect code, as on vertex-transitive graphs), an upper bound otherwise, and far
+   cheaper than the full program on highly symmetric graphs. "Greedy" / "Symmetric" return a single
+   cover and ignore count. *)
+Options[FindBallCover] = {Method -> "Exhaustive"};
+FindBallCover[g_Graph, r_ : 1, targets : (_List | All) : All, count : (_Integer | All | UpTo[_Integer]) : 1, opts : OptionsPattern[]] :=
     With[
         {vs = VertexList[g]},
         {candmat = If[targets === All,
@@ -116,11 +125,40 @@ FindBallCover[g_Graph, r_ : 1, targets : (_List | All) : All, count : (_Integer 
             ]
         ]},
         {cand = candmat[[1]], mat = candmat[[2]]},
-        {x = Array[\[FormalX], Length[cand]]},
-        {one = cand[[ Flatten @ Position[Round[x /. LinearOptimization[Total[x], Join[Thread[mat . x >= 1], Thread[0 <= x <= 1]], x \[Element] Vectors[Length[cand], Integers]]], 1] ]]},
-        If[count === 1, one,
-            With[{covers = Select[Subsets[cand, {Length[one]}], BallCoverQ[g, r, #, targets] &]},
-                Replace[count, {All -> covers, (n_Integer | UpTo[n_]) :> Take[covers, UpTo[n]]}]
+        Switch[OptionValue[Method],
+            "Greedy",
+            cand[[ Module[{uncov = ConstantArray[1, Length[mat]], chosen = {}},
+                While[Total[uncov] > 0,
+                    With[{j = First @ Ordering[uncov . mat, -1]},
+                        AppendTo[chosen, j]; uncov = uncov (1 - Normal[mat[[All, j]]])]];
+                chosen] ]],
+            "Symmetric",
+            With[
+                {els = DeleteCases[GroupElements[GraphAutomorphismGroup[g]], Cycles[{}]],
+                 dmat = GraphDistanceMatrix[g], n = Length[vs],
+                 tIdx = If[targets === All, Range @ Length[vs], Flatten[FirstPosition[vs, #] & /@ targets]]},
+                {orbits = Select[DeleteDuplicates[Sort /@ Flatten[GroupOrbits[PermutationGroup[{#}], Range[n]] & /@ els, 1]], Length[#] >= 2 &]},
+                {m = Length[orbits], contain = Table[Select[Range @ Length[orbits], MemberQ[orbits[[#]], v] &], {v, n}]},
+                {y = Array[\[FormalY], m], z = Array[\[FormalZ], n]},
+                {sol = LinearOptimization[Total[z],
+                    Join[
+                        Flatten @ Table[z[[v]] >= y[[k]], {k, m}, {v, orbits[[k]]}],
+                        Table[z[[v]] <= Total[y[[ contain[[v]] ]]], {v, n}],
+                        Table[Total[ z[[ Flatten @ Position[dmat[[t]], d_ /; d <= r] ]] ] >= 1, {t, tIdx}],
+                        Thread[0 <= Join[y, z] <= 1]
+                    ],
+                    Join[y, z] \[Element] Vectors[m + n, Integers]]},
+                vs[[ Flatten @ Position[Round[z /. sol], 1] ]]
+            ],
+            _,
+            With[
+                {x = Array[\[FormalX], Length[cand]]},
+                {one = cand[[ Flatten @ Position[Round[x /. LinearOptimization[Total[x], Join[Thread[mat . x >= 1], Thread[0 <= x <= 1]], x \[Element] Vectors[Length[cand], Integers]]], 1] ]]},
+                If[count === 1, one,
+                    With[{covers = Select[Subsets[cand, {Length[one]}], BallCoverQ[g, r, #, targets] &]},
+                        Replace[count, {All -> covers, (n_Integer | UpTo[n_]) :> Take[covers, UpTo[n]]}]
+                    ]
+                ]
             ]
         ]
     ]
