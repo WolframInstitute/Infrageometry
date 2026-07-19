@@ -5,6 +5,9 @@ PackageExport[VectorFieldCommutator]
 PackageExport[VectorFieldSum]
 PackageExport[VectorFieldDifference]
 PackageExport[VectorFieldInverse]
+PackageExport[GradientVectorField]
+PackageExport[RotationVectorField]
+PackageExport[VectorFieldPlot]
 
 
 
@@ -27,6 +30,47 @@ Scan[
 
 VectorFieldInverse[g_ ? GraphQ, x_Association] :=
     Merge[Catenate[(p |-> Thread[vectorFieldValues[g, x, p] -> p]) /@ Keys[x]], Sort]
+
+
+GradientVectorField[g_ ? GraphQ, v_] /; VertexQ[g, v] :=
+    With[{dist = AssociationThread[VertexList[g], GraphDistance[g, v]]},
+        AssociationMap[
+            p |-> If[p === v || ! IntegerQ[dist[p]], p, First @ MinimalBy[AdjacencyList[g, p], dist]],
+            VertexList[g]
+        ]
+    ]
+
+RotationVectorField[g_ ? GraphQ, c_] /; VertexQ[g, c] :=
+    With[{pos = AssociationThread[VertexList[g], GraphEmbedding[g]]},
+        AssociationMap[
+            p |-> With[{u = {pos[c][[2]] - pos[p][[2]], pos[p][[1]] - pos[c][[1]]}},
+                If[Norm[u] < 1.*^-6, p,
+                    With[{q = First @ MaximalBy[AdjacencyList[g, p], w |-> Normalize[pos[w] - pos[p]] . Normalize[u]]},
+                        If[Normalize[pos[q] - pos[p]] . Normalize[u] < 0.5, p, q]
+                    ]
+                ]
+            ],
+            VertexList[g]
+        ]
+    ]
+
+
+Options[VectorFieldPlot] = Options[Graph]
+
+VectorFieldPlot[g_ ? GraphQ, x_Association, opts : OptionsPattern[]] := VectorFieldPlot[g, {x -> Red}, opts]
+
+VectorFieldPlot[g_ ? GraphQ, fields : {__Rule}, opts : OptionsPattern[]] :=
+    With[{pos = AssociationThread[VertexList[g], GraphEmbedding[g]]},
+        Show[
+            Graph[g, opts, VertexSize -> Small, VertexStyle -> GrayLevel[0.5], EdgeStyle -> GrayLevel[0.87]],
+            Graphics[{Arrowheads[0.025],
+                (field |-> {field[[2]],
+                    Catenate[
+                        (p |-> (v |-> If[v === p, {PointSize[0.012], Point[pos[p]]}, Arrow[{pos[p], pos[v]}]]) /@ vectorFieldValues[g, field[[1]], p]) /@
+                            Keys[field[[1]]]
+                    ]}) /@ fields}]
+        ]
+    ]
 
 
 commutatorSteps[g_, x_, y_] := {forwardStep[g, x], forwardStep[g, y], inverseStep[g, x], inverseStep[g, y]}
