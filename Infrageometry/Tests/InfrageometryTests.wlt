@@ -2666,4 +2666,46 @@ VerificationTest[
     TestID -> "GeodesicIntervalGraph-disconnected-empty"
 ]
 
+VerificationTest[
+    VectorFieldCommutator[CycleGraph[4], <|1 -> 2, 2 -> 1, 3 -> 3, 4 -> 4|>, <|1 -> 1, 2 -> 3, 3 -> 2, 4 -> 4|>],
+    <|1 -> 2, 2 -> 3, 3 -> 1, 4 -> 4|>,
+    TestID -> "VectorFieldCommutator-C4-Swaps"
+]
+
+VerificationTest[
+    VectorFieldCommutator[CycleGraph[4], <|1 -> 2, 2 -> 1, 3 -> 3, 4 -> 4|>, <|1 -> 1, 2 -> 3, 3 -> 2, 4 -> 4|>, All],
+    <|1 -> {2}, 2 -> {3}, 3 -> {1}, 4 -> {4}|>,
+    TestID -> "VectorFieldCommutator-WholeField-All"
+]
+
+VerificationTest[
+    With[{rot = AssociationThread[Range[5], RotateLeft[Range[5]]]},
+        VectorFieldCommutator[CycleGraph[5], rot, rot]
+    ],
+    AssociationThread[Range[5], Range[5]],
+    TestID -> "VectorFieldCommutator-SelfCommutator-Identity"
+]
+
+VerificationTest[
+    With[{g = PathGraph[Range[4]], x = <|1 -> 2, 2 -> 2, 3 -> 2, 4 -> 4|>, y = AssociationThread[Range[4], Range[4]]},
+        {VectorFieldCommutator[g, x, y, 1], VectorFieldCommutator[g, x, y, 1, All], VectorFieldCommutator[g, x, y, 1, 2], VectorFieldCommutator[g, x, y, 1, UpTo[5]]}
+    ],
+    {1, {1, 2, 3}, {1, 2}, {1, 2, 3}},
+    TestID -> "VectorFieldCommutator-NearestSelection"
+]
+
+VerificationTest[
+    With[{g = PathGraph[Range[5]], x = <|1 -> 1, 2 -> {1, 3}, 3 -> 3, 4 -> 4, 5 -> 5|>, y = <|1 -> 2, 2 -> 3, 3 -> 4, 4 -> 5, 5 -> 5|>},
+        {VectorFieldCommutator[g, x, y, 2], VectorFieldCommutator[g, x, y, 1]}
+    ],
+    {3, Missing["NotFound"]},
+    TestID -> "VectorFieldCommutator-Multivalued-Branching"
+]
+
+VerificationTest[
+    VectorFieldInverse[PathGraph[Range[5]], <|1 -> 1, 2 -> {1, 3}, 3 -> 3, 4 -> 4, 5 -> 5|>],
+    <|1 -> {1, 2}, 3 -> {2, 3}, 4 -> {4}, 5 -> {5}|>,
+    TestID -> "VectorFieldInverse-Multivalued"
+]
+
 EndTestSection[]
