@@ -2,34 +2,44 @@ Package["WolframInstitute`Infrageometry`"]
 
 
 PackageExport[VectorFieldCommutator]
+PackageExport[VectorFieldSum]
+PackageExport[VectorFieldDifference]
 PackageExport[VectorFieldInverse]
 
 
 
-VectorFieldCommutator[g_ ? GraphQ, x_Association, y_Association, p_, n : _Integer | _UpTo | All | Automatic : Automatic] /; VertexQ[g, p] :=
-    selectEndpoints[g, p, commutatorEndpoints[g, x, y, VectorFieldInverse[g, x], VectorFieldInverse[g, y], p], n]
-
-VectorFieldCommutator[g_ ? GraphQ, x_Association, y_Association, n : _Integer | _UpTo | All | Automatic : Automatic] :=
-    With[{xInv = VectorFieldInverse[g, x], yInv = VectorFieldInverse[g, y]},
-        AssociationMap[p |-> selectEndpoints[g, p, commutatorEndpoints[g, x, y, xInv, yInv, p], n], VertexList[g]]
-    ]
+Scan[
+    Apply[{f, steps} |-> (
+        f[g_ ? GraphQ, x_Association, y_Association, p_, n : _Integer | _UpTo | All | Automatic : Automatic] /; VertexQ[g, p] :=
+            selectEndpoints[g, p, transportEndpoints[steps[g, x, y], p], n];
+        f[g_ ? GraphQ, x_Association, y_Association, n : _Integer | _UpTo | All | Automatic : Automatic] :=
+            With[{fixedSteps = steps[g, x, y]},
+                AssociationMap[p |-> selectEndpoints[g, p, transportEndpoints[fixedSteps, p], n], VertexList[g]]
+            ]
+    )],
+    {
+        {VectorFieldCommutator, commutatorSteps},
+        {VectorFieldSum, sumSteps},
+        {VectorFieldDifference, differenceSteps}
+    }
+]
 
 
 VectorFieldInverse[g_ ? GraphQ, x_Association] :=
     Merge[Catenate[(p |-> Thread[vectorFieldValues[g, x, p] -> p]) /@ Keys[x]], Sort]
 
 
-commutatorEndpoints[g_, x_, y_, xInv_, yInv_, p_] :=
-    Fold[
-        {points, step} |-> Catenate[step /@ points],
-        {p},
-        {
-            q |-> vectorFieldValues[g, x, q],
-            q |-> vectorFieldValues[g, y, q],
-            q |-> Lookup[xInv, Key[q], {}],
-            q |-> Lookup[yInv, Key[q], {}]
-        }
-    ]
+commutatorSteps[g_, x_, y_] := {forwardStep[g, x], forwardStep[g, y], inverseStep[g, x], inverseStep[g, y]}
+
+sumSteps[g_, x_, y_] := {forwardStep[g, y], forwardStep[g, x]}
+
+differenceSteps[g_, x_, y_] := {inverseStep[g, y], forwardStep[g, x]}
+
+transportEndpoints[steps_List, p_] := Fold[{points, step} |-> Catenate[step /@ points], {p}, steps]
+
+forwardStep[g_, x_] := q |-> vectorFieldValues[g, x, q]
+
+inverseStep[g_, x_] := With[{inv = VectorFieldInverse[g, x]}, q |-> Lookup[inv, Key[q], {}]]
 
 selectEndpoints[g_, p_, points_, n_] :=
     With[{sorted = SortBy[DeleteDuplicates[points], AssociationThread[VertexList[g], GraphDistance[g, p]]]},

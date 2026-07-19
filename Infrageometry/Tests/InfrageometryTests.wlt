@@ -2708,4 +2708,36 @@ VerificationTest[
     TestID -> "VectorFieldInverse-Multivalued"
 ]
 
+VerificationTest[
+    With[{g = PathGraph[Range[5]], shift = <|1 -> 2, 2 -> 3, 3 -> 4, 4 -> 5, 5 -> 5|>},
+        {VectorFieldSum[g, shift, shift, 1], VectorFieldSum[g, shift, shift]}
+    ],
+    {3, <|1 -> 3, 2 -> 4, 3 -> 5, 4 -> 5, 5 -> 5|>},
+    TestID -> "VectorFieldSum-Shifts"
+]
+
+VerificationTest[
+    With[{g = PathGraph[Range[5]], x = <|2 -> {1, 3}|>, y = <|1 -> 2, 2 -> 3, 3 -> 4, 4 -> 5, 5 -> 5|>},
+        {VectorFieldSum[g, x, y, 1], VectorFieldSum[g, x, y, 1, All]}
+    ],
+    {1, {1, 3}},
+    TestID -> "VectorFieldSum-Multivalued-Nearest"
+]
+
+VerificationTest[
+    With[{g = PathGraph[Range[5]], shift = <|1 -> 2, 2 -> 3, 3 -> 4, 4 -> 5, 5 -> 5|>},
+        VectorFieldDifference[g, shift, shift]
+    ],
+    <|1 -> Missing["NotFound"], 2 -> 2, 3 -> 3, 4 -> 4, 5 -> 5|>,
+    TestID -> "VectorFieldDifference-SelfDifference"
+]
+
+VerificationTest[
+    With[{g = PathGraph[Range[5]], shift = <|1 -> 2, 2 -> 3, 3 -> 4, 4 -> 5, 5 -> 5|>},
+        VectorFieldDifference[g, shift, AssociationThread[Range[5], Range[5]]]
+    ],
+    <|1 -> 2, 2 -> 3, 3 -> 4, 4 -> 5, 5 -> 5|>,
+    TestID -> "VectorFieldDifference-ZeroField"
+]
+
 EndTestSection[]
