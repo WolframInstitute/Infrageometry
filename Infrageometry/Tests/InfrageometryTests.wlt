@@ -2666,78 +2666,94 @@ VerificationTest[
     TestID -> "GeodesicIntervalGraph-disconnected-empty"
 ]
 
+
+(* ===== Displacements ===== *)
+
+(* displacement fixtures: coordinate grid, cycle step *)
+dispGrid = VertexReplace[GridGraph[{5, 5}], Catenate @ Table[5 j + i + 1 -> {i + 1, j + 1}, {j, 0, 4}, {i, 0, 4}]]
+dispX = AssociationMap[{{Min[#[[1]] + 1, 5], #[[2]]}} &, VertexList @ dispGrid]
+dispY = AssociationMap[{{#[[1]], Min[#[[2]] + 1, 5]}} &, VertexList @ dispGrid]
+dispCycleStep = AssociationMap[{Mod[#, 10] + 1} &, Range @ 10]
+
+(* the sum is exactly commutative: the bisector construction is symmetric *)
 VerificationTest[
-    VectorFieldCommutator[CycleGraph[4], <|1 -> 2, 2 -> 1, 3 -> 3, 4 -> 4|>, <|1 -> 1, 2 -> 3, 3 -> 2, 4 -> 4|>],
-    <|1 -> 2, 2 -> 3, 3 -> 1, 4 -> 4|>,
-    TestID -> "VectorFieldCommutator-C4-Swaps"
+    DisplacementSum[dispGrid, dispX, dispY] === DisplacementSum[dispGrid, dispY, dispX],
+    True,
+    TestID -> "Displacement-sum-commutative"
 ]
 
+(* coordinate steps commute: group commutator is the identity on the interior *)
 VerificationTest[
-    VectorFieldCommutator[CycleGraph[4], <|1 -> 2, 2 -> 1, 3 -> 3, 4 -> 4|>, <|1 -> 1, 2 -> 3, 3 -> 2, 4 -> 4|>, All],
-    <|1 -> {2}, 2 -> {3}, 3 -> {1}, 4 -> {4}|>,
-    TestID -> "VectorFieldCommutator-WholeField-All"
+    DisplacementCommutator[dispGrid, dispX, dispY, {2, 2}],
+    {{2, 2}},
+    TestID -> "Displacement-commutator-coordinate-steps"
 ]
 
+(* inverse is the straight reflection on the interior *)
 VerificationTest[
-    With[{rot = AssociationThread[Range[5], RotateLeft[Range[5]]]},
-        VectorFieldCommutator[CycleGraph[5], rot, rot]
-    ],
-    AssociationThread[Range[5], Range[5]],
-    TestID -> "VectorFieldCommutator-SelfCommutator-Identity"
+    DisplacementInverse[dispGrid, dispX] @ {3, 3},
+    {{2, 3}},
+    TestID -> "Displacement-inverse-reflection"
 ]
 
+(* scaling round-trip on the cycle: (1/3)(3 D) = D *)
 VerificationTest[
-    With[{g = PathGraph[Range[4]], x = <|1 -> 2, 2 -> 2, 3 -> 2, 4 -> 4|>, y = AssociationThread[Range[4], Range[4]]},
-        {VectorFieldCommutator[g, x, y, 1], VectorFieldCommutator[g, x, y, 1, All], VectorFieldCommutator[g, x, y, 1, 2], VectorFieldCommutator[g, x, y, 1, UpTo[5]]}
-    ],
-    {1, {1, 2, 3}, {1, 2}, {1, 2, 3}},
-    TestID -> "VectorFieldCommutator-NearestSelection"
+    DisplacementScale[CycleGraph[10], DisplacementScale[CycleGraph[10], dispCycleStep, 3], 1/3],
+    dispCycleStep,
+    TestID -> "Displacement-scale-roundtrip"
 ]
 
+(* magnitude of a unit step field is 1 *)
 VerificationTest[
-    With[{g = PathGraph[Range[5]], x = <|1 -> 1, 2 -> {1, 3}, 3 -> 3, 4 -> 4, 5 -> 5|>, y = <|1 -> 2, 2 -> 3, 3 -> 4, 4 -> 5, 5 -> 5|>},
-        {VectorFieldCommutator[g, x, y, 2], VectorFieldCommutator[g, x, y, 1]}
-    ],
-    {3, Missing["NotFound"]},
-    TestID -> "VectorFieldCommutator-Multivalued-Branching"
+    DisplacementMagnitude[dispGrid, dispX],
+    1,
+    TestID -> "Displacement-magnitude-unit"
 ]
 
+(* reduce recovers a field from its neighbourhood blur *)
 VerificationTest[
-    VectorFieldInverse[PathGraph[Range[5]], <|1 -> 1, 2 -> {1, 3}, 3 -> 3, 4 -> 4, 5 -> 5|>],
-    <|1 -> {1, 2}, 3 -> {2, 3}, 4 -> {4}, 5 -> {5}|>,
-    TestID -> "VectorFieldInverse-Multivalued"
+    DisplacementReduce[dispGrid, Map[Union @ Flatten[{#, AdjacencyList[dispGrid, First @ #]}, 1] &, dispX]],
+    dispX,
+    TestID -> "Displacement-reduce-deblur"
 ]
 
+(* predicate hierarchy: clamped grid step is single-valued but no bijection; cycle step is a Killing displacement *)
 VerificationTest[
-    With[{g = PathGraph[Range[5]], shift = <|1 -> 2, 2 -> 3, 3 -> 4, 4 -> 5, 5 -> 5|>},
-        {VectorFieldSum[g, shift, shift, 1], VectorFieldSum[g, shift, shift]}
-    ],
-    {3, <|1 -> 3, 2 -> 4, 3 -> 5, 4 -> 5, 5 -> 5|>},
-    TestID -> "VectorFieldSum-Shifts"
+    {DisplacementSingleValuedQ @ dispX, DisplacementBijectionQ @ dispX,
+     DisplacementBijectionQ @ dispCycleStep, DisplacementIsomorphismQ[CycleGraph[10], dispCycleStep]},
+    {True, False, True, True},
+    TestID -> "Displacement-predicates"
 ]
 
+(* k-continuity: the clamped step is 1-continuous *)
 VerificationTest[
-    With[{g = PathGraph[Range[5]], x = <|2 -> {1, 3}|>, y = <|1 -> 2, 2 -> 3, 3 -> 4, 4 -> 5, 5 -> 5|>},
-        {VectorFieldSum[g, x, y, 1], VectorFieldSum[g, x, y, 1, All]}
-    ],
-    {1, {1, 3}},
-    TestID -> "VectorFieldSum-Multivalued-Nearest"
+    ContinuousDisplacementQ[dispGrid, dispX],
+    True,
+    TestID -> "Displacement-continuity"
 ]
 
+(* smallest Killing displacement of the cycle is a unit rotation *)
 VerificationTest[
-    With[{g = PathGraph[Range[5]], shift = <|1 -> 2, 2 -> 3, 3 -> 4, 4 -> 5, 5 -> 5|>},
-        VectorFieldDifference[g, shift, shift]
-    ],
-    <|1 -> Missing["NotFound"], 2 -> 2, 3 -> 3, 4 -> 4, 5 -> 5|>,
-    TestID -> "VectorFieldDifference-SelfDifference"
+    With[{killing = FindKillingDisplacement[CycleGraph[10]]},
+      {DisplacementMagnitude[CycleGraph[10], killing], DisplacementIsomorphismQ[CycleGraph[10], killing]}],
+    {1, True},
+    TestID -> "Displacement-killing-cycle"
 ]
 
+(* the outward radial displacement is the gradient of the distance from the centre *)
 VerificationTest[
-    With[{g = PathGraph[Range[5]], shift = <|1 -> 2, 2 -> 3, 3 -> 4, 4 -> 5, 5 -> 5|>},
-        VectorFieldDifference[g, shift, AssociationThread[Range[5], Range[5]]]
-    ],
-    <|1 -> 2, 2 -> 3, 3 -> 4, 4 -> 5, 5 -> 5|>,
-    TestID -> "VectorFieldDifference-ZeroField"
+    First @ PolarDisplacements[dispGrid, {3, 3}] ===
+      GradientDisplacement[dispGrid, AssociationThread[VertexList @ dispGrid, GraphDistance[dispGrid, {3, 3}]]],
+    True,
+    TestID -> "Displacement-radial-is-gradient"
+]
+
+(* random displacements are continuous sections of the scale-r tangent bundle *)
+VerificationTest[
+    SeedRandom[7]; With[{d = RandomDisplacement[dispGrid, 2]},
+      {ContinuousDisplacementQ[dispGrid, d], DisplacementMagnitude[dispGrid, d] <= 2}],
+    {True, True},
+    TestID -> "Displacement-random-continuous"
 ]
 
 EndTestSection[]
