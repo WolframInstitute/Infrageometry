@@ -1,25 +1,30 @@
 # Infrageometry
 
-![Infrageometry](./infra.png)
-
 > ⚠️ **Actively developed, experimental research code.** It undergoes frequent cleanings and refactors, and the API may change without notice.
 
-## ✨ Install
+Discrete geometry of combinatorial objects — complexes, hypergraphs, Hodge/Dirac calculus, Forman–Ricci curvature, simplicial maps, and differential forms on graphs.
 
-Install the actively developed version from the Wolfram Cloud:
+## ✨ Usage
+
+Install from the Wolfram Cloud:
 
 ```wolfram
 PacletInstall["https://www.wolframcloud.com/obj/hajek_pavel/Infrageometry.paclet", ForceVersionInstall -> True]
 Needs["WolframInstitute`Infrageometry`"]
 ```
 
-## 📓 Notebooks
+Test on **[Example graphs](https://www.wolframcloud.com/obj/hajek_pavel/ExampleGraphs.nb)**
 
-Concise, mathematician-facing notebooks — definitions, illustrated functionality, and results — published to the Wolfram Cloud. Sources live in the dev repo (`NotebooksLLM/*.md`); each is deployed with `Scripts/publish_notebooks.wls`.
 
-| Notebook | Topic | Cloud link |
+## 📓 Research Notebooks
+
+| Notebook | Description | Link |
 |---|---|---|
-| Differential forms and cochains | Forms vs. cochains, `R`/`I` maps, wedge/cup, the A∞ integration map | _(publish pending)_ |
-| Vector fields and displacements | Coordinate-free vector fields; sums, scalars, Lie brackets at scale `r` | _(planned)_ |
+| Forms and cochains | Forms as wedge products of incident edges vs. cochains on the clique complex | Wolfram Cloud |
+| Vectors and displacements | Algebra of discrete vector fields and their flows | Wolfram Cloud |
+| Simplicial sets and face graphs | Simplicial sets and the face graphs of complexes | Wolfram Cloud |
+| Regular and uniform tessellation graphs | Regular maps and uniform tilings of surfaces, as graphs | Wolfram Cloud |
 
-_Published links follow `https://www.wolframcloud.com/obj/hajek_pavel/Infrageometry/<Notebook>.nb`._
+## 🎨 Founding Sketch
+
+![Infrageometry](./infra.png)
