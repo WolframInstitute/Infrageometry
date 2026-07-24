@@ -7,12 +7,13 @@ $pacletDir = DirectoryName[$InputFileName];
 PacletDirectoryLoad[$pacletDir <> "/Infrageometry"];
 Needs["WolframInstitute`Infrageometry`"];
 
-$testFile = FileNameJoin[{$pacletDir, "Infrageometry", "Tests", "InfrageometryTests.wlt"}];
+$testFiles = FileNames["*.wlt", FileNameJoin[{$pacletDir, "Infrageometry", "Tests"}]];
 
-Print["Running tests: ", $testFile];
+Print["Running ", Length[$testFiles], " test file(s):"];
+Scan[Print["  ", FileNameTake[#]] &, $testFiles];
 Print[""];
 
-report = TestReport[$testFile];
+report = TestReport[$testFiles];
 
 passed = Length[report["TestsSucceededIndices"]];
 failed = Length[report["TestsFailedIndices"]];
