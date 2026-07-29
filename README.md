@@ -20,8 +20,8 @@ Test on **[Example graphs](https://www.wolframcloud.com/obj/hajek_pavel/ExampleG
 
 | Notebook | Description | Link |
 |---|---|---|
-| Forms and cochains | Forms as wedge products of incident edges vs. cochains on the clique complex | Wolfram Cloud |
-| Vectors and displacements | Algebra of discrete vector fields and their flows | Wolfram Cloud |
+| Forms and cochains | Forms as wedge products of incident edges vs. cochains on the clique complex | [Wolfram Cloud](https://www.wolframcloud.com/obj/hajek_pavel/Infrageometry/FormsAndCochains.nb) |
+| Vectors and displacements | Algebra of discrete vector fields and their flows | [Wolfram Cloud](https://www.wolframcloud.com/obj/hajek_pavel/Infrageometry/Displacements.nb) |
 | Simplicial sets and face graphs | Simplicial sets and the face graphs of complexes | Wolfram Cloud |
 | Regular and uniform tessellation graphs | Regular maps and uniform tilings of surfaces, as graphs | Wolfram Cloud |
 
