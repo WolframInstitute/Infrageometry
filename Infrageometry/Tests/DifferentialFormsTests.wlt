@@ -64,6 +64,7 @@ VerificationTest[Not[cEqual[CochainCup[k4, aC, bC], scale[CochainCup[k4, bC, aC]
 
 (* ===== Antisymmetrized cup: graded-commutative but NOT associative (A-infinity) ===== *)
 
+VerificationTest[cEqual[AntisymmetrizedCup[k4, aC, bC], scale[AntisymmetrizedCup[k4, bC, aC], -1]], True, TestID -> "antisym-cup-graded-comm-K4"]
 VerificationTest[Not[cEqual[AntisymmetrizedCup[k4, AntisymmetrizedCup[k4, aC, bC], cC], AntisymmetrizedCup[k4, aC, AntisymmetrizedCup[k4, bC, cC]]]], True, TestID -> "antisym-cup-non-assoc-K4"]
 
 (* ===== I is a chain map but not a ring map; the defect is a coboundary ===== *)

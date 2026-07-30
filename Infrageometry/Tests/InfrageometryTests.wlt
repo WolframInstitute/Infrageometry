@@ -2776,6 +2776,16 @@ VerificationTest[
         TestID -> "Displacement-commutator-killing-closure-antisymmetry"
 ]
 
+(* inverse and negative commutator loops remain separately selectable *)
+VerificationTest[
+        {DisplacementCommutator[dispGrid, dispX, dispY, Method -> "Inverse"] ===
+             DisplacementCommutator[dispGrid, dispX, dispY],
+         DisplacementCommutator[dispGrid, dispX, dispY, Method -> "Negative"] ===
+             DisplacementBracket[dispGrid, dispX, dispY]},
+        {True, True},
+        TestID -> "Displacement-commutator-methods"
+]
+
 (* the outward radial displacement is the gradient of the distance from the centre *)
 VerificationTest[
     First @ PolarDisplacements[dispGrid, {3, 3}] ===

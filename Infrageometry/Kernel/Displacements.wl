@@ -78,28 +78,37 @@ DisplacementSum[ graph_Graph, displacement1_Association, displacement2_Associati
           { end1, order12 @ # }, { end2, order21 @ # } ], 1 ] ) &,
       Keys @ displacement1 ] ]
 
-(* exact group commutator for bijective displacements *)
-DisplacementCommutator[ graph_Graph, displacement1_Association, displacement2_Association ] :=
-  DisplacementCompose[
-    displacement1, displacement2,
-    DisplacementInverse @ displacement1, DisplacementInverse @ displacement2 ]
+Options[ DisplacementCommutator ] = { Method -> "Inverse" };
 
-DisplacementCommutator[ graph_Graph, displacement1_Association, displacement2_Association, point_ ] :=
-  DisplacementCommutator[ graph, displacement1, displacement2 ] @ point
-
-(* metric bracket candidate Phi_{-Y} . Phi_{-X} . Phi_Y . Phi_X
-   = exp( r^2 [X, Y] + O(r^3) ), second order in the scale *)
-DisplacementBracket[ graph_Graph, displacement1_Association, displacement2_Association ] :=
-  AssociationMap[ DisplacementBracket[ graph, displacement1, displacement2, # ] &,
+(* commutator loop using relation inverse or metric negative *)
+DisplacementCommutator[
+    graph_Graph, displacement1_Association, displacement2_Association,
+    opts : OptionsPattern[] ] :=
+  AssociationMap[
+    DisplacementCommutator[ graph, displacement1, displacement2, #, opts ] &,
     Keys @ displacement1 ]
 
+DisplacementCommutator[
+    graph_Graph, displacement1_Association, displacement2_Association, point_,
+    OptionsPattern[] ] :=
+  Switch[ OptionValue[ Method ],
+    "Inverse", DisplacementCompose[
+      displacement1, displacement2,
+      DisplacementInverse @ displacement1, DisplacementInverse @ displacement2 ] @ point,
+    "Negative", Fold[
+      { points, step } |-> Union @@ ( step /@ points ),
+      { point },
+      { displacement1, displacement2,
+        displacementNegativeAt[ graph, displacement1, # ] &,
+        displacementNegativeAt[ graph, displacement2, # ] & } ]
+  ]
+
+(* metric commutator Phi_{-Y} . Phi_{-X} . Phi_Y . Phi_X *)
+DisplacementBracket[ graph_Graph, displacement1_Association, displacement2_Association ] :=
+  DisplacementCommutator[ graph, displacement1, displacement2, Method -> "Negative" ]
+
 DisplacementBracket[ graph_Graph, displacement1_Association, displacement2_Association, point_ ] :=
-  Fold[
-    { points, step } |-> Union @@ ( step /@ points ),
-    { point },
-    { displacement1, displacement2,
-      displacementNegativeAt[ graph, displacement1, # ] &,
-      displacementNegativeAt[ graph, displacement2, # ] & } ]
+  DisplacementCommutator[ graph, displacement1, displacement2, point, Method -> "Negative" ]
 
 DisplacementMagnitude[ graph_Graph, displacement_Association ] :=
   Max @ KeyValueMap[
