@@ -2,9 +2,11 @@ Package["WolframInstitute`Infrageometry`"]
 
 PackageExport[DisplacementCompose]
 PackageExport[DisplacementScale]
+PackageExport[DisplacementNegative]
 PackageExport[DisplacementInverse]
 PackageExport[DisplacementSum]
 PackageExport[DisplacementCommutator]
+PackageExport[DisplacementBracket]
 PackageExport[DisplacementMagnitude]
 PackageExport[DisplacementReduce]
 PackageExport[DisplacementSingleValuedQ]
@@ -13,16 +15,18 @@ PackageExport[DisplacementIsomorphismQ]
 PackageExport[ContinuousDisplacementQ]
 PackageExport[RandomDisplacement]
 PackageExport[FindKillingDisplacement]
+PackageExport[KillingDisplacementMagnitude]
 PackageExport[PolarDisplacements]
 PackageExport[GradientDisplacement]
 PackageExport[TranslationDisplacement]
 PackageExport[DisplacementPlot]
 
 PackageScope[displacementGammaSet]
-PackageScope[displacementInverseAt]
+PackageScope[displacementNegativeAt]
 PackageScope[displacementSetCenters]
 PackageScope[displacementDistances]
 PackageScope[displacementGeodesicCounts]
+PackageScope[displacementSetDistance]
 
 
 (* ===================== Displacements ===================== *)
@@ -39,10 +43,10 @@ PackageScope[displacementGeodesicCounts]
    composition orders (the +-(1/2)[X, Y] terms cancel), negation is the
    metric reflection through the base point, and general scalars are
    endpoints of t-scaled geodesics (rounded target distance, straightest
-   candidates kept by geodesic flux).  A displacement is k-continuous when
-   across every edge some pair of targets is at distance <= k; genuine
-   metric ties stay multivalued and DisplacementReduce contracts them by
-   iterated centres. *)
+  candidates kept by geodesic flux). Weak k-continuity asks for one close
+  target pair across each edge; Hausdorff and strong variants control all
+  targets. Genuine metric ties stay multivalued and DisplacementReduce
+  contracts them by iterated centres. *)
 
 (* flows act left to right: DisplacementCompose[X, Y] = Phi_Y . Phi_X *)
 DisplacementCompose[ displacements__Association ] :=
@@ -54,8 +58,14 @@ DisplacementScale[ graph_Graph, displacement_Association, t_ ] :=
     ( Union @@ Table[ displacementGammaSet[ graph, #, target, t ], { target, displacement @ # } ] ) &,
     Keys @ displacement ]
 
-DisplacementInverse[ graph_Graph, displacement_Association ] :=
+DisplacementNegative[ graph_Graph, displacement_Association ] :=
   DisplacementScale[ graph, displacement, -1 ]
+
+DisplacementInverse[ displacement_Association ] :=
+  With[ { vertices = Keys @ displacement },
+    AssociationMap[
+      { vertex } |-> Select[ vertices, MemberQ[ displacement @ #, vertex ] & ],
+      vertices ] ]
 
 (* X + Y: bisector of Phi_Y Phi_X (v) and Phi_X Phi_Y (v) -- the two orders are
    exp( X + Y +- (1/2)[X, Y] + O(r^3) ), so their midpoints realise
@@ -68,19 +78,28 @@ DisplacementSum[ graph_Graph, displacement1_Association, displacement2_Associati
           { end1, order12 @ # }, { end2, order21 @ # } ], 1 ] ) &,
       Keys @ displacement1 ] ]
 
-(* [X, Y]: group commutator Phi_{-Y} . Phi_{-X} . Phi_Y . Phi_X
-   = exp( r^2 [X, Y] + O(r^3) ), second order in the scale *)
+(* exact group commutator for bijective displacements *)
 DisplacementCommutator[ graph_Graph, displacement1_Association, displacement2_Association ] :=
-  AssociationMap[ DisplacementCommutator[ graph, displacement1, displacement2, # ] &,
-    Keys @ displacement1 ]
+  DisplacementCompose[
+    displacement1, displacement2,
+    DisplacementInverse @ displacement1, DisplacementInverse @ displacement2 ]
 
 DisplacementCommutator[ graph_Graph, displacement1_Association, displacement2_Association, point_ ] :=
+  DisplacementCommutator[ graph, displacement1, displacement2 ] @ point
+
+(* metric bracket candidate Phi_{-Y} . Phi_{-X} . Phi_Y . Phi_X
+   = exp( r^2 [X, Y] + O(r^3) ), second order in the scale *)
+DisplacementBracket[ graph_Graph, displacement1_Association, displacement2_Association ] :=
+  AssociationMap[ DisplacementBracket[ graph, displacement1, displacement2, # ] &,
+    Keys @ displacement1 ]
+
+DisplacementBracket[ graph_Graph, displacement1_Association, displacement2_Association, point_ ] :=
   Fold[
     { points, step } |-> Union @@ ( step /@ points ),
     { point },
     { displacement1, displacement2,
-      displacementInverseAt[ graph, displacement1, # ] &,
-      displacementInverseAt[ graph, displacement2, # ] & } ]
+      displacementNegativeAt[ graph, displacement1, # ] &,
+      displacementNegativeAt[ graph, displacement2, # ] & } ]
 
 DisplacementMagnitude[ graph_Graph, displacement_Association ] :=
   Max @ KeyValueMap[
@@ -108,11 +127,19 @@ DisplacementIsomorphismQ[ graph_Graph, displacement_Association ] :=
     AllTrue[ EdgeList @ graph,
       EdgeQ[ graph, UndirectedEdge @@ Catenate @ Lookup[ displacement, List @@ # ] ] & ]
 
-(* k-continuity: across every edge some pair of targets is at distance <= k *)
-ContinuousDisplacementQ[ graph_Graph, displacement_Association, k_ : 1 ] :=
+Options[ ContinuousDisplacementQ ] = { Method -> "Weak" };
+
+ContinuousDisplacementQ[ graph_Graph, displacement_Association, opts : OptionsPattern[] ] :=
+  ContinuousDisplacementQ[ graph, displacement, 1, opts ]
+
+(* weak: one close pair; Hausdorff: every target has a close partner;
+   strong: every cross-pair is close *)
+ContinuousDisplacementQ[
+    graph_Graph, displacement_Association, k_, OptionsPattern[] ] :=
   AllTrue[ EdgeList @ graph,
-    { edge } |-> Min @ Outer[ GraphDistance[ graph, #1, #2 ] &,
-      displacement @ First @ edge, displacement @ Last @ edge, 1, 1 ] <= k ]
+    { edge } |-> displacementSetDistance[
+      graph, displacement @ First @ edge, displacement @ Last @ edge,
+      OptionValue[ Method ] ] <= k ]
 
 
 (* ===================== Canonical displacements ===================== *)
@@ -210,6 +237,11 @@ FindKillingDisplacement[ graph_Graph, All ] :=
     MinimalBy[ displacements, DisplacementMagnitude[ graph, # ] & ]
   ]
 
+KillingDisplacementMagnitude[ graph_Graph ] :=
+  Min @ Append[
+    Map[ DisplacementMagnitude[ graph, # ] &, FindKillingDisplacement[ graph, All ] ],
+    Infinity ]
+
 
 (* ===================== Plotting ===================== *)
 
@@ -266,14 +298,25 @@ displacementGammaSet[ graph_, a_, b_, t_ ] :=
       ] & ]
   ]
 
-(* the inverse displacement evaluated lazily at one point *)
-displacementInverseAt[ graph_, displacement_, point_ ] :=
+(* the negative displacement evaluated lazily at one point *)
+displacementNegativeAt[ graph_, displacement_, point_ ] :=
   Union @@ Table[ displacementGammaSet[ graph, point, target, -1 ], { target, displacement @ point } ]
 
 (* one centre step: members of minimal eccentricity within the set *)
 displacementSetCenters[ graph_ ][ targets_List ] :=
   MinimalBy[ targets,
     { candidate } |-> Max @ Table[ GraphDistance[ graph, candidate, target ], { target, targets } ] ]
+
+displacementSetDistance[ graph_, targets1_, targets2_, "Weak" ] :=
+  Min @ Flatten @ Outer[ GraphDistance[ graph, #1, #2 ] &, targets1, targets2, 1, 1 ]
+
+displacementSetDistance[ graph_, targets1_, targets2_, "Hausdorff" ] :=
+  Max[
+    Max @ Map[ target1 |-> Min @ Map[ GraphDistance[ graph, target1, # ] &, targets2 ], targets1 ],
+    Max @ Map[ target2 |-> Min @ Map[ GraphDistance[ graph, target2, # ] &, targets1 ], targets2 ] ]
+
+displacementSetDistance[ graph_, targets1_, targets2_, "Strong" ] :=
+  Max @ Flatten @ Outer[ GraphDistance[ graph, #1, #2 ] &, targets1, targets2, 1, 1 ]
 
 displacementDistances[ graph_, source_ ] :=
   AssociationThread[ VertexList @ graph, GraphDistance[ graph, source ] ]

@@ -2682,18 +2682,33 @@ VerificationTest[
     TestID -> "Displacement-sum-commutative"
 ]
 
-(* coordinate steps commute: group commutator is the identity on the interior *)
+(* coordinate steps have zero metric bracket on the interior *)
 VerificationTest[
-    DisplacementCommutator[dispGrid, dispX, dispY, {2, 2}],
+    DisplacementBracket[dispGrid, dispX, dispY, {2, 2}],
     {{2, 2}},
-    TestID -> "Displacement-commutator-coordinate-steps"
+    TestID -> "Displacement-bracket-coordinate-steps"
 ]
 
-(* inverse is the straight reflection on the interior *)
+(* negative is the straight reflection on the interior *)
 VerificationTest[
-    DisplacementInverse[dispGrid, dispX] @ {3, 3},
+    DisplacementNegative[dispGrid, dispX] @ {3, 3},
     {{2, 3}},
-    TestID -> "Displacement-inverse-reflection"
+    TestID -> "Displacement-negative-reflection"
+]
+
+(* inverse relations record every preimage, including empty fibers *)
+VerificationTest[
+    Lookup[DisplacementInverse @ dispX, {{1, 3}, {5, 3}}],
+    {{}, {{4, 3}, {5, 3}}},
+    TestID -> "Displacement-inverse-relation"
+]
+
+(* a Killing displacement has a genuine two-sided inverse *)
+VerificationTest[
+    With[{inverse = DisplacementInverse @ dispCycleStep},
+      {DisplacementCompose[dispCycleStep, inverse], DisplacementCompose[inverse, dispCycleStep]}],
+    ConstantArray[AssociationMap[{#} &, Range @ 10], 2],
+    TestID -> "Displacement-inverse-killing"
 ]
 
 (* scaling round-trip on the cycle: (1/3)(3 D) = D *)
@@ -2732,12 +2747,33 @@ VerificationTest[
     TestID -> "Displacement-continuity"
 ]
 
+(* weak, Hausdorff and strong continuity distinguish their set quantifiers *)
+VerificationTest[
+        With[{graph = PathGraph[Range[4]], displacement = <|1 -> {1, 4}, 2 -> {2}, 3 -> {3}, 4 -> {4}|>},
+            ContinuousDisplacementQ[graph, displacement, Method -> #] & /@ {"Weak", "Hausdorff", "Strong"}],
+        {True, False, False},
+        TestID -> "Displacement-continuity-methods"
+]
+
 (* smallest Killing displacement of the cycle is a unit rotation *)
 VerificationTest[
     With[{killing = FindKillingDisplacement[CycleGraph[10]]},
-      {DisplacementMagnitude[CycleGraph[10], killing], DisplacementIsomorphismQ[CycleGraph[10], killing]}],
-    {1, True},
+            {KillingDisplacementMagnitude[CycleGraph[10]], killing, DisplacementIsomorphismQ[CycleGraph[10], killing]}],
+        {1, FindKillingDisplacement[CycleGraph[10]], True},
     TestID -> "Displacement-killing-cycle"
+]
+
+(* exact commutators of Killing displacements close and reverse by inversion *)
+VerificationTest[
+        With[
+            {graph = CycleGraph[10], rotation = dispCycleStep,
+             reflection = AssociationMap[{Mod[2 - #, 10, 1]} &, Range @ 10]},
+            With[
+                {xy = DisplacementCommutator[graph, rotation, reflection],
+                 yx = DisplacementCommutator[graph, reflection, rotation]},
+                {DisplacementIsomorphismQ[graph, xy], xy === DisplacementInverse @ yx}]],
+        {True, True},
+        TestID -> "Displacement-commutator-killing-closure-antisymmetry"
 ]
 
 (* the outward radial displacement is the gradient of the distance from the centre *)
