@@ -3,11 +3,30 @@ Package["WolframInstitute`Infrageometry`"]
 (* Differential forms on the tangent fibers of a graph vs. cochains on its clique
    complex, and the maps R (restriction) and I (integration) between them.
    Forms:    <|v -> <|{w1<...<wk} -> c|>|>   -- alternating germ on tuples of neighbours of v (sparse).
-   Cochains: <|{v0<...<vk} -> c|>            -- alternating function on (k+1)-cliques (sparse).
-   Antisymmetry is carried by Signature at lookup time; only sorted representatives are stored. *)
+   Cochains: <|{v0<...<vk} -> c|>            -- function on (k+1)-cliques (sparse), sorted representative only.
+
+   TWO CONVENTIONS SHARE THAT ONE STORAGE FORMAT, AND THEY ARE NOT INTERCHANGEABLE.
+
+   * ALTERNATING cochains. The stored value determines the value on every ordering of the
+     tuple, by the sign of the permutation. This is the orientation convention: it needs no
+     choice of vertex order, and it is the convention of forms, of RestrictionMap and of
+     IntegrationMap. Read it with CochainValue.
+
+   * ORDERED cochains. The stored value is the value on the increasing tuple and on no
+     other; the object is a cochain of the simplicial complex with its vertices ordered by
+     <. Read it with OrderedCochainValue.
+
+   Coboundary agrees on both, because every face of an increasing tuple is increasing.
+   The products do not. The Alexander-Whitney formula CochainCup is well defined only in
+   the ORDERED convention -- the cup of two alternating cochains is not alternating, so
+   reading CochainCup's result with CochainValue silently returns a different cochain.
+   AntisymmetrizedCup is the ALTERNATING product: it is the full antisymmetrisation of the
+   cup, orientation-invariant by construction, and its 1/(p+q+1)! normalisation is forced
+   by agreement with the cup product on cohomology. *)
 
 PackageExport[FormValue]
 PackageExport[CochainValue]
+PackageExport[OrderedCochainValue]
 PackageExport[FormDegree]
 PackageExport[CochainDegree]
 PackageExport[ZeroForm]
@@ -18,6 +37,7 @@ PackageExport[FormDifferential]
 PackageExport[NaiveDifferential]
 PackageExport[FormWedge]
 PackageExport[CochainCup]
+PackageExport[CochainCupOne]
 PackageExport[AntisymmetrizedCup]
 
 (* ===================== Evaluation ===================== *)
@@ -25,8 +45,17 @@ PackageExport[AntisymmetrizedCup]
 (* value of the germ omega_v on an arbitrary tuple of neighbours, alternating *)
 FormValue[omega_, v_, tuple_List] := Signature[tuple] * Lookup[Lookup[omega, Key[v], <||>], Key[Sort[tuple]], 0]
 
-(* value of a cochain on an arbitrary vertex tuple, alternating, 0 off the complex *)
+(* value of an ALTERNATING cochain on an arbitrary vertex tuple, 0 off the complex *)
 CochainValue[alpha_, tuple_List] := Signature[tuple] * Lookup[alpha, Key[Sort[tuple]], 0]
+
+(* value of an ORDERED cochain: defined on increasing tuples only, 0 off the complex.
+   A non-increasing tuple is not an error in the caller but a convention mismatch, so it
+   returns Missing rather than a number that would silently be wrong. *)
+OrderedCochainValue[alpha_, tuple_List] :=
+    If[ OrderedQ[tuple] && DuplicateFreeQ[tuple],
+        Lookup[alpha, Key[tuple], 0],
+        Missing["NonIncreasingTuple", tuple]
+    ]
 
 (* k = form / cochain degree, read off a nonempty stored key *)
 FormDegree[omega_] := Length @ First @ Keys @ First @ Select[Values[omega], # =!= <||> &]
@@ -111,7 +140,10 @@ germWedge[a_, b_] := DeleteCases[0] @ Merge[
     Total
 ]
 
-(* Alexander-Whitney cup product, (alpha ^ beta)(v0..v_{p+q}) = alpha(v0..vp) beta(vp..v_{p+q}) *)
+(* Alexander-Whitney cup product on ORDERED cochains,
+     (alpha cup beta)(v0<..<v_{p+q}) = alpha(v0..vp) beta(vp..v_{p+q}).
+   Associative and unital, not graded-commutative. The result is an ORDERED cochain: read it
+   with OrderedCochainValue, never with CochainValue. *)
 CochainCup[g_, alpha_, beta_] := If[alpha === <||> || beta === <||>, <||>, With[{p = CochainDegree[alpha], q = CochainDegree[beta]},
     DeleteCases[0] @ Association @ Map[
         clique |-> clique -> Lookup[alpha, Key[Take[clique, p + 1]], 0] Lookup[beta, Key[Take[clique, -(q + 1)]], 0],
@@ -119,7 +151,28 @@ CochainCup[g_, alpha_, beta_] := If[alpha === <||> || beta === <||>, <||>, With[
     ]
 ]]
 
-(* graded-commutative cup: the full antisymmetrisation of the Alexander-Whitney product *)
+(* Steenrod cup-1 product on ORDERED cochains: the primitive measuring the failure of the
+   cup to be graded-commutative. For closed alpha, beta,
+     delta(alpha cup_1 beta) = alpha cup beta - (-1)^(p q) beta cup alpha,
+   so the graded commutator of cocycles is exact with this explicit primitive. Zero when
+   p = 0. Verified for 1 <= p, q <= 3 on K6. *)
+CochainCupOne[g_, alpha_, beta_] := If[alpha === <||> || beta === <||>, <||>, With[{p = CochainDegree[alpha], q = CochainDegree[beta]},
+    DeleteCases[0] @ Association @ Map[
+        clique |-> clique -> Sum[
+            (-1)^((p - i) (q + 1) + p + q + 1) *
+                Lookup[alpha, Key[Join[Take[clique, i + 1], Take[clique, {i + q + 1, p + q}]]], 0] *
+                Lookup[beta, Key[Take[clique, {i + 1, i + q + 1}]], 0],
+            {i, 0, p - 1}
+        ],
+        cliqueSimplices[g, p + q - 1]
+    ]
+]]
+
+(* graded-commutative cup on ALTERNATING cochains: the full antisymmetrisation of the
+   Alexander-Whitney product. Orientation-invariant, unital, graded-commutative, a
+   derivation for the coboundary, and NOT associative. The 1/(p+q+1)! normalisation is not
+   a choice: it is the one under which this product agrees with the cup product on
+   cohomology (checked on the 4x4 torus, where doubling it changes the H^2 class). *)
 AntisymmetrizedCup[g_, alpha_, beta_] := If[alpha === <||> || beta === <||>, <||>, With[{p = CochainDegree[alpha], q = CochainDegree[beta]},
     DeleteCases[0] @ Association @ Map[
         clique |-> clique -> Sum[

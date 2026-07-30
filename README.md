@@ -20,7 +20,7 @@ Test on **[Example graphs](https://www.wolframcloud.com/obj/hajek_pavel/ExampleG
 
 | Notebook | Description | Link |
 |---|---|---|
-| Forms and cochains | Forms as wedge products of incident edges vs. cochains on the clique complex | [Wolfram Cloud](https://www.wolframcloud.com/obj/hajek_pavel/Infrageometry/FormsAndCochains.nb) |
+| Forms and cochains | Vertex-anchored forms vs. clique cochains, the ordered and alternating cochain conventions, wedge/cup/cup-1, and the Steenrod primitive on a torus | [Wolfram Cloud](https://www.wolframcloud.com/obj/hajek_pavel/Infrageometry/FormsAndCochains.nb) |
 | Homotopy transfer on graph cochains | A-infinity products, Massey products, and the transfer to cohomology from one Hodge contraction | [Wolfram Cloud](https://www.wolframcloud.com/obj/hajek_pavel/Infrageometry/AInfinityTransfer.nb) |
 | Vectors and displacements | Algebra of discrete vector fields and their flows | [Wolfram Cloud](https://www.wolframcloud.com/obj/hajek_pavel/Infrageometry/Displacements.nb) |
 | Displacements on graphs | Metric inverse, negative, continuity, commutator, and bracket of graph displacements | [Wolfram Cloud](https://www.wolframcloud.com/obj/hajek_pavel/Infrageometry/Displacement1.nb) |

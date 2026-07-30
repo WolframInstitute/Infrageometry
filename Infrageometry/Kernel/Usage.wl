@@ -278,3 +278,23 @@ PolarDisplacements::usage = "PolarDisplacements[g, c] gives the polar pair {radi
 GradientDisplacement::usage = "GradientDisplacement[g, f] is the steepest-ascent displacement of the vertex function f (an association): each vertex moves to the neighbours maximising the increase of f; local maxima stay put.";
 TranslationDisplacement::usage = "TranslationDisplacement[g, v] translates along the graph embedding: each vertex moves to the vertices whose coordinates are nearest to its own position plus the vector v.";
 DisplacementPlot::usage = "DisplacementPlot[g, d] draws displacement d as bent arcs over the graph's own embedding. DisplacementPlot[g, {d1, d2, ...}] draws a sequence, the k-th in the k-th Standard colour.";
+
+(* Differential forms and cochains. Cochains are stored sparsely on the increasing
+   representative of each clique; two conventions share that format and are not
+   interchangeable -- see the header of Kernel/DifferentialForms.wl. *)
+
+FormValue::usage = "FormValue[w, v, tuple] gives the value of the germ of form w at vertex v on a tuple of neighbours of v, alternating in the tuple.";
+CochainValue::usage = "CochainValue[a, tuple] gives the value of the ALTERNATING cochain a on an arbitrary vertex tuple, by the sign of the permutation taking it to increasing order; 0 off the complex. Do not apply it to the output of CochainCup or CochainCupOne, which are ordered cochains.";
+OrderedCochainValue::usage = "OrderedCochainValue[a, tuple] gives the value of the ORDERED cochain a on an increasing vertex tuple, 0 off the complex, and Missing[\"NonIncreasingTuple\", tuple] otherwise. This is the correct accessor for the output of CochainCup and CochainCupOne.";
+FormDegree::usage = "FormDegree[w] gives the degree of form w, read off a stored germ.";
+CochainDegree::usage = "CochainDegree[a] gives the degree of cochain a: one less than the number of vertices of a stored cell.";
+ZeroForm::usage = "ZeroForm[g, f] is the vertex function f (an association or a function) as a 0-form on g.";
+RestrictionMap::usage = "RestrictionMap[g, a] is the form R a obtained from the alternating cochain a by reading it with the base vertex prepended; it vanishes off cliques.";
+IntegrationMap::usage = "IntegrationMap[g, w] is the alternating cochain I w obtained by averaging the germs of w over the vertices of each clique with the orientation sign. I is a left inverse of RestrictionMap and a chain map.";
+Coboundary::usage = "Coboundary[g, a] is the coboundary of cochain a: the alternating sum over the faces of every clique one dimension up. It agrees on the alternating and the ordered convention.";
+FormDifferential::usage = "FormDifferential[g, w] is the differential of form w: the graph gradient on 0-forms, and on 1-forms the difference of germ values corrected by the transport term from the neighbouring germs.";
+NaiveDifferential::usage = "NaiveDifferential[g, w] is the differential of the 1-form w with the transport term dropped; integrating it loses the factor (k+1)/(k+2).";
+FormWedge::usage = "FormWedge[w, e] is the wedge product of forms, the exterior product on each tangent fiber. It is strictly associative and graded-commutative, but its differential fails Leibniz.";
+CochainCup::usage = "CochainCup[g, a, b] is the Alexander-Whitney cup product of ORDERED cochains, a(v0..vp) b(vp..v_{p+q}) on each increasing clique. Associative and unital but not graded-commutative, and well defined only in the ordered convention: the cup of two alternating cochains is not alternating. Use AntisymmetrizedCup for an orientation-invariant product.";
+CochainCupOne::usage = "CochainCupOne[g, a, b] is the Steenrod cup-1 product of ORDERED cochains. For closed a and b it is a primitive for the graded commutator: Coboundary[g, CochainCupOne[g, a, b]] equals CochainCup[g, a, b] - (-1)^(p q) CochainCup[g, b, a]. It vanishes when a has degree 0.";
+AntisymmetrizedCup::usage = "AntisymmetrizedCup[g, a, b] is the full antisymmetrisation of the Alexander-Whitney cup, the product of ALTERNATING cochains. It is orientation-invariant, unital, graded-commutative and a derivation for the coboundary, but not associative; its 1/(p+q+1)! normalisation is the one agreeing with the cup product on cohomology.";
