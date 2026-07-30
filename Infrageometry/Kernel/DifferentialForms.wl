@@ -17,12 +17,18 @@ Package["WolframInstitute`Infrageometry`"]
      <. Read it with OrderedCochainValue.
 
    Coboundary agrees on both, because every face of an increasing tuple is increasing.
-   The products do not. The Alexander-Whitney formula CochainCup is well defined only in
-   the ORDERED convention -- the cup of two alternating cochains is not alternating, so
-   reading CochainCup's result with CochainValue silently returns a different cochain.
-   AntisymmetrizedCup is the ALTERNATING product: it is the full antisymmetrisation of the
-   cup, orientation-invariant by construction, and its 1/(p+q+1)! normalisation is forced
-   by agreement with the cup product on cohomology. *)
+   The products do not, so there are two cup products and they carry different names.
+
+   * CochainCup is THE cup product: the full antisymmetrisation of the Alexander-Whitney
+     formula, acting on ALTERNATING cochains. It needs no vertex order, is unital, graded-
+     commutative and a derivation for the coboundary, and is not associative. Its
+     1/(p+q+1)! normalisation is forced by agreement with the cup product on cohomology.
+   * OrderedCochainCup is the bare Alexander-Whitney formula on ORDERED cochains. It is
+     associative and unital but not graded-commutative, and it is well defined only in the
+     ordered convention -- the Alexander-Whitney cup of two alternating cochains is not
+     alternating, so reading its result with CochainValue returns a different cochain.
+     It is kept because the Steenrod tower and the A-infinity comparison need an
+     associative product. *)
 
 PackageExport[FormValue]
 PackageExport[CochainValue]
@@ -37,6 +43,7 @@ PackageExport[FormDifferential]
 PackageExport[NaiveDifferential]
 PackageExport[FormWedge]
 PackageExport[CochainCup]
+PackageExport[OrderedCochainCup]
 PackageExport[CochainCupOne]
 PackageExport[AntisymmetrizedCup]
 
@@ -144,7 +151,7 @@ germWedge[a_, b_] := DeleteCases[0] @ Merge[
      (alpha cup beta)(v0<..<v_{p+q}) = alpha(v0..vp) beta(vp..v_{p+q}).
    Associative and unital, not graded-commutative. The result is an ORDERED cochain: read it
    with OrderedCochainValue, never with CochainValue. *)
-CochainCup[g_, alpha_, beta_] := If[alpha === <||> || beta === <||>, <||>, With[{p = CochainDegree[alpha], q = CochainDegree[beta]},
+OrderedCochainCup[g_, alpha_, beta_] := If[alpha === <||> || beta === <||>, <||>, With[{p = CochainDegree[alpha], q = CochainDegree[beta]},
     DeleteCases[0] @ Association @ Map[
         clique |-> clique -> Lookup[alpha, Key[Take[clique, p + 1]], 0] Lookup[beta, Key[Take[clique, -(q + 1)]], 0],
         cliqueSimplices[g, p + q]
@@ -152,8 +159,8 @@ CochainCup[g_, alpha_, beta_] := If[alpha === <||> || beta === <||>, <||>, With[
 ]]
 
 (* Steenrod cup-1 product on ORDERED cochains: the primitive measuring the failure of the
-   cup to be graded-commutative. For closed alpha, beta,
-     delta(alpha cup_1 beta) = alpha cup beta - (-1)^(p q) beta cup alpha,
+   Alexander-Whitney cup to be graded-commutative. For closed alpha, beta,
+     delta(alpha cup_1 beta) = OrderedCochainCup[alpha, beta] - (-1)^(p q) OrderedCochainCup[beta, alpha],
    so the graded commutator of cocycles is exact with this explicit primitive. Zero when
    p = 0. Verified for 1 <= p, q <= 3 on K6. *)
 CochainCupOne[g_, alpha_, beta_] := If[alpha === <||> || beta === <||>, <||>, With[{p = CochainDegree[alpha], q = CochainDegree[beta]},
@@ -168,12 +175,12 @@ CochainCupOne[g_, alpha_, beta_] := If[alpha === <||> || beta === <||>, <||>, Wi
     ]
 ]]
 
-(* graded-commutative cup on ALTERNATING cochains: the full antisymmetrisation of the
+(* THE cup product, on ALTERNATING cochains: the full antisymmetrisation of the
    Alexander-Whitney product. Orientation-invariant, unital, graded-commutative, a
    derivation for the coboundary, and NOT associative. The 1/(p+q+1)! normalisation is not
    a choice: it is the one under which this product agrees with the cup product on
    cohomology (checked on the 4x4 torus, where doubling it changes the H^2 class). *)
-AntisymmetrizedCup[g_, alpha_, beta_] := If[alpha === <||> || beta === <||>, <||>, With[{p = CochainDegree[alpha], q = CochainDegree[beta]},
+CochainCup[g_, alpha_, beta_] := If[alpha === <||> || beta === <||>, <||>, With[{p = CochainDegree[alpha], q = CochainDegree[beta]},
     DeleteCases[0] @ Association @ Map[
         clique |-> clique -> Sum[
             Signature[perm] CochainValue[alpha, Take[perm, p + 1]] CochainValue[beta, Take[perm, -(q + 1)]],
@@ -182,6 +189,11 @@ AntisymmetrizedCup[g_, alpha_, beta_] := If[alpha === <||> || beta === <||>, <||
         cliqueSimplices[g, p + q]
     ]
 ]]
+
+(* AntisymmetrizedCup was the name of the antisymmetrised product before it became THE cup
+   product; kept as an alias so existing callers, notably the A-infinity engine's
+   AltCupStructure, keep working *)
+AntisymmetrizedCup[g_, alpha_, beta_] := CochainCup[g, alpha, beta]
 
 (* k-simplices of the clique complex as sorted vertex tuples *)
 cliqueSimplices[g_, k_] := Union[Sort /@ GraphComplex[g, {k + 1}]]

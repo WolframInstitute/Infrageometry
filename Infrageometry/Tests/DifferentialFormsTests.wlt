@@ -57,20 +57,30 @@ VerificationTest[cEqual[IntegrationMap[k4, FormWedge[RestrictionMap[k4, aC], Res
 VerificationTest[fEqual[FormWedge[FormWedge[genFormA[k5], genFormB[k5]], genFormC[k5]], FormWedge[genFormA[k5], FormWedge[genFormB[k5], genFormC[k5]]]], True, TestID -> "wedge-assoc-K5"]
 VerificationTest[fEqual[FormWedge[genFormA[k5], genFormB[k5]], scale[FormWedge[genFormB[k5], genFormA[k5]], -1]], True, TestID -> "wedge-graded-comm-K5"]
 
-(* ===== Cup: strictly associative, NOT graded-commutative ===== *)
+(* ===== OrderedCochainCup, the bare Alexander-Whitney formula:
+        strictly associative, NOT graded-commutative ===== *)
 
-VerificationTest[cEqual[CochainCup[k4, CochainCup[k4, aC, bC], cC], CochainCup[k4, aC, CochainCup[k4, bC, cC]]], True, TestID -> "cup-assoc-K4"]
-VerificationTest[Not[cEqual[CochainCup[k4, aC, bC], scale[CochainCup[k4, bC, aC], -1]]], True, TestID -> "cup-not-graded-comm-K4"]
+VerificationTest[cEqual[OrderedCochainCup[k4, OrderedCochainCup[k4, aC, bC], cC], OrderedCochainCup[k4, aC, OrderedCochainCup[k4, bC, cC]]], True, TestID -> "cup-assoc-K4"]
+VerificationTest[Not[cEqual[OrderedCochainCup[k4, aC, bC], scale[OrderedCochainCup[k4, bC, aC], -1]]], True, TestID -> "cup-not-graded-comm-K4"]
 
-(* ===== Antisymmetrized cup: graded-commutative but NOT associative (A-infinity) ===== *)
+(* ===== CochainCup, the cup product: graded-commutative but NOT associative (A-infinity).
+        AntisymmetrizedCup is its alias. ===== *)
 
-VerificationTest[cEqual[AntisymmetrizedCup[k4, aC, bC], scale[AntisymmetrizedCup[k4, bC, aC], -1]], True, TestID -> "antisym-cup-graded-comm-K4"]
-VerificationTest[Not[cEqual[AntisymmetrizedCup[k4, AntisymmetrizedCup[k4, aC, bC], cC], AntisymmetrizedCup[k4, aC, AntisymmetrizedCup[k4, bC, cC]]]], True, TestID -> "antisym-cup-non-assoc-K4"]
+VerificationTest[cEqual[CochainCup[k4, aC, bC], scale[CochainCup[k4, bC, aC], -1]], True, TestID -> "cup-graded-comm-K4"]
+VerificationTest[Not[cEqual[CochainCup[k4, CochainCup[k4, aC, bC], cC], CochainCup[k4, aC, CochainCup[k4, bC, cC]]]], True, TestID -> "cup-non-assoc-K4"]
+VerificationTest[DeleteCases[Merge[{CochainCup[k4, CochainCup[k4, aC, bC], cC], Map[Minus, CochainCup[k4, aC, CochainCup[k4, bC, cC]]]}, Total], 0], <|{1, 2, 3, 4} -> -1/6|>, TestID -> "cup-associator-K4-is-minus-one-sixth"]
+VerificationTest[cEqual[CochainCup[k4, aC, bC], AntisymmetrizedCup[k4, aC, bC]], True, TestID -> "antisym-cup-is-alias-of-cup"]
+VerificationTest[Not[cEqual[CochainCup[k4, aC, bC], OrderedCochainCup[k4, aC, bC]]], True, TestID -> "cup-differs-from-ordered-cup"]
+
+(* ===== The cup is unital and orientation-invariant, which the ordered cup is not ===== *)
+
+VerificationTest[cEqual[CochainCup[k4, <|{1} -> 1, {2} -> 1, {3} -> 1, {4} -> 1|>, aC], aC], True, TestID -> "cup-unital-K4"]
+VerificationTest[CochainValue[CochainCup[k4, aC, bC], {1, 3, 2}] === -CochainValue[CochainCup[k4, aC, bC], {1, 2, 3}], True, TestID -> "cup-is-alternating-K4"]
 
 (* ===== I is a chain map but not a ring map; the defect is a coboundary ===== *)
 
-VerificationTest[Not[cEqual[IntegrationMap[k4, FormWedge[RestrictionMap[k4, aC], RestrictionMap[k4, bC]]], CochainCup[k4, aC, bC]]], True, TestID -> "I-not-ring-map-K4"]
-VerificationTest[cEqual[Coboundary[k4, DeleteCases[Merge[{CochainCup[k4, Coboundary[k4, fC], Coboundary[k4, gC]], Map[Minus, CochainCup[k4, Coboundary[k4, gC], Coboundary[k4, fC]]]}, Total], 0]], <||>], True, TestID -> "cup-commutator-closed-cocycle-K4"]
+VerificationTest[Not[cEqual[IntegrationMap[k4, FormWedge[RestrictionMap[k4, aC], RestrictionMap[k4, bC]]], OrderedCochainCup[k4, aC, bC]]], True, TestID -> "I-not-ring-map-K4"]
+VerificationTest[cEqual[Coboundary[k4, DeleteCases[Merge[{OrderedCochainCup[k4, Coboundary[k4, fC], Coboundary[k4, gC]], Map[Minus, OrderedCochainCup[k4, Coboundary[k4, gC], Coboundary[k4, fC]]]}, Total], 0]], <||>], True, TestID -> "cup-commutator-closed-cocycle-K4"]
 
 (* ===== The cup is an ORDERED cochain: reading it as alternating gives a different cochain.
         Regression guard for the two conventions sharing one storage format. ===== *)
@@ -78,10 +88,10 @@ VerificationTest[cEqual[Coboundary[k4, DeleteCases[Merge[{CochainCup[k4, Cobound
 awValue[al_, be_, p_, q_, t_] := CochainValue[al, Take[t, p + 1]] CochainValue[be, Take[t, -(q + 1)]]
 
 VerificationTest[awValue[aC, bC, 1, 1, {1, 3, 2}], -2, TestID -> "cup-ordered-true-value-K4"]
-VerificationTest[CochainValue[CochainCup[k4, aC, bC], {1, 3, 2}], -1, TestID -> "cup-ordered-misread-K4"]
-VerificationTest[Not[awValue[aC, bC, 1, 1, {1, 3, 2}] === CochainValue[CochainCup[k4, aC, bC], {1, 3, 2}]], True, TestID -> "cup-not-alternating-K4"]
-VerificationTest[OrderedCochainValue[CochainCup[k4, aC, bC], {1, 2, 3}], 1, TestID -> "ordered-value-increasing-K4"]
-VerificationTest[OrderedCochainValue[CochainCup[k4, aC, bC], {1, 3, 2}], Missing["NonIncreasingTuple", {1, 3, 2}], TestID -> "ordered-value-non-increasing-K4"]
+VerificationTest[CochainValue[OrderedCochainCup[k4, aC, bC], {1, 3, 2}], -1, TestID -> "cup-ordered-misread-K4"]
+VerificationTest[Not[awValue[aC, bC, 1, 1, {1, 3, 2}] === CochainValue[OrderedCochainCup[k4, aC, bC], {1, 3, 2}]], True, TestID -> "cup-not-alternating-K4"]
+VerificationTest[OrderedCochainValue[OrderedCochainCup[k4, aC, bC], {1, 2, 3}], 1, TestID -> "ordered-value-increasing-K4"]
+VerificationTest[OrderedCochainValue[OrderedCochainCup[k4, aC, bC], {1, 3, 2}], Missing["NonIncreasingTuple", {1, 3, 2}], TestID -> "ordered-value-non-increasing-K4"]
 
 (* ===== Steenrod cup-1 is a primitive for the graded commutator of cocycles ===== *)
 
@@ -90,7 +100,7 @@ randomCochain[g_, k_] := Association[# -> RandomInteger[{-4, 4}] & /@ Union[Sort
 cupOneIdentityQ[g_, p_, q_] := (SeedRandom[5];
   With[{al = Coboundary[g, randomCochain[g, p - 1]], be = Coboundary[g, randomCochain[g, q - 1]]},
     cEqual[Coboundary[g, CochainCupOne[g, al, be]],
-      DeleteCases[Merge[{CochainCup[g, al, be], Map[-(-1)^(p q) # &, CochainCup[g, be, al]]}, Total], 0]]])
+      DeleteCases[Merge[{OrderedCochainCup[g, al, be], Map[-(-1)^(p q) # &, OrderedCochainCup[g, be, al]]}, Total], 0]]])
 
 VerificationTest[Table[cupOneIdentityQ[k6, p, q], {p, 3}, {q, 3}], ConstantArray[True, {3, 3}], TestID -> "cup-one-primitive-K6-degrees-1-3"]
 VerificationTest[CochainCupOne[k4, fC, aC], <||>, TestID -> "cup-one-vanishes-degree-0"]
@@ -115,19 +125,19 @@ VerificationTest[{Length[cellsOf[torus, 1]], Length[cellsOf[torus, 2]], Length[c
 VerificationTest[Length[h1Gens[torus]], 2, TestID -> "torus-H1-rank-2"]
 VerificationTest[Length[cellsOf[torus, 3]] - MatrixRank[dMat[torus, 2]], 1, TestID -> "torus-H2-rank-1"]
 VerificationTest[{cEqual[Coboundary[torus, z1], <||>], cEqual[Coboundary[torus, z2], <||>]}, {True, True}, TestID -> "torus-H1-gens-closed"]
-VerificationTest[h2ExactQ[torus, DeleteCases[Merge[{CochainCup[torus, z1, z2], CochainCup[torus, z2, z1]}, Total], 0]], True, TestID -> "torus-graded-commutator-exact"]
-VerificationTest[h2ExactQ[torus, DeleteCases[Merge[{CochainCup[torus, z1, z2], Map[Minus, CochainCup[torus, z2, z1]]}, Total], 0]], False, TestID -> "torus-difference-not-exact"]
-VerificationTest[cEqual[Coboundary[torus, CochainCupOne[torus, z1, z2]], DeleteCases[Merge[{CochainCup[torus, z1, z2], CochainCup[torus, z2, z1]}, Total], 0]], True, TestID -> "torus-cup-one-primitive"]
+VerificationTest[h2ExactQ[torus, DeleteCases[Merge[{OrderedCochainCup[torus, z1, z2], OrderedCochainCup[torus, z2, z1]}, Total], 0]], True, TestID -> "torus-graded-commutator-exact"]
+VerificationTest[h2ExactQ[torus, DeleteCases[Merge[{OrderedCochainCup[torus, z1, z2], Map[Minus, OrderedCochainCup[torus, z2, z1]]}, Total], 0]], False, TestID -> "torus-difference-not-exact"]
+VerificationTest[cEqual[Coboundary[torus, CochainCupOne[torus, z1, z2]], DeleteCases[Merge[{OrderedCochainCup[torus, z1, z2], OrderedCochainCup[torus, z2, z1]}, Total], 0]], True, TestID -> "torus-cup-one-primitive"]
 
 (* ===== The 1/(p+q+1)! normalisation is forced: doubling it changes the H^2 class ===== *)
 
-VerificationTest[Not[h2ExactQ[torus, CochainCup[torus, z1, z2]]], True, TestID -> "torus-cup-nonzero-in-H2"]
+VerificationTest[Not[h2ExactQ[torus, OrderedCochainCup[torus, z1, z2]]], True, TestID -> "torus-cup-nonzero-in-H2"]
 VerificationTest[Not[h2ExactQ[torus, AntisymmetrizedCup[torus, z1, z2]]], True, TestID -> "torus-antisym-nonzero-in-H2"]
-VerificationTest[h2ExactQ[torus, DeleteCases[Merge[{CochainCup[torus, z1, z2], Map[Minus, AntisymmetrizedCup[torus, z1, z2]]}, Total], 0]], True, TestID -> "torus-cup-and-antisym-agree-in-H2"]
-VerificationTest[h2ExactQ[torus, DeleteCases[Merge[{CochainCup[torus, z1, z2], Map[-2 # &, AntisymmetrizedCup[torus, z1, z2]]}, Total], 0]], False, TestID -> "torus-doubled-antisym-wrong-in-H2"]
+VerificationTest[h2ExactQ[torus, DeleteCases[Merge[{OrderedCochainCup[torus, z1, z2], Map[Minus, AntisymmetrizedCup[torus, z1, z2]]}, Total], 0]], True, TestID -> "torus-cup-and-antisym-agree-in-H2"]
+VerificationTest[h2ExactQ[torus, DeleteCases[Merge[{OrderedCochainCup[torus, z1, z2], Map[-2 # &, AntisymmetrizedCup[torus, z1, z2]]}, Total], 0]], False, TestID -> "torus-doubled-antisym-wrong-in-H2"]
 
 (* ===== Exact-cochain tests of the commutator are vacuous: each term is separately exact ===== *)
 
-VerificationTest[cEqual[CochainCup[k4, Coboundary[k4, fC], Coboundary[k4, aC]], Coboundary[k4, CochainCup[k4, fC, Coboundary[k4, aC]]]], True, TestID -> "exact-cup-closed-is-exact-K4"]
+VerificationTest[cEqual[OrderedCochainCup[k4, Coboundary[k4, fC], Coboundary[k4, aC]], Coboundary[k4, OrderedCochainCup[k4, fC, Coboundary[k4, aC]]]], True, TestID -> "exact-cup-closed-is-exact-K4"]
 
 EndTestSection[]
