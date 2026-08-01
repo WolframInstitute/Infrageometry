@@ -4,6 +4,10 @@
 
 Discrete geometry of combinatorial objects — complexes, hypergraphs, Hodge/Dirac calculus, Forman–Ricci curvature, simplicial maps, and differential forms on graphs.
 
+## 🎨 Founding Sketch
+
+![Infrageometry](./infra.png)
+
 ## ✨ Usage
 
 Install from the Wolfram Cloud:
@@ -18,7 +22,7 @@ Test on **[Example graphs](https://www.wolframcloud.com/obj/hajek_pavel/ExampleG
 
 ## 📓 Research Notebooks — "Math from code"
 
-> ⚠️ Versions default to **LLM**: generated directly from the codebase (via [ClaudePluginComputationalResearch](https://github.com/WolframInstitute/ClaudePluginComputationalResearch)), with no warranty of correctness. Humans are welcome to publish their own version alongside.
+> ⚠️ LLM versions generated directly from the codebase via [ClaudePluginComputationalResearch](https://github.com/WolframInstitute/ClaudePluginComputationalResearch) with no warranty of correctness. Humans are welcome to publish their own versions alongside.
 
 | Notebook | Description | Versions |
 |---|---|---|
@@ -28,7 +32,3 @@ Test on **[Example graphs](https://www.wolframcloud.com/obj/hajek_pavel/ExampleG
 | Displacements on graphs | Metric inverse, negative, continuity, commutator, and bracket of graph displacements | [LLM](https://www.wolframcloud.com/obj/hajek_pavel/Infrageometry/Displacement1.nb) |
 | Simplicial sets and face graphs | Simplicial sets and the face graphs of complexes |  |
 | Regular and uniform tessellation graphs | Regular maps and uniform tilings of surfaces, as graphs |  |
-
-## 🎨 Founding Sketch
-
-![Infrageometry](./infra.png)
