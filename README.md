@@ -8,6 +8,11 @@ Discrete geometry of combinatorial objects — complexes, hypergraphs, Hodge/Dir
 
 ![Infrageometry](./infra.png)
 
+## 📄 License
+
+- **Code**: [MIT](https://opensource.org/license/mit)
+- **Research notebooks and ideas**: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+
 ## ✨ Usage
 
 Install from the Wolfram Cloud:
