@@ -1,6 +1,6 @@
-# Infrageometry
-
 > ⚠️ **Actively developed, experimental research code.** It undergoes frequent cleanings and refactors, and the API may change without notice.
+
+# Infrageometry
 
 Discrete geometry of combinatorial objects — complexes, hypergraphs, Hodge/Dirac calculus, Forman–Ricci curvature, simplicial maps, and differential forms on graphs.
 
@@ -17,6 +17,8 @@ Test on **[Example graphs](https://www.wolframcloud.com/obj/hajek_pavel/ExampleG
 
 
 ## 📓 Research Notebooks
+
+> ⚠️ **LLM-generated theory from code.** These notebooks are written by an LLM directly from the repository using [ClaudePluginComputationalResearch](https://github.com/WolframInstitute/ClaudePluginComputationalResearch) as a demonstration of a new form of access to computational knowledge, where the source of truth lies in the code. They are **not revised by a human** by default.
 
 | Notebook | Description | Link |
 |---|---|---|
