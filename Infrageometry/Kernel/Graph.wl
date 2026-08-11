@@ -15,6 +15,7 @@ PackageExport[CylinderVolumes]
 PackageScope[cylinderVolume]
 PackageExport[GeodesicIntervalGraph]
 PackageExport[GeodesicOccupation]
+PackageExport[GeodesicEdgeOccupation]
 
 PackageExport[FormanRicciCurvature]
 PackageExport[OllivierRicciCurvature]
@@ -503,6 +504,29 @@ GeodesicOccupation[dag_Graph] :=
 	]
 
 GeodesicOccupation[g_Graph, u_, v_] := GeodesicOccupation[GeodesicIntervalGraph[g, u, v]]
+
+
+(* GeodesicEdgeOccupation[dag]: the per-edge geodesic occupation
+   c(u -> v) = sigma_in(u) * sigma_out(v) over a geodesic DAG -- the number of
+   maximal directed paths through the edge, keyed by the DAG's DirectedEdges;
+   the edge companion of GeodesicOccupation, same two topological-order DP
+   sweeps, never enumerating the paths.  GeodesicEdgeOccupation[g, u, v]
+   builds the u-v geodesic DAG first. *)
+
+GeodesicEdgeOccupation[dag_Graph] :=
+	Module[{order = TopologicalSort[dag],
+			inNbr = GroupBy[EdgeList[dag], Last -> First],
+			outNbr = GroupBy[EdgeList[dag], First -> Last], sigmaIn, sigmaOut},
+		sigmaIn = Fold[
+			{acc, w} |-> Append[acc, w -> With[{p = Lookup[inNbr, w, {}]}, If[p === {}, 1, Total[acc /@ p]]]],
+			<||>, order];
+		sigmaOut = Fold[
+			{acc, w} |-> Append[acc, w -> With[{q = Lookup[outNbr, w, {}]}, If[q === {}, 1, Total[acc /@ q]]]],
+			<||>, Reverse[order]];
+		Association[(# -> sigmaIn[First[#]] sigmaOut[Last[#]]) & /@ EdgeList[dag]]
+	]
+
+GeodesicEdgeOccupation[g_Graph, u_, v_] := GeodesicEdgeOccupation[GeodesicIntervalGraph[g, u, v]]
 
 
 (* ===================== Log-difference quotients ===================== *)

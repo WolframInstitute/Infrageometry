@@ -2659,6 +2659,25 @@ VerificationTest[
     TestID -> "GeodesicOccupation-path-cycle"
 ]
 
+(* edge occupation matches brute-force edge counts over all geodesics *)
+VerificationTest[
+    With[{g = GridGraph[{3, 3}]},
+        KeySort @ KeyMap[Sort @* Apply[List], GeodesicEdgeOccupation[g, 1, 9]] ===
+        KeySort @ KeyMap[Sort, Counts @ Catenate[Partition[#, 2, 1] & /@ FindPath[g, 1, 9, {GraphDistance[g, 1, 9]}, All]]]
+    ],
+    True,
+    TestID -> "GeodesicEdgeOccupation-matches-bruteforce"
+]
+
+(* every edge of a unique geodesic carries occupation 1; total flow through a
+   layer cut equals the family size *)
+VerificationTest[
+    {Values @ GeodesicEdgeOccupation[PathGraph[Range[5]], 1, 5],
+     Total @ Values @ KeySelect[GeodesicEdgeOccupation[GridGraph[{3, 3}], 1, 9], First[#] === 1 &]},
+    {{1, 1, 1, 1}, Max @ Values @ GeodesicOccupation[GridGraph[{3, 3}], 1, 9]},
+    TestID -> "GeodesicEdgeOccupation-flow-conservation"
+]
+
 (* disconnected endpoints: the interval graph is empty *)
 VerificationTest[
     VertexCount @ GeodesicIntervalGraph[Graph[{1, 2, 3}, {1 <-> 2}], 1, 3],
