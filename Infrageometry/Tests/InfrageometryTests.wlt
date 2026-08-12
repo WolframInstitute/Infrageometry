@@ -2821,4 +2821,90 @@ VerificationTest[
     TestID -> "Displacement-random-continuous"
 ]
 
+
+(* ===================== Example substrates ===================== *)
+
+(* a patch models an open subset of the plane: connected, and with no pendant vertex, since a vertex
+   with a single neighbour represents nothing in the plane *)
+VerificationTest[
+    AllTrue[{"Plane", "Triangular", "Square", "Hexagonal"},
+      With[{g = ExampleGraphData[#, "Large"]}, ConnectedGraphQ[g] && Min[VertexDegree[g]] >= 2] &],
+    True,
+    TestID -> "ExampleGraphData-patches-open"
+]
+
+(* the interior of a tiling patch carries the valence the tiling prescribes *)
+VerificationTest[
+    Max @ VertexDegree @ ExampleGraphData[#, "Large"] & /@ {"Triangular", "Square", "Hexagonal"},
+    {6, 4, 3},
+    TestID -> "ExampleGraphData-tiling-valence"
+]
+
+(* the frozen table and the live generator agree on the tilings, which carry no randomness *)
+VerificationTest[
+    AllTrue[{"Triangular", "Square", "Hexagonal"},
+      IsomorphicGraphQ[ExampleGraphData[#, "Large"], ExampleGraphData[#, 12]] &],
+    True,
+    TestID -> "ExampleGraphData-frozen-matches-live"
+]
+
+(* tiers are strictly increasing in size *)
+VerificationTest[
+    AllTrue[ExampleGraphData[],
+      OrderedQ[VertexCount /@ Lookup[ExampleGraphData[#], {"Small", "Medium", "Large"}]] &],
+    True,
+    TestID -> "ExampleGraphData-tiers-increase"
+]
+
+VerificationTest[
+    AmbientGraphStyle[],
+    {"Default", "GrayFaint", "GrayOpaque", "Gray"},
+    TestID -> "AmbientGraphStyle-names"
+]
+
+
+(* ===================== Inflation ===================== *)
+
+(* inflation leaves the base intact: it survives as the induced subgraph on the original vertices *)
+VerificationTest[
+    SeedRandom[42]; With[{base = GridGraph[{6, 6}]},
+      {inf = InflateGraph[base, "ExtraVertices" -> {1, 3}, "ExtraEdges" -> 1]},
+      {IsomorphicGraphQ[Subgraph[inf, VertexList @ base], base], VertexCount[inf] > VertexCount[base]}],
+    {True, True},
+    TestID -> "InflateGraph-base-recoverable"
+]
+
+(* every base vertex carries a fiber of the requested size, and each fiber vertex is joined to it *)
+VerificationTest[
+    SeedRandom[42]; With[{base = CycleGraph[8]},
+      {inf = InflateGraph[base, "ExtraVertices" -> 2, "ExtraEdges" -> 0, "Density" -> 0]},
+      {VertexCount[inf], AllTrue[VertexList @ base, MemberQ[AdjacencyList[inf, InflatedVertex[#, 1]], #] &]}],
+    {24, True},
+    TestID -> "InflateGraph-fibers-attached"
+]
+
+(* cross-fiber edges only join fibers whose base vertices lie within "Radius" of each other *)
+VerificationTest[
+    With[{base = GridGraph[{6, 6}]},
+      AllTrue[{1, 2, 3},
+        Function[r,
+          SeedRandom[7];
+          AllTrue[
+            Cases[EdgeList @ InflateGraph[base, "ExtraVertices" -> 2, "Radius" -> r, "Density" -> 2],
+              UndirectedEdge[InflatedVertex[a_, _], InflatedVertex[b_, _]] /; a =!= b :> {a, b}],
+            GraphDistance[base, First @ #, Last @ #] <= r &]]]],
+    True,
+    TestID -> "InflateGraph-radius-respected"
+]
+
+(* fiber size is sampled inside the given range, per base vertex *)
+VerificationTest[
+    SeedRandom[3]; With[{base = CycleGraph[20]},
+      {inf = InflateGraph[base, "ExtraVertices" -> {1, 4}]},
+      {sizes = Length /@ GroupBy[Cases[VertexList @ inf, InflatedVertex[v_, _] :> v], Identity]},
+      {Min @ Values @ sizes >= 1, Max @ Values @ sizes <= 4, Length @ sizes == 20}],
+    {True, True, True},
+    TestID -> "InflateGraph-fiber-size-range"
+]
+
 EndTestSection[]

@@ -19,6 +19,13 @@ PacletObject[
         "Documentation",
         "Root" -> "Documentation",
         "Language" -> "English"
+      },
+      {
+        "Asset",
+        "Root" -> "Assets",
+        "Assets" -> {
+          {"ExampleGraphs", "ExampleGraphs.wxf"}
+        }
       }
     }
   |>
