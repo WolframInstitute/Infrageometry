@@ -1712,6 +1712,38 @@ VerificationTest[
 ]
 
 
+(* ===== InteriorGraph ===== *)
+
+(* Defining property: connected, and no surviving edge has both endpoints below the average degree *)
+VerificationTest[
+    With[{g = GridGraph[{5, 5}]},
+        {deg = AssociationThread[VertexList[g], VertexDegree[g]], h = InteriorGraph[g]},
+        {avg = Mean[N @ Values @ deg]},
+        {ConnectedGraphQ[h], AnyTrue[EdgeList[h], deg[#[[1]]] < avg && deg[#[[2]]] < avg &]}
+    ],
+    {True, False},
+    TestID -> "InteriorGraph-degree-boundary-stripped"
+]
+
+(* A substrate embedded in R^3 stays in R^3, every surviving vertex at its original position *)
+VerificationTest[
+    With[{g = Graph3D @ GridGraph[{3, 3, 3}]},
+        {h = InteriorGraph[g]},
+        {Last @ Dimensions @ GraphEmbedding[h],
+         GraphEmbedding[h] === Lookup[AssociationThread[VertexList[g], GraphEmbedding[g]], VertexList[h]]}
+    ],
+    {3, True},
+    TestID -> "InteriorGraph-3D-coordinates"
+]
+
+(* A planar substrate stays planar *)
+VerificationTest[
+    Last @ Dimensions @ GraphEmbedding @ InteriorGraph @ GridGraph[{5, 5}],
+    2,
+    TestID -> "InteriorGraph-2D-coordinates"
+]
+
+
 (* ===== GraphBoundary & GraphInterior ===== *)
 
 (* Worked example: path 1-2-3-4-5, S = {2,3,4} -> boundary {2,4}, interior {3} *)

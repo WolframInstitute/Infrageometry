@@ -107,7 +107,8 @@ InteriorGraph[g_Graph, opts : OptionsPattern[Graph]] :=
 			ConnectedGraphComponents @ EdgeDelete[g,
 				Select[EdgeList[g], deg[#[[1]]] < avg && deg[#[[2]]] < avg &]],
 			VertexCount]},
-		Graph[h, opts, VertexCoordinates -> Lookup[coords, VertexList[h]]]
+		If[Length @ First @ coords === 3, Graph3D, Graph][h, opts,
+			VertexCoordinates -> Lookup[coords, VertexList[h]]]
 	]
 
 (* apply forwarded Graph options to a constructed graph, passing a non-graph result
