@@ -1,7 +1,8 @@
 Package["WolframInstitute`Infrageometry`"]
 
 PackageExport[PunchHole]
-PackageScope[TorusTessellation]
+PackageExport[TorusTessellation]
+PackageExport[InfraSubstrate]
 
 PackageExport[SierpinskiGraph]
 PackageExport[BetheGraph]
@@ -175,6 +176,148 @@ tilingSymbol[ name_ ] := First @ Keys @ Select[ shapeName, # === name & ]
    the only rim vertices that misrepresent the plane. *)
 trimPendants[ g_Graph ] :=
   FixedPoint[ h |-> VertexDelete[ h, Pick[ VertexList @ h, VertexDegree @ h, 1 ] ], g ]
+
+
+(* ===================== InfraSubstrate ===================== *)
+
+(* InfraSubstrate[name, size, style] is the named example substrate, generated on demand (never
+   stored) at tier "Small" | "Medium" | "Large" or a raw spec, carrying an AmbientGraphStyle
+   backdrop.  Generation is seeded per (name, spec), so repeated calls return the same graph
+   without a frozen asset.  A substrate is a backdrop for a construction drawn on top of it, so
+   the style defaults to the ambient gray of its tier rather than to Graph's own colours;
+   InfraSubstrate[name, size, "Default"] opts out. *)
+
+substrateTiers = <|
+  "Plane"             -> <| "Small" -> 0.02, "Medium" -> 0.005, "Large" -> 0.001 |>,
+  "Box"               -> <| "Small" -> 0.01, "Medium" -> 0.002, "Large" -> 0.001 |>,
+  "Sphere"            -> <| "Small" -> 0.5, "Medium" -> 0.1, "Large" -> 0.02 |>,
+  "Triangular"        -> <| "Small" -> 6, "Medium" -> 9, "Large" -> 12 |>,
+  "Square"            -> <| "Small" -> 6, "Medium" -> 9, "Large" -> 12 |>,
+  "Hexagonal"         -> <| "Small" -> 6, "Medium" -> 9, "Large" -> 12 |>,
+  "Spherical"         -> <| "Small" -> 5, "Medium" -> 6, "Large" -> 8 |>,
+  "Hyperbolic"        -> <| "Small" -> 3, "Medium" -> 4, "Large" -> 5 |>,
+  "InflatedSquare"    -> <| "Small" -> 6, "Medium" -> 9, "Large" -> 12 |>,
+  "Grid"              -> <| "Small" -> { 9, 9 }, "Medium" -> { 15, 15 }, "Large" -> { 25, 25 } |>,
+  "Cube"              -> <| "Small" -> { 5, 5, 5 }, "Medium" -> { 7, 7, 7 }, "Large" -> { 9, 9, 9 } |>,
+  "TorusSquare"       -> <| "Small" -> { 8, 6 }, "Medium" -> { 20, 15 }, "Large" -> { 40, 30 } |>,
+  "TorusTriangular"   -> <| "Small" -> { 8, 6 }, "Medium" -> { 20, 15 }, "Large" -> { 40, 30 } |>,
+  "TorusHexagonal"    -> <| "Small" -> { 8, 6 }, "Medium" -> { 20, 15 }, "Large" -> { 40, 30 } |>,
+  "BinaryTree"        -> <| "Small" -> 63, "Medium" -> 127, "Large" -> 255 |>,
+  "Complete"          -> <| "Small" -> 10, "Medium" -> 20, "Large" -> 40 |>,
+  "DilutedTree"       -> <| "Small" -> { 1/2, 20 }, "Medium" -> { 1/2, 45 }, "Large" -> { 3/4, 15 } |>,
+  "Sierpinski"        -> <| "Small" -> 4, "Medium" -> 5, "Large" -> 6 |>,
+  "Buckyball"         -> <| "Small" -> 2, "Medium" -> 4, "Large" -> 6 |>,
+  "wm6655"            -> <| "Small" -> 8, "Medium" -> 11, "Large" -> 13 |>,
+  "wm8619"            -> <| "Small" -> 100, "Medium" -> 500, "Large" -> 1000 |>,
+  "wm1811"            -> <| "Small" -> 100, "Medium" -> 500, "Large" -> 1000 |>,
+  "EllipsoidRound"    -> <| "Small" -> 100, "Medium" -> 300, "Large" -> 600 |>,
+  "EllipsoidProtruse" -> <| "Small" -> 100, "Medium" -> 300, "Large" -> 600 |>,
+  "EllipsoidTriaxial" -> <| "Small" -> 100, "Medium" -> 300, "Large" -> 600 |>
+|>;
+
+InfraSubstrate[ ] := Keys @ substrateTiers
+
+InfraSubstrate[ name_String ] := InfraSubstrate[ name, "Medium" ]
+
+(* a registry universe outside the listed roster still takes a tier, but growth rates vary far too
+   much across the 947 rules for one generation count to suit them all -- pass an explicit count *)
+substrateSpec[ name_, tier_ ] :=
+  Replace[ Lookup[ substrateTiers, name, <| |> ][ tier ],
+    _Missing :> <| "Small" -> 6, "Medium" -> 8, "Large" -> 10 |>[ tier ] ]
+
+InfraSubstrate[ name_String, size_, style : ( _String | Automatic ) : Automatic, opts : OptionsPattern[ Graph ] ] :=
+  With[ { g = substrateGraph[ name, Replace[ size, tier_String :> substrateSpec[ name, tier ] ] ] },
+    Graph[ g, opts,
+      Sequence @@ AmbientGraphStyle @ Replace[ style, Automatic :> defaultAmbientStyle[ g, size ] ] ] ]
+
+(* the gallery's size/style pairing: the denser the picture, the fainter the backdrop must be for a
+   construction drawn over it to read; a raw spec is placed on that scale by its vertex count *)
+defaultAmbientStyle[ _, "Small" ] := "Gray"
+defaultAmbientStyle[ _, "Medium" ] := "GrayOpaque"
+defaultAmbientStyle[ _, "Large" ] := "GrayFaint"
+defaultAmbientStyle[ g_, _ ] := Which[ VertexCount @ g <= 250, "Gray", VertexCount @ g <= 800, "GrayOpaque", True, "GrayFaint" ]
+
+(* memoized: substrates are rebuilt across many figure cells; seeding makes the cache honest *)
+substrateGraph[ name_, spec_ ] := substrateGraph[ name, spec ] =
+  BlockRandom[ substrateBuild[ name, spec ], RandomSeeding -> Hash @ { name, spec } ]
+
+substrateBuild[ "Plane", m_ ] :=
+  trimPendants @ InteriorMeshGraph @ DiscretizeRegion[ Rectangle[ ], MaxCellMeasure -> m, PrecisionGoal -> Infinity ]
+
+substrateBuild[ "Box", m_ ] :=
+  trimPendants @ InteriorMeshGraph @ DiscretizeRegion[ Cuboid[ ], MaxCellMeasure -> m, PrecisionGoal -> Infinity ]
+
+substrateBuild[ "Sphere", m_ ] :=
+  IndexGraph @ MeshConnectivityGraph @ DiscretizeRegion[ Sphere[ ], MaxCellMeasure -> m ]
+
+substrateBuild[ name : "Triangular" | "Square" | "Hexagonal", r_Integer ] :=
+  trimPendants @ TessellationNeighborhoodGraph[ tilingSymbol @ name, r ]
+
+substrateBuild[ "Spherical", r_Integer ] := TessellationNeighborhoodGraph[ { 3, 5 }, r ]
+
+substrateBuild[ "Hyperbolic", r_Integer ] := TessellationNeighborhoodGraph[ { 3, 7 }, r ]
+
+substrateBuild[ "InflatedSquare", r_Integer ] := InflateGraph @ substrateBuild[ "Square", r ]
+
+substrateBuild[ "Grid" | "Cube", dims_List ] := GridGraph @ dims
+
+substrateBuild[ "TorusSquare", { m_, n_ } ] := TorusTessellation[ { m, n }, "Square" ]
+
+substrateBuild[ "TorusTriangular", { m_, n_ } ] := TorusTessellation[ { m, n }, "Triangular" ]
+
+substrateBuild[ "TorusHexagonal", { m_, n_ } ] := TorusTessellation[ { m, n }, "Hexagonal" ]
+
+substrateBuild[ "BinaryTree", n_Integer ] := KaryTree @ n
+
+substrateBuild[ "Complete", n_Integer ] := CompleteGraph @ n
+
+(* intermediate growth 2^(r^alpha): branch 2 exactly at the depths hit by Ceiling[k^(1/alpha)] *)
+substrateBuild[ "DilutedTree", { alpha_, depth_Integer } ] :=
+  With[ { branchSet = Union @ Select[ Ceiling[ Range[ depth ]^( 1 / alpha ) ], LessEqualThan @ depth ] },
+    BranchingSequenceTree @ Table[ If[ MemberQ[ branchSet, level ], 2, 1 ], { level, depth } ] ]
+
+substrateBuild[ "Sierpinski", n_Integer ] := IndexGraph @ MeshConnectivityGraph @ SierpinskiMesh @ n
+
+substrateBuild[ "Buckyball", n_Integer ] := ResourceFunction[ "BuckyballGraph" ][ n ]
+
+(* a Wolfram-model universe is named by its Registry of Notable Universes number
+   (wolframphysics.org/universes/wmNNNN): any of the 947 registry entries works, evolved from its
+   registry initial condition for the given number of generations.  The rules of the universes the
+   writeup uses are inlined so a figure builds with no network; anything else is pulled through
+   ResourceFunction["WolframModelData"], whose All-form fetches the whole registry in one request. *)
+
+$registryUniverses = <|
+  "wm6655" -> <| "Rule" -> ( { { 1, 2 }, { 1, 3 } } -> { { 1, 2 }, { 1, 4 }, { 2, 4 }, { 3, 4 } } ),
+                 "Init" -> { { 1, 1 }, { 1, 1 } } |>,
+  "wm8619" -> <| "Rule" -> ( { { 1, 2, 2 }, { 1, 3, 4 } } -> { { 4, 5, 5 }, { 5, 3, 2 }, { 1, 2, 5 } } ),
+                 "Init" -> { { 1, 1, 1 }, { 1, 1, 1 } } |>,
+  "wm1811" -> <| "Rule" -> ( { { 1, 1, 2 }, { 1, 3, 4 } } -> { { 4, 4, 3 }, { 2, 5, 3 }, { 2, 5, 3 } } ),
+                 "Init" -> { { 1, 1, 1 }, { 1, 1, 1 } } |>
+|>;
+
+substrateBuild[ id_String /; StringMatchQ[ id, "wm" ~~ DigitCharacter .. ], generations_Integer ] :=
+  With[ { universe = Lookup[ $registryUniverses, id, registryUniverse @ id ] },
+    hypergraphGraph @ ResourceFunction[ "WolframModel" ][
+      universe[ "Rule" ], universe[ "Init" ], generations, "FinalState" ] ]
+
+registryUniverse[ id_ ] := registryUniverse[ id ] =
+  <| "Rule" -> First @ Flatten[ { ResourceFunction[ "WolframModelData" ][ id, "Rule" ] }, 2 ],
+     "Init" -> ResourceFunction[ "WolframModelData" ][ id, "InitialCondition" ] |>
+
+(* binary hyperedges are already a graph; higher arities go through the 2-section *)
+hypergraphGraph[ state_ ] :=
+  If[ AllTrue[ state, Length @ # === 2 & ],
+    Graph @ DeleteDuplicates[ UndirectedEdge @@@ Sort /@ DeleteCases[ state, { v_, v_ } ] ],
+    UndirectedGraph @ ResourceFunction[ "HypergraphToGraph" ][ state ] ]
+
+substrateBuild[ "EllipsoidRound", n_Integer ] := unitLengthEllipsoid[ { 1, 1, 1 }, n ]
+
+substrateBuild[ "EllipsoidProtruse", n_Integer ] := unitLengthEllipsoid[ { 5, 1, 1 }, n ]
+
+substrateBuild[ "EllipsoidTriaxial", n_Integer ] := unitLengthEllipsoid[ { 4, 2, 1 }, n ]
+
+unitLengthEllipsoid[ axes_, n_ ] :=
+  UniformLengthGraph[ BoundaryDiscretizeRegion @ Ellipsoid[ { 0, 0, 0 }, axes ], n ]
 
 
 (* ===================== Ambient styles ===================== *)
