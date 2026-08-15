@@ -2939,4 +2939,62 @@ VerificationTest[
     TestID -> "InflateGraph-fiber-size-range"
 ]
 
+
+(* ===================== InfraSubstrate ===================== *)
+
+(* named tiers resolve and generate real graphs *)
+VerificationTest[
+    With[{g = InfraSubstrate["Grid", {9, 9}]}, {GraphQ @ g, VertexCount @ g, EdgeCount @ g}],
+    {True, 81, 144},
+    TestID -> "InfraSubstrate-grid-exact"
+]
+
+(* the square torus is the 4-regular Cayley graph of Z_m x Z_n *)
+VerificationTest[
+    With[{g = InfraSubstrate["TorusSquare", {8, 6}]},
+      {VertexCount @ g, Union @ VertexDegree @ g, GraphDiameter @ g}],
+    {48, {4}, 7},
+    TestID -> "InfraSubstrate-torus-square"
+]
+
+(* diluted tree: branch 2 exactly at depths Ceiling[k^(1/alpha)], so the shell at depth r has 2^#{branch depths <= r} vertices *)
+VerificationTest[
+    With[{g = InfraSubstrate["DilutedTree", {1/2, 20}]},
+      {shells = Values @ KeySort @ Counts @ GraphDistance[g, {0, 1}]},
+      shells === Table[2^Length @ Select[Union @ Select[Ceiling[Range[20]^2], LessEqualThan @ 20], LessEqualThan @ r], {r, 0, 20}]],
+    True,
+    TestID -> "InfraSubstrate-diluted-growth"
+]
+
+(* a registry universe is named by its wm number and its tier is a generation count, so the tier
+   and the count it stands for must give the same graph *)
+(* Quiet: loading WolframModel pulls in SetReplace`, whose IndexHypergraph shadows the paclet's *)
+VerificationTest[
+    Quiet @ With[{tier = InfraSubstrate["wm6655", "Small"], raw = InfraSubstrate["wm6655", 8]},
+      {VertexList @ tier === VertexList @ raw, EdgeList @ tier === EdgeList @ raw, ConnectedGraphQ @ tier}],
+    {True, True, True},
+    TestID -> "InfraSubstrate-registry-universe"
+]
+
+(* generation is seeded per (name, spec): two fresh (unmemoized) builds agree vertex for vertex *)
+VerificationTest[
+    With[{build = Symbol @ First @ Names["WolframInstitute`*`substrateBuild"]},
+      {seed = Hash @ {"Plane", 0.013}},
+      {g1 = BlockRandom[build["Plane", 0.013], RandomSeeding -> seed],
+       g2 = BlockRandom[build["Plane", 0.013], RandomSeeding -> seed]},
+      {VertexList @ g1 === VertexList @ g2, EdgeList @ g1 === EdgeList @ g2}],
+    {True, True},
+    TestID -> "InfraSubstrate-seeded-generation"
+]
+
+
+(* MaxDegree interior: a lattice's boundary is its degree-deficient rim, so the
+   interior of an 11x11 grid is the inner 9x9 grid and of a 7^3 cube the 5^3 *)
+VerificationTest[
+  {VertexCount[InteriorGraph[GridGraph[{11, 11}], Method -> "MaxDegree"]],
+   VertexCount[InteriorGraph[GridGraph[{7, 7, 7}], Method -> "MaxDegree"]]},
+  {81, 125},
+  TestID -> "InteriorGraph-MaxDegree-lattice-interior"
+]
+
 EndTestSection[]

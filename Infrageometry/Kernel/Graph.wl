@@ -93,21 +93,32 @@ GraphInterior[g_Graph, h_Graph] :=
 GraphInterior[g_Graph, subset_List] :=
 	Complement[subset, GraphBoundary[g, subset]]
 
-(* InteriorGraph[g]: strip the degree-boundary -- delete every edge both of whose
-   endpoints have below-average degree (the thin rim of a mesh), then keep the
-   largest connected component, carrying the original vertex coordinates over.
-   The geometric "remove the boundary layer" companion to the combinatorial
-   GraphInterior. *)
-InteriorGraph[g_Graph, opts : OptionsPattern[Graph]] :=
+(* InteriorGraph[g]: strip the degree-boundary, keeping the largest connected
+   component and carrying the original vertex coordinates over.  The geometric
+   "remove the boundary layer" companion to the combinatorial GraphInterior.
+   Method -> "AverageDegree" (default, for meshes): delete every edge both of
+   whose endpoints have below-average degree (the thin rim).  Method ->
+   "MaxDegree" (for lattices -- grids, hexagonal / triangular tilings, cubes):
+   the induced subgraph on the vertices of full degree, since a lattice's
+   boundary is exactly its degree-deficient rim. *)
+Options[InteriorGraph] = Join[{Method -> "AverageDegree"}, Options[Graph]];
+
+InteriorGraph[g_Graph, opts : OptionsPattern[]] :=
 	With[
 		{deg = AssociationThread[VertexList[g], VertexDegree[g]],
 		 coords = AssociationThread[VertexList[g], GraphEmbedding[g]]},
-		{avg = Mean[N @ Values @ deg]},
 		{h = First @ MaximalBy[
-			ConnectedGraphComponents @ EdgeDelete[g,
-				Select[EdgeList[g], deg[#[[1]]] < avg && deg[#[[2]]] < avg &]],
+			Switch[OptionValue[Method] /. Automatic -> "AverageDegree",
+				"AverageDegree",
+					With[{avg = Mean[N @ Values @ deg]},
+						ConnectedGraphComponents @ EdgeDelete[g,
+							Select[EdgeList[g], deg[#[[1]]] < avg && deg[#[[2]]] < avg &]]],
+				"MaxDegree",
+					ConnectedGraphComponents @ Subgraph[g,
+						Select[VertexList[g], deg[#] == Max[Values @ deg] &]]],
 			VertexCount]},
-		If[Length @ First @ coords === 3, Graph3D, Graph][h, opts,
+		If[Length @ First @ coords === 3, Graph3D, Graph][h,
+			Sequence @@ FilterRules[{opts}, Options[Graph]],
 			VertexCoordinates -> Lookup[coords, VertexList[h]]]
 	]
 
