@@ -225,9 +225,14 @@ substrateSpec[ name_, tier_ ] :=
   Replace[ Lookup[ substrateTiers, name, <| |> ][ tier ],
     _Missing :> <| "Small" -> 6, "Medium" -> 8, "Large" -> 10 |>[ tier ] ]
 
-InfraSubstrate[ name_String, size_, style : ( _String | Automatic ) : Automatic, opts : OptionsPattern[ Graph ] ] :=
+Options[ InfraSubstrate ] = { "KeepCoordinates" -> True };
+
+InfraSubstrate[ name_String, size_, style : ( _String | Automatic ) : Automatic,
+    opts : OptionsPattern[ { InfraSubstrate, Graph } ] ] :=
   With[ { g = substrateGraph[ name, Replace[ size, tier_String :> substrateSpec[ name, tier ] ] ] },
-    Graph[ g, opts,
+    Graph[ g, FilterRules[ { opts }, Options @ Graph ],
+      substrateCoordinates[ g, TrueQ @ OptionValue[ InfraSubstrate,
+        FilterRules[ { opts }, Options @ InfraSubstrate ], "KeepCoordinates" ] ],
       Sequence @@ AmbientGraphStyle @ Replace[ style, Automatic :> defaultAmbientStyle[ g, size ] ] ] ]
 
 (* the gallery's size/style pairing: the denser the picture, the fainter the backdrop must be for a
@@ -259,13 +264,25 @@ substrateBuild[ "Hyperbolic", r_Integer ] := TessellationNeighborhoodGraph[ { 3,
 
 substrateBuild[ "InflatedSquare", r_Integer ] := InflateGraph @ substrateBuild[ "Square", r ]
 
-substrateBuild[ "Grid" | "Cube", dims_List ] := GridGraph @ dims
+(* the lattice sits in its own dimension: GridGraph indexes with the first dimension
+   fastest, and without these a 3D grid falls back to a 2D spring layout *)
+substrateBuild[ "Grid" | "Cube", dims_List ] :=
+  Graph[ GridGraph @ dims, VertexCoordinates -> Reverse /@ Tuples[ Range /@ Reverse @ dims ] ]
 
-substrateBuild[ "TorusSquare", { m_, n_ } ] := TorusTessellation[ { m, n }, "Square" ]
+substrateBuild[ name : "TorusSquare" | "TorusTriangular" | "TorusHexagonal", { m_, n_ } ] :=
+  With[ { g = TorusTessellation[ { m, n }, StringDrop[ name, 5 ] ] },
+    Graph[ g, VertexCoordinates -> torusCoordinates[ VertexList @ g, { m, n } ] ] ]
 
-substrateBuild[ "TorusTriangular", { m_, n_ } ] := TorusTessellation[ { m, n }, "Triangular" ]
-
-substrateBuild[ "TorusHexagonal", { m_, n_ } ] := TorusTessellation[ { m, n }, "Hexagonal" ]
+(* the tessellation's vertices are lattice indices {i, j} (plus a sublattice index for the
+   honeycomb), so the torus they wrap around can be drawn as an actual torus rather than
+   guessed at by a spring layout.  Sublattice sites are offset inside their cell so they
+   do not land on top of each other. *)
+torusCoordinates[ vertices_List, { m_, n_ } ] :=
+  With[ { i0 = Min[ #[[ 1 ]] & /@ vertices ], j0 = Min[ #[[ 2 ]] & /@ vertices ] },
+    Function[ v,
+      With[ { s = If[ Length[ v ] >= 3, v[[ 3 ]], 0 ] },
+        { u = 2 Pi ( ( v[[ 1 ]] - i0 ) + s / 2 ) / m, w = 2 Pi ( ( v[[ 2 ]] - j0 ) + s / 2 ) / n },
+        { ( 1 + 0.4 Cos[ w ] ) Cos[ u ], ( 1 + 0.4 Cos[ w ] ) Sin[ u ], 0.4 Sin[ w ] } ] ] /@ vertices ]
 
 substrateBuild[ "BinaryTree", n_Integer ] := KaryTree @ n
 
@@ -283,6 +300,14 @@ substrateBuild[ "Sierpinski", n_Integer ] := IndexGraph @ MeshConnectivityGraph 
 substrateBuild[ "Buckyball", n_Integer ] :=
   With[ { g = ResourceFunction[ "BuckyballGraph" ][ n ] },
     Graph[ g, VertexCoordinates -> GraphEmbedding @ g ] ]
+
+(* a substrate whose vertices sit somewhere -- a mesh, a lattice, a surface, a fullerene --
+   is drawn where it lives; "KeepCoordinates" -> False discards that and lets the layout
+   place the vertices instead. *)
+substrateCoordinates[ g_Graph, True ] :=
+  If[ Options[ g, VertexCoordinates ] === { VertexCoordinates -> Automatic },
+    Sequence @@ { }, VertexCoordinates -> GraphEmbedding @ g ]
+substrateCoordinates[ _Graph, _ ] := VertexCoordinates -> Automatic
 
 (* a Wolfram-model universe is named by its Registry of Notable Universes number
    (wolframphysics.org/universes/wmNNNN): any of the 947 registry entries works, evolved from its
@@ -321,7 +346,8 @@ substrateBuild[ "EllipsoidProtruse", n_Integer ] := unitLengthEllipsoid[ { 5, 1,
 substrateBuild[ "EllipsoidTriaxial", n_Integer ] := unitLengthEllipsoid[ { 4, 2, 1 }, n ]
 
 unitLengthEllipsoid[ axes_, n_ ] :=
-  UniformLengthGraph[ BoundaryDiscretizeRegion @ Ellipsoid[ { 0, 0, 0 }, axes ], n ]
+  UniformLengthGraph[ BoundaryDiscretizeRegion @ Ellipsoid[ { 0, 0, 0 }, axes ], n,
+    "KeepCoordinates" -> True ]
 
 
 (* ===================== Ambient styles ===================== *)
