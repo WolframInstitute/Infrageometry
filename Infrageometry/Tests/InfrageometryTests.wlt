@@ -2745,6 +2745,37 @@ VerificationTest[
     TestID -> "GeodesicOccupation-grid-counts"
 ]
 
+(* list-valued vertex labels ({i, j} grids, tessellations) must give the same
+   occupation as the integer relabelling -- Lookup / assoc[...] read a list as a
+   LIST OF KEYS, so every vertex lookup in the DP is wrapped in Key[] *)
+VerificationTest[
+    With[{
+        gList = Graph[Flatten[Table[{i, j}, {i, 3}, {j, 3}], 1],
+            Flatten @ Join[
+                Table[UndirectedEdge[{i, j}, {i + 1, j}], {i, 2}, {j, 3}],
+                Table[UndirectedEdge[{i, j}, {i, j + 1}], {i, 3}, {j, 2}]]]},
+        With[{occ = GeodesicOccupation[gList, {1, 1}, {3, 3}]},
+            FreeQ[occ, _Missing] &&
+                Sort[Values[occ]] === Sort[Values[GeodesicOccupation[GridGraph[{3, 3}], 1, 9]]] &&
+                Lookup[occ, Key[{2, 2}]] === 4
+        ]
+    ],
+    True,
+    TestID -> "GeodesicOccupation-list-vertex-labels"
+]
+
+VerificationTest[
+    With[{
+        gList = Graph[Flatten[Table[{i, j}, {i, 3}, {j, 3}], 1],
+            Flatten @ Join[
+                Table[UndirectedEdge[{i, j}, {i + 1, j}], {i, 2}, {j, 3}],
+                Table[UndirectedEdge[{i, j}, {i, j + 1}], {i, 3}, {j, 2}]]]},
+        FreeQ[GeodesicEdgeOccupation[GeodesicIntervalGraph[gList, {1, 1}, {3, 3}]], _Missing]
+    ],
+    True,
+    TestID -> "GeodesicEdgeOccupation-list-vertex-labels"
+]
+
 (* the DAG-form accessor agrees with the (g, u, v) form *)
 VerificationTest[
     With[{g = GridGraph[{4, 4}]},

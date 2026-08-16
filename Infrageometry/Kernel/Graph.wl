@@ -532,17 +532,20 @@ GeodesicIntervalGraph[g_Graph, u_, v_] :=
    endpoints).  Two topological-order DP sweeps, never enumerating the paths.
    GeodesicOccupation[g, u, v] builds the u-v geodesic DAG first. *)
 
+(* Key[] wraps every vertex lookup: a list-valued vertex label (a {i, j} grid
+   or tessellation label) would otherwise be read by Lookup / assoc[...] as a
+   LIST OF KEYS, silently returning Missing instead of the count. *)
 GeodesicOccupation[dag_Graph] :=
 	Module[{order = TopologicalSort[dag],
 			inNbr = GroupBy[EdgeList[dag], Last -> First],
 			outNbr = GroupBy[EdgeList[dag], First -> Last], sigmaIn, sigmaOut},
 		sigmaIn = Fold[
-			{acc, w} |-> Append[acc, w -> With[{p = Lookup[inNbr, w, {}]}, If[p === {}, 1, Total[acc /@ p]]]],
+			{acc, w} |-> Append[acc, w -> With[{p = Lookup[inNbr, Key[w], {}]}, If[p === {}, 1, Total[Lookup[acc, Key /@ p]]]]],
 			<||>, order];
 		sigmaOut = Fold[
-			{acc, w} |-> Append[acc, w -> With[{q = Lookup[outNbr, w, {}]}, If[q === {}, 1, Total[acc /@ q]]]],
+			{acc, w} |-> Append[acc, w -> With[{q = Lookup[outNbr, Key[w], {}]}, If[q === {}, 1, Total[Lookup[acc, Key /@ q]]]]],
 			<||>, Reverse[order]];
-		AssociationMap[sigmaIn[#] sigmaOut[#] &, VertexList[dag]]
+		AssociationMap[Lookup[sigmaIn, Key[#]] Lookup[sigmaOut, Key[#]] &, VertexList[dag]]
 	]
 
 GeodesicOccupation[g_Graph, u_, v_] := GeodesicOccupation[GeodesicIntervalGraph[g, u, v]]
@@ -560,12 +563,12 @@ GeodesicEdgeOccupation[dag_Graph] :=
 			inNbr = GroupBy[EdgeList[dag], Last -> First],
 			outNbr = GroupBy[EdgeList[dag], First -> Last], sigmaIn, sigmaOut},
 		sigmaIn = Fold[
-			{acc, w} |-> Append[acc, w -> With[{p = Lookup[inNbr, w, {}]}, If[p === {}, 1, Total[acc /@ p]]]],
+			{acc, w} |-> Append[acc, w -> With[{p = Lookup[inNbr, Key[w], {}]}, If[p === {}, 1, Total[Lookup[acc, Key /@ p]]]]],
 			<||>, order];
 		sigmaOut = Fold[
-			{acc, w} |-> Append[acc, w -> With[{q = Lookup[outNbr, w, {}]}, If[q === {}, 1, Total[acc /@ q]]]],
+			{acc, w} |-> Append[acc, w -> With[{q = Lookup[outNbr, Key[w], {}]}, If[q === {}, 1, Total[Lookup[acc, Key /@ q]]]]],
 			<||>, Reverse[order]];
-		Association[(# -> sigmaIn[First[#]] sigmaOut[Last[#]]) & /@ EdgeList[dag]]
+		Association[(# -> Lookup[sigmaIn, Key[First[#]]] Lookup[sigmaOut, Key[Last[#]]]) & /@ EdgeList[dag]]
 	]
 
 GeodesicEdgeOccupation[g_Graph, u_, v_] := GeodesicEdgeOccupation[GeodesicIntervalGraph[g, u, v]]
