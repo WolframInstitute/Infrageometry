@@ -278,7 +278,11 @@ substrateBuild[ "DilutedTree", { alpha_, depth_Integer } ] :=
 
 substrateBuild[ "Sierpinski", n_Integer ] := IndexGraph @ MeshConnectivityGraph @ SierpinskiMesh @ n
 
-substrateBuild[ "Buckyball", n_Integer ] := ResourceFunction[ "BuckyballGraph" ][ n ]
+(* BuckyballGraph's 3D-ness lives in GraphLayout "Dimension" -> 3, which any Graph re-wrap
+   (the ambient-style wrap included) resets to a 2D layout -- bake the embedding explicitly *)
+substrateBuild[ "Buckyball", n_Integer ] :=
+  With[ { g = ResourceFunction[ "BuckyballGraph" ][ n ] },
+    Graph[ g, VertexCoordinates -> GraphEmbedding @ g ] ]
 
 (* a Wolfram-model universe is named by its Registry of Notable Universes number
    (wolframphysics.org/universes/wmNNNN): any of the 947 registry entries works, evolved from its
