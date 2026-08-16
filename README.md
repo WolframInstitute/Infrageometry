@@ -37,3 +37,4 @@ Test on **[Example graphs](https://www.wolframcloud.com/obj/hajek_pavel/ExampleG
 | Displacements on graphs | Metric inverse, negative, continuity, commutator, and bracket of graph displacements | [LLM](https://www.wolframcloud.com/obj/hajek_pavel/Infrageometry/Displacement1.nb) |
 | Simplicial sets and face graphs | Simplicial sets and the face graphs of complexes |  |
 | Regular and uniform tessellation graphs | Regular maps and uniform tilings of surfaces, as graphs |  |
+| The Riemann tensor from graph measurements | Ricci/Weyl decomposition, convergence up to scale, scalar curvature from ball counting, Ricci projections from tube volumes (exact on product fibers), two routes to Weyl, distance distributions | [LLM](https://www.wolframcloud.com/obj/hajek_pavel/Infrageometry/RiemannTensor_LLM.nb) |
