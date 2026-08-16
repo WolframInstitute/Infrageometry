@@ -12,6 +12,7 @@ PackageExport[BallHull]
 PackageExport[BallVolumes]
 PackageExport[ShellAreas]
 PackageExport[CylinderVolumes]
+PackageExport[TubeVolumes]
 PackageScope[cylinderVolume]
 PackageExport[GeodesicIntervalGraph]
 PackageExport[GeodesicOccupation]
@@ -466,6 +467,35 @@ cylinderVolume[dm_, pi_, qi_, s_] :=
 	]
 
 
+(* ===================== Tube volumes ===================== *)
+
+(* T(s) = |{ w : d(w, S) <= s }|, the tube-volume profile of a vertex set S, as the List
+   {T(0), ..., T(sMax)} with T(0) = |S|, saturating at the component of S.  The core S is
+   any vertex list -- a geodesic segment, a cycle (capless tube), a submanifold sample;
+   TubeVolumes[g, p, q] takes S = the metric interval I(p, q) (the CylinderVolumes
+   support, so TubeVolumes[g, p, q, s] == CylinderVolumes[g, p, {q}, s]).  Radius slot
+   mirrors BallVolumes: All (default) | s_Integer | {smin, smax} rectangular.  For a
+   geodesic core with direction v, Gray's tube expansion Vol T_s = omega_{n-1} s^(n-1) L
+   (1 - (tau + Ric(v,v))/(6(n+1)) s^2 + O(s^4)) makes the quotient fit read the Ricci
+   projection: DimensionCurvatureFit[..., "Probe" -> "Tube"].  One BFS from a virtual
+   vertex joined to S -- no distance matrix. *)
+
+TubeVolumes[g_Graph, core_List, range : (_Integer | {_Integer, _Integer} | All) : All] :=
+	With[{aux = Unique["tubeSource"]},
+		{aug = EdgeAdd[VertexAdd[g, {aux}], UndirectedEdge[aux, #] & /@ DeleteDuplicates[core]]},
+		windowSaturate[
+			Accumulate @ Values @ KeySort @ Counts @ DeleteCases[
+				Values @ KeyDrop[AssociationThread[VertexList[aug], GraphDistance[aug, aux]], {aux}] - 1, Infinity],
+			range]
+	]
+
+TubeVolumes[g_Graph, p : Except[_List], q : Except[_List], range : (_Integer | {_Integer, _Integer} | All) : All] :=
+	With[{vs = VertexList[g]},
+		{dp = AssociationThread[vs, GraphDistance[g, p]], dq = AssociationThread[vs, GraphDistance[g, q]]},
+		TubeVolumes[g, Select[vs, dp[#] + dq[#] == dp[q] &], range]
+	]
+
+
 (* ===================== Geodesic interval graph ===================== *)
 
 (* GeodesicIntervalGraph[g, u, v]: the metric interval I(u, v) as a directed
@@ -609,13 +639,18 @@ VolumeGrowthObservables[g_Graph,
    quotients q(r) (each the discrete d Log f / d Log r at radius r) by Bishop-Gromov regression on
    x = r (r+1) -- the squared geometric-mean radius Sqrt[r(r+1)] at which a finite difference quotient
    lives.  DimensionCurvatureFit[{q(0), q(1), ...}] takes a bare quotient list at radii 0, 1, 2, ....
-   "Probe" -> "Ball" (volume, intercept = d, slope = -R/(3(d+2))) or "Sphere" (area ~ r^(d-1),
-   intercept = d - 1, slope = -R/(3 d)): dimension = intercept + shift, curvature factor
-   = intercept + 2 - shift, shift = {Ball -> 0, Sphere -> 1}.  Fits every supplied point (the caller
-   windows by slicing the quotients); the fit uses closed-form normal equations (not LeastSquares) so
-   Around-valued quotients carry their spread to Around dimension and curvature.  The caller supplies
-   the quotients, so the convention is its choice: LogDifferenceQuotients (index-based) of a Counting
-   profile, radialQuotients of a Hausdorff profile, ... *)
+   probe table (dimension = intercept + shift, curvature factor = intercept + offset):
+     "Ball"       (V ~ r^d,      shift 0, offset 2):  R = -3(d+2) slope;
+     "Sphere"     (A ~ r^(d-1),  shift 1, offset 1):  R = -3 d slope;
+     "Tube"       (T ~ s^(d-1),  shift 1, offset 2):  tau + Ric(v,v) = -3(d+1) slope (Gray);
+     "TubeMantle" (dT ~ s^(d-2), shift 2, offset 1):  tau + Ric(v,v) = -3(d-1) slope.
+   For the tube probes "ScalarCurvature" holds the tube reading tau + Ric(v,v), the Ricci
+   projection plus the scalar; subtract a same-window ball tau to isolate Ric(v,v).
+   Fits every supplied point (the caller windows by slicing the quotients); the fit uses
+   closed-form normal equations (not LeastSquares) so Around-valued quotients carry their
+   spread to Around dimension and curvature.  The caller supplies the quotients, so the
+   convention is its choice: LogDifferenceQuotients (index-based) of a Counting profile,
+   radialQuotients of a Hausdorff profile, ... *)
 
 Options[DimensionCurvatureFit] = {"Probe" -> "Ball", "Dimension" -> Automatic};
 
@@ -624,16 +659,18 @@ DimensionCurvatureFit[q : {Except[_List] ..}, opts : OptionsPattern[]] :=
 
 DimensionCurvatureFit[data : {{_, _} ..}, OptionsPattern[]] := With[
 	{probe = OptionValue["Probe"], dimOpt = OptionValue["Dimension"]},
-	{shift = If[probe === "Sphere", 1, 0], x = N[data[[All, 1]] (data[[All, 1]] + 1)], q = data[[All, 2]]},
+	{shift = Switch[probe, "Ball", 0, "Sphere" | "Tube", 1, "TubeMantle", 2],
+	 offset = Switch[probe, "Ball" | "Tube", 2, "Sphere" | "TubeMantle", 1],
+	 x = N[data[[All, 1]] (data[[All, 1]] + 1)], q = data[[All, 2]]},
 	{dimScalar = If[dimOpt === Automatic,
 		With[{m = Length[x], sx = Total[x], sxx = Total[x^2], sq = Total[q], sxq = Total[x q]},
 			{den = m sxx - sx^2},
 			{c2 = (m sxq - sx sq) / den, c1 = (sxx sq - sx sxq) / den},
-			{c1 + shift, -3 (c1 + 2 - shift) c2}
+			{c1 + shift, -3 (c1 + offset) c2}
 		],
 		With[{sx = Total[x], sxx = Total[x^2], sxq = Total[x q]},
 			{slope = (sxq - (dimOpt - shift) sx) / sxx},
-			{N[dimOpt], -3 (dimOpt + 2 - 2 shift) slope}
+			{N[dimOpt], -3 (dimOpt - shift + offset) slope}
 		]
 	]},
 	<|"Dimension" -> dimScalar[[1]], "ScalarCurvature" -> dimScalar[[2]]|>

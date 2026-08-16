@@ -1487,6 +1487,76 @@ VerificationTest[
 ]
 
 
+(* ===== TubeVolumes: tube-volume profile T(s) = |{ w : d(w, core) <= s }| ===== *)
+
+(* tube around a meridian of the flat torus: T(s) = 20 (2s + 1) exactly until saturation *)
+VerificationTest[
+    With[{torus = GraphProduct[CycleGraph[20], CycleGraph[20], "Cartesian"]},
+        TubeVolumes[torus, Select[VertexList[torus], First[#] === 1 &], {0, 8}]
+    ],
+    Table[20 (2 s + 1), {s, 0, 8}],
+    TestID -> "TubeVolumes-torus-meridian-exact"
+]
+
+(* fiber tube in a Cartesian product decouples: T(s; {x0} x V(H)) = |V(H)| V_G(s; x0) *)
+VerificationTest[
+    With[{prod = GraphProduct[GridGraph[{5, 5}], CycleGraph[6], "Cartesian"]},
+        TubeVolumes[prod, Thread[{13, Range[6]}], {0, 4}] === 6 BallVolumes[GridGraph[{5, 5}], 13, {0, 4}]
+    ],
+    True,
+    TestID -> "TubeVolumes-product-fiber-decouples"
+]
+
+(* the interval form agrees with CylinderVolumes at every thickening radius *)
+VerificationTest[
+    With[{g = GridGraph[{9, 9}]},
+        Table[TubeVolumes[g, 37, 41, s], {s, 0, 3}] === Table[First @ CylinderVolumes[g, 37, {41}, s], {s, 0, 3}]
+    ],
+    True,
+    TestID -> "TubeVolumes-interval-matches-CylinderVolumes"
+]
+
+(* T(0) = |core|; the profile is nondecreasing and saturates at the component size *)
+VerificationTest[
+    With[{prof = TubeVolumes[PetersenGraph[], {1, 2}]},
+        {First[prof] == 2, prof === Sort[prof], Last[prof] == 10}
+    ],
+    {True, True, True},
+    TestID -> "TubeVolumes-profile-shape"
+]
+
+(* Tube probe: q(s) = (d - 1) - (tau + Ric(v,v))/(3(d+1)) s(s+1); d = 2 makes the
+   synthetic slope -Q/9 read back as exactly Q *)
+VerificationTest[
+    With[{pairs = Table[{s, 1. - (0.9/9) s (s + 1)}, {s, 1, 8}]},
+        {fit = DimensionCurvatureFit[pairs, "Probe" -> "Tube"]},
+        Max[Abs[fit["Dimension"] - 2], Abs[fit["ScalarCurvature"] - 0.9]] < 10.^-10
+    ],
+    True,
+    TestID -> "DimensionCurvatureFit-Tube-probe-exact"
+]
+
+(* TubeMantle probe: q(s) = (d - 2) - (tau + Ric(v,v))/(3(d-1)) s(s+1); d = 3 slope -Q/6 *)
+VerificationTest[
+    With[{pairs = Table[{s, 1. - (0.6/6) s (s + 1)}, {s, 1, 8}]},
+        {fit = DimensionCurvatureFit[pairs, "Probe" -> "TubeMantle"]},
+        Max[Abs[fit["Dimension"] - 3], Abs[fit["ScalarCurvature"] - 0.6]] < 10.^-10
+    ],
+    True,
+    TestID -> "DimensionCurvatureFit-TubeMantle-probe-exact"
+]
+
+(* pinned tube probe fits the slope only, through the pinned intercept d - 1 *)
+VerificationTest[
+    With[{pairs = Table[{s, 1. - (0.9/9) s (s + 1)}, {s, 1, 8}]},
+        {fit = DimensionCurvatureFit[pairs, "Probe" -> "Tube", "Dimension" -> 2]},
+        {fit["Dimension"], Abs[fit["ScalarCurvature"] - 0.9] < 10.^-10}
+    ],
+    {2., True},
+    TestID -> "DimensionCurvatureFit-Tube-pinned"
+]
+
+
 (* ===== GreenOperatorMatrix: Moore-Penrose pseudoinverse of the Hodge Laplacian ===== *)
 
 VerificationTest[
