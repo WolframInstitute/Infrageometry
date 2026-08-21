@@ -3043,23 +3043,42 @@ VerificationTest[
 
 (* ===================== InfraSubstrate ===================== *)
 
-(* named tiers resolve and generate real graphs; the default delivers the interior of the
-   patch (one rim layer peeled), "Interior" -> False the full patch *)
+(* named tiers resolve and generate real graphs; the default strips the rim edges (no edge
+   joins two rim vertices, the whiskers stay, the corners fall off), "Interior" -> False the
+   full patch, "Interior" -> n peels n - 1 vertex layers before the strip *)
 VerificationTest[
-    {IsomorphicGraphQ[InfraSubstrate["Grid", {9, 9}], GridGraph[{7, 7}]],
-     IsomorphicGraphQ[InfraSubstrate["Grid", {9, 9}, "Interior" -> False], GridGraph[{9, 9}]],
-     IsomorphicGraphQ[InfraSubstrate["Grid", {9, 9}, "Interior" -> 2], GridGraph[{5, 5}]]},
-    {True, True, True},
+    With[{int = InfraSubstrate["Grid", {9, 9}]},
+      {rim = Pick[VertexList @ #, Thread[VertexDegree @ # < 4]] & @ GridGraph[{9, 9}]},
+      {IsomorphicGraphQ[Subgraph[int, Complement[VertexList @ int, rim]], GridGraph[{7, 7}]],
+       Select[EdgeList @ int, SubsetQ[rim, List @@ #] &] === {},
+       VertexCount @ int,
+       IsomorphicGraphQ[InfraSubstrate["Grid", {9, 9}, "Interior" -> False], GridGraph[{9, 9}]],
+       VertexCount @ InfraSubstrate["Grid", {9, 9}, "Interior" -> 2]}],
+    {True, True, 77, True, 45},
     TestID -> "InfraSubstrate-grid-exact"
 ]
 
-(* the interior of a tiling patch is the max-degree shell of the full patch *)
+(* the strip of a tiling patch deletes exactly the edges joining two below-average-degree
+   vertices and keeps the largest component *)
 VerificationTest[
-    With[{full = InfraSubstrate["Triangular", "Small", "Interior" -> False]},
-      Sort @ VertexList @ InfraSubstrate["Triangular", "Small"] ===
-      Sort @ Pick[VertexList @ full, Thread[VertexDegree @ full >= Max @ VertexDegree @ full]]],
-    True,
-    TestID -> "InfraSubstrate-interior-tiling-shell"
+    With[{full = InfraSubstrate["Triangular", "Small", "Interior" -> False],
+       int = InfraSubstrate["Triangular", "Small"]},
+      {low = Pick[VertexList @ full, Thread[VertexDegree @ full < Mean[N @ VertexDegree @ full]]]},
+      {SubsetQ[VertexList @ full, VertexList @ int],
+       Select[EdgeList @ int, SubsetQ[low, List @@ #] &] === {},
+       ConnectedGraphQ @ int}],
+    {True, True, True},
+    TestID -> "InfraSubstrate-interior-tiling-strip"
+]
+
+(* a substrate is bare combinatorics by default; "KeepCoordinates" -> True draws the grid
+   at its own lattice coordinates *)
+VerificationTest[
+    {Options[InfraSubstrate["Grid", {9, 9}], VertexCoordinates] === {VertexCoordinates -> Automatic},
+     Sort @ Round @ GraphEmbedding @ InfraSubstrate["Grid", {9, 9}, "KeepCoordinates" -> True, "Interior" -> False] ===
+       Sort[Reverse /@ Tuples[Range /@ {9, 9}]]},
+    {True, True},
+    TestID -> "InfraSubstrate-bare-coordinates"
 ]
 
 (* a boundaryless or intrinsic-boundary substrate is untouched by the default peel *)
@@ -3074,7 +3093,8 @@ VerificationTest[
 (* every depth of one spec peels the same underlying mesh draw: interior vertices are a
    subset of the full patch's, with identical coordinates *)
 VerificationTest[
-    With[{int = InfraSubstrate["Plane", 0.02], full = InfraSubstrate["Plane", 0.02, "Interior" -> False]},
+    With[{int = InfraSubstrate["Plane", 0.02, "KeepCoordinates" -> True],
+       full = InfraSubstrate["Plane", 0.02, "KeepCoordinates" -> True, "Interior" -> False]},
       {cInt = AssociationThread[VertexList @ int, GraphEmbedding @ int],
        cFull = AssociationThread[VertexList @ full, GraphEmbedding @ full]},
       {SubsetQ[VertexList @ full, VertexList @ int], ConnectedGraphQ @ int,

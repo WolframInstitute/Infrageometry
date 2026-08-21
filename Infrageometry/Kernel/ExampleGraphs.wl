@@ -186,9 +186,13 @@ trimPendants[ g_Graph ] :=
    without a frozen asset.  A substrate is a backdrop for a construction drawn on top of it, so
    the style defaults to the ambient gray of its tier rather than to Graph's own colours;
    InfraSubstrate[name, size, "Default"] opts out.  A patch of an unbounded or closed geometry
-   is delivered without its cut rim: "Interior" -> Automatic (default) peels one boundary layer
-   on the patch substrates and leaves intrinsic (a tree's leaves) or absent (a torus) boundaries
-   alone; False keeps the full patch, n keeps the vertices at graph distance >= n from the rim. *)
+   is delivered without its cut rim: "Interior" -> Automatic (default) strips the rim of the
+   patch substrates via InteriorGraph -- the edges joining two below-average-degree vertices are
+   deleted, so no closed rim contour remains and the last layer keeps only its inward whiskers --
+   and leaves intrinsic (a tree's leaves) or absent (a torus) boundaries alone; False keeps the
+   full patch, n peels n - 1 vertex layers before the strip.  A substrate is bare combinatorics
+   by default -- a stored embedding is discarded and a spring layout of its own dimension places
+   the vertices; "KeepCoordinates" -> True draws the substrate where it lives instead. *)
 
 substrateTiers = <|
   "Plane"             -> <| "Small" -> 0.02, "Medium" -> 0.005, "Large" -> 0.001 |>,
@@ -228,7 +232,7 @@ substrateSpec[ name_, tier_ ] :=
   Replace[ Lookup[ substrateTiers, name, <| |> ][ tier ],
     _Missing :> <| "Small" -> 6, "Medium" -> 8, "Large" -> 10 |>[ tier ] ]
 
-Options[ InfraSubstrate ] = { "KeepCoordinates" -> True, "Interior" -> Automatic };
+Options[ InfraSubstrate ] = { "KeepCoordinates" -> False, "Interior" -> Automatic };
 
 InfraSubstrate[ name_String, size_, style : ( _String | Automatic ) : Automatic,
     opts : OptionsPattern[ { InfraSubstrate, Graph } ] ] :=
@@ -242,7 +246,7 @@ InfraSubstrate[ name_String, size_, style : ( _String | Automatic ) : Automatic,
       Sequence @@ AmbientGraphStyle @ Replace[ style, Automatic :> defaultAmbientStyle[ g, size ] ] ] ]
 
 (* the rim of a patch substrate is a discretization artifact -- an unbounded or closed geometry cut
-   off at the patch edge -- so Automatic peels it; a boundary that is intrinsic (a tree's leaves) or
+   off at the patch edge -- so Automatic strips it; a boundary that is intrinsic (a tree's leaves) or
    absent (a torus) is left alone *)
 $rimSubstrates = { "Plane", "Box", "Grid", "Cube", "Triangular", "Square", "Hexagonal", "Hyperbolic", "InflatedSquare" };
 
@@ -275,11 +279,13 @@ substrateInterior[ "Box", m_, depth_ /; depth > 0 ] := meshSubstrateInterior[ Cu
    by degree would strip them instead of the rim *)
 substrateInterior[ "InflatedSquare", r_, depth_ /; depth > 0 ] := InflateGraph @ substrateInterior[ "Square", r, depth ]
 
-(* a lattice patch's rim is its degree-deficient shell; a regular boundaryless substrate has an
-   empty shell and passes through untouched *)
+(* a lattice patch loses its rim the way the gallery draws it: peel depth - 1 vertex layers, then
+   InteriorGraph deletes the edges joining two below-average-degree vertices, so the last layer
+   keeps its inward whiskers and no closed rim contour remains; a regular boundaryless substrate
+   has equal degrees throughout and passes through the strip untouched *)
 substrateInterior[ name_, spec_, depth_ ] :=
   With[ { g = substrateBuild[ name, spec ] },
-    rimPeel[ g, Pick[ VertexList @ g, Thread[ VertexDegree @ g < Max @ VertexDegree @ g ] ], depth ] ]
+    InteriorGraph @ rimPeel[ g, Pick[ VertexList @ g, Thread[ VertexDegree @ g < Max @ VertexDegree @ g ] ], depth - 1 ] ]
 
 meshSubstrateInterior[ region_, m_, depth_ ] :=
   With[
@@ -357,13 +363,18 @@ substrateBuild[ "Buckyball", n_Integer ] :=
   With[ { g = ResourceFunction[ "BuckyballGraph" ][ n ] },
     Graph[ g, VertexCoordinates -> GraphEmbedding @ g ] ]
 
-(* a substrate whose vertices sit somewhere -- a mesh, a lattice, a surface, a fullerene --
-   is drawn where it lives; "KeepCoordinates" -> False discards that and lets the layout
-   place the vertices instead. *)
+(* a substrate is bare combinatorics by default: a stored embedding -- a mesh, a lattice, a
+   surface, a fullerene -- is discarded and a spring layout of the embedding's own dimension
+   places the vertices; "KeepCoordinates" -> True draws the substrate where it lives instead. *)
 substrateCoordinates[ g_Graph, True ] :=
   If[ Options[ g, VertexCoordinates ] === { VertexCoordinates -> Automatic },
     Sequence @@ { }, VertexCoordinates -> GraphEmbedding @ g ]
-substrateCoordinates[ _Graph, _ ] := VertexCoordinates -> Automatic
+substrateCoordinates[ g_Graph, _ ] :=
+  If[ Options[ g, VertexCoordinates ] === { VertexCoordinates -> Automatic },
+    Sequence @@ { },
+    Sequence @@ { VertexCoordinates -> Automatic, GraphLayout ->
+      { "VertexLayout" -> "SpringElectricalEmbedding",
+        "Dimension" -> Last @ Dimensions @ GraphEmbedding @ g } } ]
 
 (* a Wolfram-model universe is named by its Registry of Notable Universes number
    (wolframphysics.org/universes/wmNNNN): any of the 947 registry entries works, evolved from its
