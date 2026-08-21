@@ -185,7 +185,10 @@ trimPendants[ g_Graph ] :=
    backdrop.  Generation is seeded per (name, spec), so repeated calls return the same graph
    without a frozen asset.  A substrate is a backdrop for a construction drawn on top of it, so
    the style defaults to the ambient gray of its tier rather than to Graph's own colours;
-   InfraSubstrate[name, size, "Default"] opts out. *)
+   InfraSubstrate[name, size, "Default"] opts out.  A patch of an unbounded or closed geometry
+   is delivered without its cut rim: "Interior" -> Automatic (default) peels one boundary layer
+   on the patch substrates and leaves intrinsic (a tree's leaves) or absent (a torus) boundaries
+   alone; False keeps the full patch, n keeps the vertices at graph distance >= n from the rim. *)
 
 substrateTiers = <|
   "Plane"             -> <| "Small" -> 0.02, "Medium" -> 0.005, "Large" -> 0.001 |>,
@@ -195,7 +198,7 @@ substrateTiers = <|
   "Square"            -> <| "Small" -> 6, "Medium" -> 9, "Large" -> 12 |>,
   "Hexagonal"         -> <| "Small" -> 6, "Medium" -> 9, "Large" -> 12 |>,
   "Spherical"         -> <| "Small" -> 5, "Medium" -> 6, "Large" -> 8 |>,
-  "Hyperbolic"        -> <| "Small" -> 3, "Medium" -> 4, "Large" -> 5 |>,
+  "Hyperbolic"        -> <| "Small" -> 4, "Medium" -> 5, "Large" -> 6 |>,
   "InflatedSquare"    -> <| "Small" -> 6, "Medium" -> 9, "Large" -> 12 |>,
   "Grid"              -> <| "Small" -> { 9, 9 }, "Medium" -> { 15, 15 }, "Large" -> { 25, 25 } |>,
   "Cube"              -> <| "Small" -> { 5, 5, 5 }, "Medium" -> { 7, 7, 7 }, "Large" -> { 9, 9, 9 } |>,
@@ -225,15 +228,28 @@ substrateSpec[ name_, tier_ ] :=
   Replace[ Lookup[ substrateTiers, name, <| |> ][ tier ],
     _Missing :> <| "Small" -> 6, "Medium" -> 8, "Large" -> 10 |>[ tier ] ]
 
-Options[ InfraSubstrate ] = { "KeepCoordinates" -> True };
+Options[ InfraSubstrate ] = { "KeepCoordinates" -> True, "Interior" -> Automatic };
 
 InfraSubstrate[ name_String, size_, style : ( _String | Automatic ) : Automatic,
     opts : OptionsPattern[ { InfraSubstrate, Graph } ] ] :=
-  With[ { g = substrateGraph[ name, Replace[ size, tier_String :> substrateSpec[ name, tier ] ] ] },
+  With[
+    { g = substrateGraph[ name, Replace[ size, tier_String :> substrateSpec[ name, tier ] ],
+        interiorDepth[ name, OptionValue[ InfraSubstrate,
+          FilterRules[ { opts }, Options @ InfraSubstrate ], "Interior" ] ] ] },
     Graph[ g, FilterRules[ { opts }, Options @ Graph ],
       substrateCoordinates[ g, TrueQ @ OptionValue[ InfraSubstrate,
         FilterRules[ { opts }, Options @ InfraSubstrate ], "KeepCoordinates" ] ],
       Sequence @@ AmbientGraphStyle @ Replace[ style, Automatic :> defaultAmbientStyle[ g, size ] ] ] ]
+
+(* the rim of a patch substrate is a discretization artifact -- an unbounded or closed geometry cut
+   off at the patch edge -- so Automatic peels it; a boundary that is intrinsic (a tree's leaves) or
+   absent (a torus) is left alone *)
+$rimSubstrates = { "Plane", "Box", "Grid", "Cube", "Triangular", "Square", "Hexagonal", "Hyperbolic", "InflatedSquare" };
+
+interiorDepth[ name_, Automatic ] := If[ MemberQ[ $rimSubstrates, name ], 1, 0 ]
+interiorDepth[ _, True ] := 1
+interiorDepth[ _, False ] := 0
+interiorDepth[ _, n_Integer ] := n
 
 (* the gallery's size/style pairing: the denser the picture, the fainter the backdrop must be for a
    construction drawn over it to read; a raw spec is placed on that scale by its vertex count *)
@@ -242,9 +258,49 @@ defaultAmbientStyle[ _, "Medium" ] := "GrayOpaque"
 defaultAmbientStyle[ _, "Large" ] := "GrayFaint"
 defaultAmbientStyle[ g_, _ ] := Which[ VertexCount @ g <= 250, "Gray", VertexCount @ g <= 800, "GrayOpaque", True, "GrayFaint" ]
 
-(* memoized: substrates are rebuilt across many figure cells; seeding makes the cache honest *)
-substrateGraph[ name_, spec_ ] := substrateGraph[ name, spec ] =
-  BlockRandom[ substrateBuild[ name, spec ], RandomSeeding -> Hash @ { name, spec } ]
+(* memoized: substrates are rebuilt across many figure cells; seeding makes the cache honest, and it
+   is independent of the interior depth so every depth of one spec peels the same underlying draw *)
+substrateGraph[ name_, spec_, depth_ ] := substrateGraph[ name, spec, depth ] =
+  BlockRandom[ substrateInterior[ name, spec, depth ], RandomSeeding -> Hash @ { name, spec } ]
+
+substrateInterior[ name_, spec_, 0 ] := substrateBuild[ name, spec ]
+
+(* the surface of a mesh patch is known exactly from the mesh, so its interior peels by mesh
+   surface rather than by the degree shell (mesh bulk degrees are too irregular for it) *)
+substrateInterior[ "Plane", m_, depth_ /; depth > 0 ] := meshSubstrateInterior[ Rectangle[ ], m, depth ]
+
+substrateInterior[ "Box", m_, depth_ /; depth > 0 ] := meshSubstrateInterior[ Cuboid[ ], m, depth ]
+
+(* inflate after peeling: the fibers are low-degree by design, so peeling the inflated graph
+   by degree would strip them instead of the rim *)
+substrateInterior[ "InflatedSquare", r_, depth_ /; depth > 0 ] := InflateGraph @ substrateInterior[ "Square", r, depth ]
+
+(* a lattice patch's rim is its degree-deficient shell; a regular boundaryless substrate has an
+   empty shell and passes through untouched *)
+substrateInterior[ name_, spec_, depth_ ] :=
+  With[ { g = substrateBuild[ name, spec ] },
+    rimPeel[ g, Pick[ VertexList @ g, Thread[ VertexDegree @ g < Max @ VertexDegree @ g ] ], depth ] ]
+
+meshSubstrateInterior[ region_, m_, depth_ ] :=
+  With[
+    { mr = DiscretizeRegion[ region, MaxCellMeasure -> m, PrecisionGoal -> Infinity ] },
+    { g = Graph[ Range @ MeshCellCount[ mr, 0 ], UndirectedEdge @@@ ( First /@ MeshCells[ mr, 1 ] ),
+        VertexCoordinates -> MeshCoordinates @ mr ] },
+    trimPendants @ rimPeel[ g, meshSurfaceVertices @ mr, depth ] ]
+
+(* interior at depth n: the largest component of { v : d(v, rim) >= n }, coordinates carried over;
+   the rim distance is one multi-source BFS from a virtual vertex joined to the whole rim *)
+rimPeel[ g_Graph, { }, _ ] := g
+
+rimPeel[ g_Graph, rim_List, depth_Integer ] :=
+  With[
+    { source = Unique[ ] },
+    { keep = Pick[ VertexList @ g, Thread[ Most @ GraphDistance[
+        EdgeAdd[ VertexAdd[ g, source ], UndirectedEdge[ source, # ] & /@ rim ], source ] >= depth + 1 ] ] },
+    { h = First @ MaximalBy[ ConnectedGraphComponents @ Subgraph[ g, keep ], VertexCount ] },
+    If[ Options[ g, VertexCoordinates ] === { VertexCoordinates -> Automatic }, h,
+      Graph[ h, VertexCoordinates ->
+        Lookup[ AssociationThread[ VertexList @ g, GraphEmbedding @ g ], VertexList @ h ] ] ] ]
 
 substrateBuild[ "Plane", m_ ] :=
   trimPendants @ InteriorMeshGraph @ DiscretizeRegion[ Rectangle[ ], MaxCellMeasure -> m, PrecisionGoal -> Infinity ]

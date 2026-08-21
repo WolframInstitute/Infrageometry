@@ -3043,11 +3043,44 @@ VerificationTest[
 
 (* ===================== InfraSubstrate ===================== *)
 
-(* named tiers resolve and generate real graphs *)
+(* named tiers resolve and generate real graphs; the default delivers the interior of the
+   patch (one rim layer peeled), "Interior" -> False the full patch *)
 VerificationTest[
-    With[{g = InfraSubstrate["Grid", {9, 9}]}, {GraphQ @ g, VertexCount @ g, EdgeCount @ g}],
-    {True, 81, 144},
+    {IsomorphicGraphQ[InfraSubstrate["Grid", {9, 9}], GridGraph[{7, 7}]],
+     IsomorphicGraphQ[InfraSubstrate["Grid", {9, 9}, "Interior" -> False], GridGraph[{9, 9}]],
+     IsomorphicGraphQ[InfraSubstrate["Grid", {9, 9}, "Interior" -> 2], GridGraph[{5, 5}]]},
+    {True, True, True},
     TestID -> "InfraSubstrate-grid-exact"
+]
+
+(* the interior of a tiling patch is the max-degree shell of the full patch *)
+VerificationTest[
+    With[{full = InfraSubstrate["Triangular", "Small", "Interior" -> False]},
+      Sort @ VertexList @ InfraSubstrate["Triangular", "Small"] ===
+      Sort @ Pick[VertexList @ full, Thread[VertexDegree @ full >= Max @ VertexDegree @ full]]],
+    True,
+    TestID -> "InfraSubstrate-interior-tiling-shell"
+]
+
+(* a boundaryless or intrinsic-boundary substrate is untouched by the default peel *)
+VerificationTest[
+    {VertexList @ InfraSubstrate["TorusSquare", {8, 6}] ===
+       VertexList @ InfraSubstrate["TorusSquare", {8, 6}, "Interior" -> False],
+     VertexCount @ InfraSubstrate["BinaryTree", 63]},
+    {True, 63},
+    TestID -> "InfraSubstrate-interior-noop"
+]
+
+(* every depth of one spec peels the same underlying mesh draw: interior vertices are a
+   subset of the full patch's, with identical coordinates *)
+VerificationTest[
+    With[{int = InfraSubstrate["Plane", 0.02], full = InfraSubstrate["Plane", 0.02, "Interior" -> False]},
+      {cInt = AssociationThread[VertexList @ int, GraphEmbedding @ int],
+       cFull = AssociationThread[VertexList @ full, GraphEmbedding @ full]},
+      {SubsetQ[VertexList @ full, VertexList @ int], ConnectedGraphQ @ int,
+       And @@ (cInt[#] == cFull[#] & /@ VertexList @ int)}],
+    {True, True, True},
+    TestID -> "InfraSubstrate-interior-mesh-consistent"
 ]
 
 (* the square torus is the 4-regular Cayley graph of Z_m x Z_n *)

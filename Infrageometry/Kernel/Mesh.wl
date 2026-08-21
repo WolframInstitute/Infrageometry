@@ -23,6 +23,7 @@ PackageExport[PathMesh]
 PackageExport[UniformLengthGraph]
 PackageExport[UniformLengthEmbedding]
 
+PackageScope[meshSurfaceVertices]
 PackageScope[hardSphereFixup]
 PackageScope[fibonacciSeed]
 PackageScope[uniformLengthSeed]
@@ -125,15 +126,21 @@ GraphMesh[g_ ? GraphQ] := MeshRegion[
 ]
 
 
-Options[InteriorMeshGraph] = {"KeepCoordinates" -> True};
-
-(* surface vertices lie on a boundary face (a (d-1)-subset of a top simplex occurring in exactly one top cell); keep every edge with at least one interior endpoint, dropping surface vertices left with none (so components match the region's). "KeepCoordinates" -> True (default) attaches the mesh coordinates as VertexCoordinates; "KeepCoordinates" -> False drops them *)
-InteriorMeshGraph[mr_MeshRegion, opts : OptionsPattern[{InteriorMeshGraph, Graph}]] := With[
-	{coords = MeshCoordinates[mr], d = RegionDimension[mr], edges = UndirectedEdge @@@ (First /@ MeshCells[mr, 1])},
-	{surface = If[d <= 1,
+(* surface vertices lie on a boundary face: a (d-1)-subset of a top simplex occurring in exactly one top cell *)
+meshSurfaceVertices[mr_MeshRegion] := With[
+	{d = RegionDimension[mr]},
+	If[d <= 1,
 		{},
 		Union @@ Keys @ Select[Counts[Sort /@ Catenate[Subsets[First[#], {d}] & /@ MeshCells[mr, d]]], # == 1 &]
-	]},
+	]
+]
+
+Options[InteriorMeshGraph] = {"KeepCoordinates" -> True};
+
+(* keep every edge with at least one interior endpoint, dropping surface vertices left with none (so components match the region's). "KeepCoordinates" -> True (default) attaches the mesh coordinates as VertexCoordinates; "KeepCoordinates" -> False drops them *)
+InteriorMeshGraph[mr_MeshRegion, opts : OptionsPattern[{InteriorMeshGraph, Graph}]] := With[
+	{coords = MeshCoordinates[mr], edges = UndirectedEdge @@@ (First /@ MeshCells[mr, 1])},
+	{surface = meshSurfaceVertices[mr]},
 	{kept = Select[edges, ! SubsetQ[surface, List @@ #] &]},
 	{vertices = Union @@ (List @@@ kept)},
 	Graph[vertices, kept, Sequence @@ FilterRules[{opts}, Options[Graph]], Sequence @@ If[OptionValue["KeepCoordinates"], {VertexCoordinates -> coords[[vertices]]}, {}]]
