@@ -43,10 +43,11 @@ VerificationTest[
     TestID -> "ComplexClosure-Dimension2"
 ]
 
+(* vertices are indexed in order of first appearance, not sorted order: b, a, c -> 1, 2, 3 *)
 VerificationTest[
-    IndexHypergraph[{{"a", "b"}, {"b", "c"}}],
-    {{1, 2}, {2, 3}},
-    TestID -> "IndexHypergraph-Basic"
+    IndexComplex[{{"b", "a"}, {"a", "c"}}],
+    {{1}, {2}, {3}, {1, 2}, {2, 3}},
+    TestID -> "IndexComplex-AppearanceOrder"
 ]
 
 VerificationTest[
@@ -3122,9 +3123,8 @@ VerificationTest[
 
 (* a registry universe is named by its wm number and its tier is a generation count, so the tier
    and the count it stands for must give the same graph *)
-(* Quiet: loading WolframModel pulls in SetReplace`, whose IndexHypergraph shadows the paclet's *)
 VerificationTest[
-    Quiet @ With[{tier = InfraSubstrate["wm6655", "Small"], raw = InfraSubstrate["wm6655", 8]},
+    With[{tier = InfraSubstrate["wm6655", "Small"], raw = InfraSubstrate["wm6655", 8]},
       {VertexList @ tier === VertexList @ raw, EdgeList @ tier === EdgeList @ raw, ConnectedGraphQ @ tier}],
     {True, True, True},
     TestID -> "InfraSubstrate-registry-universe"

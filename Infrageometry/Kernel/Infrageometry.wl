@@ -2,7 +2,6 @@ Package["WolframInstitute`Infrageometry`"]
 
 
 PackageExport[ComplexClosure]
-PackageExport[IndexHypergraph]
 PackageExport[IndexComplex]
 
 PackageExport[SimplexDimension]
@@ -105,9 +104,8 @@ ComplexClosure[g : {___List}, {n_Integer}] := ComplexClosure[g, {n, n}]
 ComplexClosure[g : {___List}] := ComplexClosure[g, {1, Infinity}]
 
 
-IndexHypergraph[g : {___List}] := Replace[g, Thread[# -> Range[Length[#]]], {2}] & @ DeleteDuplicates[Catenate[g]]
 
-IndexComplex[g : {___List}] := ComplexClosure[IndexHypergraph[g]]
+IndexComplex[g : {___List}] := ComplexClosure[Replace[g, Thread[# -> Range[Length[#]]], {2}] & @ DeleteDuplicates[Catenate[g]]]
 
 SimplexDimension[x_List] := Length[x] - 1
 

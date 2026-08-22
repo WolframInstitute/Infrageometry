@@ -3,7 +3,6 @@ Package["WolframInstitute`Infrageometry`"]
 (* Usage messages for exported symbols. Experimental functions are marked (experimental). *)
 
 ComplexClosure::usage = "ComplexClosure[g] returns the simplicial closure of a list of simplices g.";
-IndexHypergraph::usage = "IndexHypergraph[h] relabels vertices of a hypergraph (list of hyperedges) h to consecutive integers.";
 IndexComplex::usage = "IndexComplex[g] relabels vertices of complex g to a consecutive ordering of integers.";
 
 SimplexDimension::usage = "SimplexDimension[s] gives the dimension (#vertices - 1) of simplex s.";
