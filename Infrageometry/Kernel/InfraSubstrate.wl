@@ -12,6 +12,10 @@ PackageExport[AmbientGraphStyle]
    InfraSubstrate[] lists the roster by class; InfraSubstrate[All] is the flat name list.
    Generation is seeded per (name, size), so repeated calls return the same graph.
 
+   Tiers are calibrated to a common ladder of roughly 100 / 300 / 1000 vertices (about
+   x3 per step, so the percentual growth corresponds across substrates), as closely as
+   each generator's granularity allows -- exceptions are noted on their lines.
+
    The roster below is the definition: one substrate[name, size] line per name, the tier table
    inline (a raw spec passes through the replacement untouched), and every exception -- an
    interior strip, a kept embedding, special coordinates -- written into the definition itself.
@@ -37,12 +41,12 @@ $substrateClasses = <|
 
 substrate[ "PlanePatch", size_ ] :=
   trimPendants @ BoundarylessGraph @ DiscretizeRegion[ Rectangle[ ],
-    MaxCellMeasure -> size /. { "Small" -> 0.02, "Medium" -> 0.005, "Large" -> 0.001 },
+    MaxCellMeasure -> size /. { "Small" -> 0.0085, "Medium" -> 0.0028, "Large" -> 0.00082 },
     PrecisionGoal -> Infinity ]
 
 substrate[ "BoxPatch", size_ ] :=
   trimPendants @ BoundarylessGraph @ DiscretizeRegion[ Cuboid[ ],
-    MaxCellMeasure -> size /. { "Small" -> 0.01, "Medium" -> 0.002, "Large" -> 0.001 },
+    MaxCellMeasure -> size /. { "Small" -> 0.004, "Medium" -> 0.00133, "Large" -> 0.0004 },
     PrecisionGoal -> Infinity ]
 
 (* DiscretizeRegion ignores MaxCellMeasure on special surface regions unless PrecisionGoal
@@ -55,47 +59,52 @@ substrate[ "SphereMesh", size_ ] :=
     Graph[ IndexGraph @ MeshConnectivityGraph @ mr, VertexCoordinates -> Normalize /@ MeshCoordinates @ mr ] ]
 
 substrate[ "TriangularPatch", size_ ] :=
-  BoundarylessGraph[ TessellationNeighborhoodGraph[ { 3, 6 }, size /. { "Small" -> 6, "Medium" -> 9, "Large" -> 12 } ], Method -> "MaxDegree" ]
+  BoundarylessGraph[ TessellationNeighborhoodGraph[ { 3, 6 }, size /. { "Small" -> 5, "Medium" -> 9, "Large" -> 16 } ], Method -> "MaxDegree" ]
 
 substrate[ "SquarePatch", size_ ] :=
-  BoundarylessGraph[ TessellationNeighborhoodGraph[ { 4, 4 }, size /. { "Small" -> 6, "Medium" -> 9, "Large" -> 12 } ], Method -> "MaxDegree" ]
+  BoundarylessGraph[ TessellationNeighborhoodGraph[ { 4, 4 }, size /. { "Small" -> 7, "Medium" -> 12, "Large" -> 22 } ], Method -> "MaxDegree" ]
 
 substrate[ "HexagonalPatch", size_ ] :=
-  BoundarylessGraph[ TessellationNeighborhoodGraph[ { 6, 3 }, size /. { "Small" -> 6, "Medium" -> 9, "Large" -> 12 } ], Method -> "MaxDegree" ]
+  BoundarylessGraph[ TessellationNeighborhoodGraph[ { 6, 3 }, size /. { "Small" -> 8, "Medium" -> 14, "Large" -> 25 } ], Method -> "MaxDegree" ]
 
 substrate[ "GeodesicSphere", size_ ] :=
   TessellationNeighborhoodGraph[ { 3, 5 }, size /. { "Small" -> 5, "Medium" -> 6, "Large" -> 8 } ]
 
+(* hyperbolic growth is exponential (~x2.7 per radius step), the closest the {3, 7} tiling comes to the x3 ladder *)
 substrate[ "HyperbolicPatch", size_ ] :=
-  BoundarylessGraph[ TessellationNeighborhoodGraph[ { 3, 7 }, size /. { "Small" -> 4, "Medium" -> 5, "Large" -> 6 } ], Method -> "MaxDegree" ]
+  BoundarylessGraph[ TessellationNeighborhoodGraph[ { 3, 7 }, size /. { "Small" -> 3, "Medium" -> 4, "Large" -> 5 } ], Method -> "MaxDegree" ]
 
-substrate[ "InflatedSquarePatch", size_ ] := InflateGraph @ substrate[ "SquarePatch", size ]
+(* inflation roughly doubles a patch, so it takes its own smaller radii *)
+substrate[ "InflatedSquarePatch", size_ ] :=
+  InflateGraph @ substrate[ "SquarePatch", size /. { "Small" -> 5, "Medium" -> 8, "Large" -> 15 } ]
 
 substrate[ "SquareGridPatch", size_ ] :=
-  BoundarylessGraph[ GridGraph[ size /. { "Small" -> { 9, 9 }, "Medium" -> { 15, 15 }, "Large" -> { 25, 25 } } ], Method -> "MaxDegree" ]
+  BoundarylessGraph[ GridGraph[ size /. { "Small" -> { 10, 10 }, "Medium" -> { 17, 17 }, "Large" -> { 32, 32 } } ], Method -> "MaxDegree" ]
 
 (* GridGraph indexes with the first dimension fastest, and without explicit coordinates a 3D
    grid falls back to a 2D spring layout *)
 substrate[ "CubicGridPatch", size_ ] :=
-  With[ { dims = size /. { "Small" -> { 5, 5, 5 }, "Medium" -> { 7, 7, 7 }, "Large" -> { 9, 9, 9 } } },
+  With[ { dims = size /. { "Small" -> { 5, 5, 5 }, "Medium" -> { 7, 7, 7 }, "Large" -> { 10, 10, 10 } } },
     BoundarylessGraph[ Graph[ GridGraph @ dims, VertexCoordinates -> Reverse /@ Tuples[ Range /@ Reverse @ dims ] ], Method -> "MaxDegree" ] ]
 
 substrate[ "SquareTorus", size_ ] :=
-  torusEmbedded[ "Square", size /. { "Small" -> { 8, 6 }, "Medium" -> { 20, 15 }, "Large" -> { 40, 30 } } ]
+  torusEmbedded[ "Square", size /. { "Small" -> { 10, 10 }, "Medium" -> { 20, 15 }, "Large" -> { 40, 25 } } ]
 
 substrate[ "TriangularTorus", size_ ] :=
-  torusEmbedded[ "Triangular", size /. { "Small" -> { 8, 6 }, "Medium" -> { 20, 15 }, "Large" -> { 40, 30 } } ]
+  torusEmbedded[ "Triangular", size /. { "Small" -> { 10, 10 }, "Medium" -> { 20, 15 }, "Large" -> { 40, 25 } } ]
 
+(* the honeycomb carries two vertices per cell, so its torus takes half-size dims *)
 substrate[ "HexagonalTorus", size_ ] :=
-  torusEmbedded[ "Hexagonal", size /. { "Small" -> { 8, 6 }, "Medium" -> { 20, 15 }, "Large" -> { 40, 30 } } ]
+  torusEmbedded[ "Hexagonal", size /. { "Small" -> { 7, 7 }, "Medium" -> { 15, 10 }, "Large" -> { 25, 20 } } ]
 
-substrate[ "BinaryTree", size_ ] := KaryTree[ size /. { "Small" -> 63, "Medium" -> 127, "Large" -> 255 } ]
+(* a full binary tree only comes in sizes 2^k - 1, so the ladder is x4 like the buckyball *)
+substrate[ "BinaryTree", size_ ] := KaryTree[ size /. { "Small" -> 63, "Medium" -> 255, "Large" -> 1023 } ]
 
-substrate[ "CompleteGraph", size_ ] := CompleteGraph[ size /. { "Small" -> 10, "Medium" -> 20, "Large" -> 40 } ]
+substrate[ "CompleteGraph", size_ ] := CompleteGraph[ size /. { "Small" -> 10, "Medium" -> 30, "Large" -> 90 } ]
 
 (* intermediate growth 2^(r^alpha): branch 2 exactly at the depths hit by Ceiling[k^(1/alpha)] *)
 substrate[ "DilutedTree", size_ ] :=
-  With[ { spec = size /. { "Small" -> { 1/2, 20 }, "Medium" -> { 1/2, 45 }, "Large" -> { 3/4, 15 } } },
+  With[ { spec = size /. { "Small" -> { 1/2, 16 }, "Medium" -> { 1/2, 26 }, "Large" -> { 1/2, 42 } } },
     BranchingSequenceTree @ Table[
       If[ MemberQ[ Ceiling[ Range[ Last @ spec ]^( 1 / First @ spec ) ], level ], 2, 1 ],
       { level, Last @ spec } ] ]
@@ -106,7 +115,7 @@ substrate[ "SierpinskiTriangle", size_ ] :=
 (* BuckyballGraph's 3D-ness lives in GraphLayout "Dimension" -> 3, which any Graph re-wrap
    resets to a 2D layout -- bake the embedding explicitly *)
 substrate[ "Buckyball", size_ ] :=
-  With[ { g = ResourceFunction[ "BuckyballGraph" ][ size /. { "Small" -> 2, "Medium" -> 4, "Large" -> 6 } ] },
+  With[ { g = ResourceFunction[ "BuckyballGraph" ][ size /. { "Small" -> 1, "Medium" -> 2, "Large" -> 4 } ] },
     Graph[ g, VertexCoordinates -> GraphEmbedding @ g ] ]
 
 (* a Wolfram-model universe is named by its Registry of Notable Universes number
@@ -118,31 +127,31 @@ substrate[ "wm6655", size_ ] :=
   hypergraphGraph @ ResourceFunction[ "WolframModel" ][
     { { 1, 2 }, { 1, 3 } } -> { { 1, 2 }, { 1, 4 }, { 2, 4 }, { 3, 4 } },
     { { 1, 1 }, { 1, 1 } },
-    size /. { "Small" -> 8, "Medium" -> 11, "Large" -> 13 }, "FinalState" ]
+    size /. { "Small" -> 7, "Medium" -> 9, "Large" -> 11 }, "FinalState" ]
 
 substrate[ "wm8619", size_ ] :=
   hypergraphGraph @ ResourceFunction[ "WolframModel" ][
     { { 1, 2, 2 }, { 1, 3, 4 } } -> { { 4, 5, 5 }, { 5, 3, 2 }, { 1, 2, 5 } },
     { { 1, 1, 1 }, { 1, 1, 1 } },
-    size /. { "Small" -> 100, "Medium" -> 500, "Large" -> 1000 }, "FinalState" ]
+    size /. { "Small" -> 100, "Medium" -> 300, "Large" -> 1000 }, "FinalState" ]
 
 substrate[ "wm1811", size_ ] :=
   hypergraphGraph @ ResourceFunction[ "WolframModel" ][
     { { 1, 1, 2 }, { 1, 3, 4 } } -> { { 4, 4, 3 }, { 2, 5, 3 }, { 2, 5, 3 } },
     { { 1, 1, 1 }, { 1, 1, 1 } },
-    size /. { "Small" -> 100, "Medium" -> 500, "Large" -> 1000 }, "FinalState" ]
+    size /. { "Small" -> 100, "Medium" -> 300, "Large" -> 1000 }, "FinalState" ]
 
 substrate[ "RoundEllipsoid", size_ ] :=
   UniformLengthGraph[ BoundaryDiscretizeRegion @ Ellipsoid[ { 0, 0, 0 }, { 1, 1, 1 } ],
-    size /. { "Small" -> 100, "Medium" -> 300, "Large" -> 600 }, "KeepCoordinates" -> True ]
+    size /. { "Small" -> 100, "Medium" -> 300, "Large" -> 1000 }, "KeepCoordinates" -> True ]
 
 substrate[ "ProlateEllipsoid", size_ ] :=
   UniformLengthGraph[ BoundaryDiscretizeRegion @ Ellipsoid[ { 0, 0, 0 }, { 5, 1, 1 } ],
-    size /. { "Small" -> 100, "Medium" -> 300, "Large" -> 600 }, "KeepCoordinates" -> True ]
+    size /. { "Small" -> 100, "Medium" -> 300, "Large" -> 1000 }, "KeepCoordinates" -> True ]
 
 substrate[ "TriaxialEllipsoid", size_ ] :=
   UniformLengthGraph[ BoundaryDiscretizeRegion @ Ellipsoid[ { 0, 0, 0 }, { 4, 2, 1 } ],
-    size /. { "Small" -> 100, "Medium" -> 300, "Large" -> 600 }, "KeepCoordinates" -> True ]
+    size /. { "Small" -> 100, "Medium" -> 300, "Large" -> 1000 }, "KeepCoordinates" -> True ]
 
 (* any registry entry beyond the inlined three, one network round-trip per id, memoized *)
 substrate[ id_String /; StringMatchQ[ id, "wm" ~~ DigitCharacter .. ], size_ ] :=
@@ -249,11 +258,23 @@ InfraSubstrateStyle[ state : { __List }, style : ( _String | Automatic ) : Autom
    highlighted construction drawn on top of it stands out; splice it in with
    Graph[g, Sequence @@ AmbientGraphStyle["GrayFaint"]]. *)
 
+(* The vertex size is absolute ({"AbsolutePointSize", 4}) and identical in every style, so
+   the dots read the same across all graphs and tiers; a highlight mark stays legible above
+   them with AbsolutePointSize[5].  Vertices are outlined disks (EdgeForm) over a faint
+   fill; the opacity ladder steps down as the picture gets denser, "GrayFaint" being the
+   reference styling for the large graphs. *)
+
 ambientGraphStyles = <|
   "Default"    -> { },
-  "GrayFaint"  -> { EdgeStyle -> Directive[ StandardGray, Opacity[ 0.15 ] ], VertexStyle -> Directive[ StandardGray, Opacity[ 0.3 ] ] },
-  "GrayOpaque" -> { EdgeStyle -> Directive[ StandardGray, Opacity[ 0.4 ] ], VertexStyle -> Directive[ StandardGray, Opacity[ 0.6 ] ] },
-  "Gray"       -> { EdgeStyle -> StandardGray, VertexStyle -> StandardGray }
+  "GrayFaint"  -> { EdgeStyle -> Directive[ StandardGray, Opacity[ 0.35 ] ],
+                    VertexStyle -> Directive[ StandardGray, Opacity[ 0.13 ], EdgeForm[ { GrayLevel[ 0 ], Opacity[ 0.25 ] } ] ],
+                    VertexSize -> { "AbsolutePointSize", 4 } },
+  "GrayOpaque" -> { EdgeStyle -> Directive[ StandardGray, Opacity[ 0.5 ] ],
+                    VertexStyle -> Directive[ StandardGray, Opacity[ 0.2 ], EdgeForm[ { GrayLevel[ 0 ], Opacity[ 0.35 ] } ] ],
+                    VertexSize -> { "AbsolutePointSize", 4 } },
+  "Gray"       -> { EdgeStyle -> Directive[ StandardGray, Opacity[ 0.7 ] ],
+                    VertexStyle -> Directive[ StandardGray, Opacity[ 0.3 ], EdgeForm[ { GrayLevel[ 0 ], Opacity[ 0.5 ] } ] ],
+                    VertexSize -> { "AbsolutePointSize", 4 } }
 |>;
 
 AmbientGraphStyle[ ] := Keys @ ambientGraphStyles

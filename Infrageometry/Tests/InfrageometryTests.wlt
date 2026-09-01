@@ -3099,7 +3099,7 @@ VerificationTest[
 (* a registry universe is named by its wm number and its tier is a generation count, so the tier
    and the count it stands for must give the same graph *)
 VerificationTest[
-    With[{tier = InfraSubstrate["wm6655", "Small"], raw = InfraSubstrate["wm6655", 8]},
+    With[{tier = InfraSubstrate["wm6655", "Small"], raw = InfraSubstrate["wm6655", 7]},
       {VertexList @ tier === VertexList @ raw, EdgeList @ tier === EdgeList @ raw, ConnectedGraphQ @ tier}],
     {True, True, True},
     TestID -> "InfraSubstrate-registry-universe"
