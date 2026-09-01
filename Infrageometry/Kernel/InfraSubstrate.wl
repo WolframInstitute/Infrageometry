@@ -67,8 +67,11 @@ substrate[ "SquarePatch", size_ ] :=
 substrate[ "HexagonalPatch", size_ ] :=
   BoundarylessGraph[ TessellationNeighborhoodGraph[ { 6, 3 }, size /. { "Small" -> 8, "Medium" -> 14, "Large" -> 25 } ], Method -> "MaxDegree" ]
 
+(* the frequency-nu geodesic subdivision of the icosahedron projected onto the unit
+   sphere (10 nu^2 + 2 vertices) -- refinable without bound, the regular counterpart of
+   the random SphereMesh; replaces the bare {3, 5} map, which is frozen at 12 vertices *)
 substrate[ "GeodesicSphere", size_ ] :=
-  TessellationNeighborhoodGraph[ { 3, 5 }, size /. { "Small" -> 5, "Medium" -> 6, "Large" -> 8 } ]
+  geodesicSphere[ size /. { "Small" -> 3, "Medium" -> 6, "Large" -> 10 } ]
 
 (* hyperbolic growth is exponential (~x2.7 per radius step), the closest the {3, 7} tiling comes to the x3 ladder *)
 substrate[ "HyperbolicPatch", size_ ] :=
@@ -205,6 +208,26 @@ defaultAmbientStyle[ g_, _ ] := Which[ VertexCount @ g <= 250, "Gray", VertexCou
 
 
 (* ===================== Roster helpers ===================== *)
+
+geodesicSphere[ nu_Integer ] :=
+  Module[ { verts, ico, faces, key, edges, vertexKeys, index },
+    verts = Flatten[ Table[ RotateRight[ { 0., s1, s2 N @ GoldenRatio }, r ],
+      { s1, { -1., 1. } }, { s2, { -1., 1. } }, { r, 0, 2 } ], 2 ];
+    ico = RelationGraph[ EuclideanDistance[ #1, #2 ] < 2.1 &, verts ];
+    faces = FindClique[ ico, { 3 }, All ];
+    key = p |-> Round[ 1.*^5 Normalize @ p ];
+    edges = DeleteDuplicates[ Sort /@ Catenate @ Map[
+      f |-> Module[ { pt },
+        pt[ i_, j_ ] := pt[ i, j ] = key[ ( i f[[ 1 ]] + j f[[ 2 ]] + ( nu - i - j ) f[[ 3 ]] ) / nu ];
+        Catenate @ Catenate @ Table[
+          { { pt[ i, j ], pt[ i + 1, j ] }, { pt[ i, j ], pt[ i, j + 1 ] }, { pt[ i + 1, j ], pt[ i, j + 1 ] } },
+          { i, 0, nu - 1 }, { j, 0, nu - 1 - i } ] ],
+      faces ] ];
+    vertexKeys = DeleteDuplicates @ Catenate @ edges;
+    index = First /@ PositionIndex[ vertexKeys ];
+    Graph[ Range @ Length @ vertexKeys, UndirectedEdge @@@ Map[ index, edges, { 2 } ],
+      VertexCoordinates -> Map[ Normalize @ N @ # &, vertexKeys ] ]
+  ]
 
 (* trimPendants[g] repeatedly deletes degree-1 vertices: a mesh patch has a few corner vertices
    left hanging by one edge, and a vertex with a single neighbour models nothing in the plane *)

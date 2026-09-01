@@ -4,6 +4,8 @@ PackageExport[GraphBoundary]
 PackageExport[GraphInterior]
 PackageExport[GraphExteriorBoundary]
 PackageExport[BoundarylessGraph]
+PackageExport[RelativeEccentricity]
+PackageExport[RelativeEccentricitySubgraph]
 PackageScope[meshSurfaceVertices]
 
 
@@ -106,4 +108,37 @@ rimEdgeTrim[g_, boundary_] :=
 		{bQ = Association @ Thread[boundary -> True]},
 		{h = EdgeDelete[g, Select[EdgeList[g], TrueQ[bQ[#[[1]]]] && TrueQ[bQ[#[[2]]]] &]]},
 		VertexDelete[h, Pick[VertexList[h], VertexDegree[h], 0]]
+	]
+
+
+(* ===================== Relative eccentricity ===================== *)
+
+(* RelativeEccentricity[x]: t(v) = (e(v) - radius) / (diameter - radius), the scale-free
+   depth coordinate of a finite metric space -- 0 exactly on the center, 1 exactly on the
+   periphery. Takes a graph or a distance matrix, and returns one number per point in
+   VertexList / row order. Degenerate when diameter == radius (a vertex-transitive graph)
+   or the space is disconnected: there every point is at once center and periphery, and t
+   is identically 0. *)
+
+RelativeEccentricity[g_Graph] := RelativeEccentricity @ GraphDistanceMatrix[g]
+
+RelativeEccentricity[distMatrix_List] :=
+	With[
+		{ecc = Max /@ distMatrix},
+		{r = Min[ecc], d = Max[ecc]},
+		If[! NumericQ[d] || d == r, ConstantArray[0, Length[ecc]], (ecc - r) / (d - r)]
+	]
+
+
+(* RelativeEccentricitySubgraph[g, band]: the induced subgraph on {v : lo <= t(v) <= hi},
+   the substrate cut to a relative depth. A bare q is the band {0, q}. Subgraph keeps the
+   vertex labels and their coordinates, so a construction carried out on the band is
+   simultaneously an object of g and draws on it unchanged. The rim-stripping cousin
+   BoundarylessGraph cuts absolutely and once; this cuts relatively and by a dial. A band
+   that disconnects is returned disconnected. *)
+
+RelativeEccentricitySubgraph[g_Graph, band : (_?NumericQ | {_?NumericQ, _?NumericQ}) : 1] :=
+	With[
+		{range = Replace[band, q_?NumericQ :> {0, q}]},
+		Subgraph[g, Pick[VertexList[g], range[[1]] <= # <= range[[2]] & /@ RelativeEccentricity[g]]]
 	]

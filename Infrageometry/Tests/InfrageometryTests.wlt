@@ -3153,6 +3153,17 @@ VerificationTest[
     TestID -> "InfraSubstrate-sphere-mesh-tiers"
 ]
 
+(* the geodesic sphere is the frequency-nu icosahedron subdivision: 10 nu^2 + 2 vertices,
+   12 seeds of degree 5, everything else degree 6, every vertex on the unit sphere *)
+VerificationTest[
+    With[{g = InfraSubstrate["GeodesicSphere", "Small", "KeepCoordinates" -> True]},
+      {VertexCount /@ (InfraSubstrate["GeodesicSphere", #] & /@ {"Small", "Medium", "Large"}),
+       Sort @ Tally @ VertexDegree @ g,
+       Max[Abs[Norm /@ GraphEmbedding[g] - 1]] < 1.*^-6}],
+    {{92, 362, 1002}, {{5, 12}, {6, 80}}, True},
+    TestID -> "InfraSubstrate-geodesic-sphere-tiers"
+]
+
 (* the roster is classified by what a substrate models; the flat list carries every name *)
 VerificationTest[
     With[{classes = InfraSubstrate[], names = InfraSubstrate[All]},
@@ -3184,6 +3195,81 @@ VerificationTest[
    VertexCount[BoundarylessGraph[GridGraph[{7, 7, 7}], Method -> "MaxDegree"]]},
   {117, 275},
   TestID -> "BoundarylessGraph-MaxDegree-lattice-interior"
+]
+
+(* ===== RelativeEccentricity / RelativeEccentricitySubgraph ===== *)
+
+(* t is 0 exactly on the center and 1 exactly on the periphery. *)
+VerificationTest[
+	With[
+		{g = GridGraph[{4, 6}]},
+		{t = AssociationThread[VertexList[g], RelativeEccentricity[g]]},
+		Sort[Keys @ Select[t, # == 0 &]] === Sort[GraphCenter[g]] &&
+			Sort[Keys @ Select[t, # == 1 &]] === Sort[GraphPeriphery[g]]
+	],
+	True,
+	TestID -> "RelativeEccentricity-center-and-periphery"
+]
+
+(* On a vertex-transitive graph diameter == radius, every vertex is both center and
+   periphery, and the coordinate degenerates to 0. Same for a disconnected graph. *)
+VerificationTest[
+	{RelativeEccentricity[CycleGraph[8]],
+	 RelativeEccentricity[GraphDisjointUnion[PathGraph[{1, 2}], PathGraph[{3, 4}]]]},
+	{ConstantArray[0, 8], ConstantArray[0, 4]},
+	TestID -> "RelativeEccentricity-degenerate-cases"
+]
+
+(* The graph form is the distance-matrix form. *)
+VerificationTest[
+	With[{g = GridGraph[{3, 5}]}, RelativeEccentricity[g] === RelativeEccentricity[GraphDistanceMatrix[g]]],
+	True,
+	TestID -> "RelativeEccentricity-graph-is-distance-matrix"
+]
+
+(* The band is a sublevel set: monotone in q, and every member sits below the cut
+   eccentricity radius + q (diameter - radius). Endpoints are the center and the graph. *)
+VerificationTest[
+	With[
+		{g = GridGraph[{5, 7}]},
+		{r = GraphRadius[g], d = GraphDiameter[g], qs = {0, 1/4, 1/2, 3/4, 1}},
+		{pools = Sort @ VertexList @ RelativeEccentricitySubgraph[g, #] & /@ qs},
+		First[pools] === Sort[GraphCenter[g]] && Last[pools] === Sort[VertexList[g]] &&
+			AllTrue[Partition[pools, 2, 1], Apply[SubsetQ[#2, #1] &]] &&
+			AllTrue[Transpose[{pools, qs}],
+				Apply[{pool, q} |-> AllTrue[pool, v |-> Max[GraphDistance[g, v]] <= r + q (d - r)]]]
+	],
+	True,
+	TestID -> "RelativeEccentricitySubgraph-monotone-sublevel"
+]
+
+(* The band keeps g's vertex labels AND each kept vertex keeps its own coordinate --
+   that is what lets a construction made on the band be drawn on g. *)
+VerificationTest[
+	With[
+		{g = GridGraph[{5, 5}, VertexCoordinates -> Tuples[Range[5], 2]]},
+		{h = RelativeEccentricitySubgraph[g, 1/2]},
+		{coords = AssociationThread[VertexList[g], GraphEmbedding[g]]},
+		SubsetQ[VertexList[g], VertexList[h]] &&
+			GraphEmbedding[h] === Lookup[coords, VertexList[h]]
+	],
+	True,
+	TestID -> "RelativeEccentricitySubgraph-keeps-labels-and-coordinates"
+]
+
+(* The band is an induced subgraph of g, so a walk of the band is a walk of g. *)
+VerificationTest[
+	With[
+		{g = GridGraph[{7, 7}]},
+		{h = RelativeEccentricitySubgraph[g, 1/2]},
+		{ends = {First @ VertexList[h], Last @ VertexList[h]}},
+		AllTrue[EdgeList[h], EdgeQ[g, #] &] &&
+			AllTrue[Partition[FindShortestPath[h, Sequence @@ ends], 2, 1],
+				Apply[EdgeQ[g, UndirectedEdge[#1, #2]] &]] &&
+			GraphDistance[h, Sequence @@ ends] >= GraphDistance[g, Sequence @@ ends]
+	],
+	True,
+	TestID -> "RelativeEccentricitySubgraph-band-walks-are-graph-walks"
 ]
 
 EndTestSection[]
