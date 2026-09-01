@@ -275,4 +275,7 @@ ambientGraphStyles = <|
 
 AmbientGraphStyle[ ] := Keys @ ambientGraphStyles
 
-AmbientGraphStyle[ name_String ] := ambientGraphStyles @ name
+(* the tier names are accepted as aliases, so a hand-drawn figure can ask for the same
+   look its tier would get: Small -> "Gray", Medium -> "GrayOpaque", Large -> "GrayFaint" *)
+AmbientGraphStyle[ name_String ] := ambientGraphStyles @ Replace[ name,
+  { "Small" -> "Gray", "Medium" -> "GrayOpaque", "Large" -> "GrayFaint" } ]

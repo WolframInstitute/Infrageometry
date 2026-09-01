@@ -3153,6 +3153,15 @@ VerificationTest[
     TestID -> "InfraSubstrate-sphere-mesh-tiers"
 ]
 
+(* the tier names alias the ambient styles, so a hand-drawn figure can ask for its tier's look *)
+VerificationTest[
+    {AmbientGraphStyle["Small"] === AmbientGraphStyle["Gray"],
+     AmbientGraphStyle["Medium"] === AmbientGraphStyle["GrayOpaque"],
+     AmbientGraphStyle["Large"] === AmbientGraphStyle["GrayFaint"]},
+    {True, True, True},
+    TestID -> "AmbientGraphStyle-tier-aliases"
+]
+
 (* the roster is classified by what a substrate models; the flat list carries every name *)
 VerificationTest[
     With[{classes = InfraSubstrate[], names = InfraSubstrate[All]},
