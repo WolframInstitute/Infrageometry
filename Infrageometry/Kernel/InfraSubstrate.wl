@@ -2,13 +2,12 @@ Package["WolframInstitute`Infrageometry`"]
 
 PackageExport[InfraSubstrate]
 PackageExport[InfraSubstrateStyle]
-PackageExport[AmbientGraphStyle]
 
 
 (* ===================== InfraSubstrate ===================== *)
 
 (* InfraSubstrate[name, size, style] is the named example substrate at tier "Small" | "Medium" |
-   "Large" or a raw spec, drawn as an AmbientGraphStyle backdrop for a construction on top of it.
+   "Large" or a raw spec, drawn as an InfraSubstrateStyle backdrop for a construction on top of it.
    InfraSubstrate[] lists the roster by class; InfraSubstrate[All] is the flat name list.
    Generation is seeded per (name, size), so repeated calls return the same graph.
 
@@ -173,7 +172,7 @@ InfraSubstrate[ name_String, size_, style : ( _String | Automatic ) : Automatic,
     Graph[ g, FilterRules[ { opts }, Options @ Graph ],
       substrateCoordinates[ g, TrueQ @ OptionValue[ InfraSubstrate,
         FilterRules[ { opts }, Options @ InfraSubstrate ], "KeepCoordinates" ] ],
-      Sequence @@ AmbientGraphStyle @ Replace[ style, Automatic :> defaultAmbientStyle[ g, size ] ] ] ]
+      Sequence @@ InfraSubstrateStyle @ Replace[ style, Automatic :> defaultAmbientStyle[ g, size ] ] ] ]
 
 (* memoized: substrates are rebuilt across many figure cells, and seeding makes the cache honest *)
 substrateGraph[ name_, size_ ] := substrateGraph[ name, size ] =
@@ -232,27 +231,9 @@ registryUniverse[ id_ ] := registryUniverse[ id ] =
 
 (* ===================== InfraSubstrateStyle ===================== *)
 
-(* InfraSubstrateStyle[g, style] applies the substrate backdrop styling to ANY graph, so
-   a hand-built object -- a Wolfram-model final state included -- draws exactly like the
-   roster substrates.  style Automatic (default) picks the ambient gray by vertex count,
-   the same rule InfraSubstrate uses for a raw spec; a list of hyperedges goes through
-   the same 2-section conversion as the wm substrates.  Graph options are forwarded. *)
-
-InfraSubstrateStyle[ g_Graph, style : ( _String | Automatic ) : Automatic,
-    opts : OptionsPattern[ Graph ] ] :=
-  Graph[ g, FilterRules[ { opts }, Options @ Graph ],
-    Sequence @@ AmbientGraphStyle @ Replace[ style, Automatic :> defaultAmbientStyle[ g, None ] ] ]
-
-InfraSubstrateStyle[ state : { __List }, style : ( _String | Automatic ) : Automatic,
-    opts : OptionsPattern[ Graph ] ] :=
-  InfraSubstrateStyle[ hypergraphGraph @ state, style, opts ]
-
-
-(* ===================== Ambient styles ===================== *)
-
-(* AmbientGraphStyle[name] is the Graph option list rendering a substrate as a backdrop, so that a
+(* InfraSubstrateStyle[name] is the Graph option list rendering a substrate as a backdrop, so that a
    highlighted construction drawn on top of it stands out; splice it in with
-   Graph[g, Sequence @@ AmbientGraphStyle["GrayFaint"]]. *)
+   Graph[g, Sequence @@ InfraSubstrateStyle["GrayFaint"]]. *)
 
 (* The vertex size is absolute ({"AbsolutePointSize", 4}) and identical in every style, so
    the dots read the same across all graphs and tiers; a highlight mark stays legible above
@@ -260,7 +241,7 @@ InfraSubstrateStyle[ state : { __List }, style : ( _String | Automatic ) : Autom
    fill; the opacity ladder steps down as the picture gets denser, "GrayFaint" being the
    reference styling for the large graphs. *)
 
-ambientGraphStyles = <|
+infraSubstrateStyles = <|
   "Default"    -> { },
   "GrayFaint"  -> { EdgeStyle -> Directive[ StandardGray, Opacity[ 0.35 ] ],
                     VertexStyle -> Directive[ StandardGray, Opacity[ 0.13 ], EdgeForm[ { GrayLevel[ 0 ], Opacity[ 0.25 ] } ] ],
@@ -273,9 +254,9 @@ ambientGraphStyles = <|
                     VertexSize -> { "AbsolutePointSize", 4 } }
 |>;
 
-AmbientGraphStyle[ ] := Keys @ ambientGraphStyles
+InfraSubstrateStyle[ ] := Keys @ infraSubstrateStyles
 
 (* the tier names are accepted as aliases, so a hand-drawn figure can ask for the same
    look its tier would get: Small -> "Gray", Medium -> "GrayOpaque", Large -> "GrayFaint" *)
-AmbientGraphStyle[ name_String ] := ambientGraphStyles @ Replace[ name,
+InfraSubstrateStyle[ name_String ] := infraSubstrateStyles @ Replace[ name,
   { "Small" -> "Gray", "Medium" -> "GrayOpaque", "Large" -> "GrayFaint" } ]

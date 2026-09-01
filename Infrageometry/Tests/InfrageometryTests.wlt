@@ -2976,9 +2976,9 @@ VerificationTest[
 (* ===================== Ambient styles ===================== *)
 
 VerificationTest[
-    AmbientGraphStyle[],
+    InfraSubstrateStyle[],
     {"Default", "GrayFaint", "GrayOpaque", "Gray"},
-    TestID -> "AmbientGraphStyle-names"
+    TestID -> "InfraSubstrateStyle-names"
 ]
 
 
@@ -3128,20 +3128,6 @@ VerificationTest[
     TestID -> "InfraSubstrate-tiers-increase"
 ]
 
-(* InfraSubstrateStyle applies the backdrop styling to any graph -- density-picked gray by
-   default, named style on request -- and takes a hand-built hyperedge state directly *)
-VerificationTest[
-    With[{g = InfraSubstrateStyle @ GridGraph[{7, 7}],
-          h = InfraSubstrateStyle[GridGraph[{40, 40}], "Gray"],
-          w = InfraSubstrateStyle @ {{1, 2}, {2, 3}, {3, 1}, {1, 2, 4}}},
-      {Options[g, EdgeStyle][[1, 2]] === {AmbientGraphStyle["Gray"][[1, 2]]},
-       Options[h, EdgeStyle][[1, 2]] === {AmbientGraphStyle["Gray"][[1, 2]]},
-       Options[InfraSubstrateStyle @ GridGraph[{40, 40}], EdgeStyle][[1, 2]] === {AmbientGraphStyle["GrayFaint"][[1, 2]]},
-       GraphQ[w] && VertexCount[w] == 4}],
-    {True, True, True, True},
-    TestID -> "InfraSubstrateStyle-any-graph"
-]
-
 (* the sphere mesh honours its tier: the {"Area" -> m} + PrecisionGoal spec form is the one
    DiscretizeRegion respects on Sphere[], and every vertex sits on the unit sphere *)
 VerificationTest[
@@ -3153,13 +3139,16 @@ VerificationTest[
     TestID -> "InfraSubstrate-sphere-mesh-tiers"
 ]
 
-(* the tier names alias the ambient styles, so a hand-drawn figure can ask for its tier's look *)
+(* InfraSubstrateStyle is the palette: the named option list splices into any graph
+   construction, and the tier names alias the looks *)
 VerificationTest[
-    {AmbientGraphStyle["Small"] === AmbientGraphStyle["Gray"],
-     AmbientGraphStyle["Medium"] === AmbientGraphStyle["GrayOpaque"],
-     AmbientGraphStyle["Large"] === AmbientGraphStyle["GrayFaint"]},
-    {True, True, True},
-    TestID -> "AmbientGraphStyle-tier-aliases"
+    {InfraSubstrateStyle["Small"] === InfraSubstrateStyle["Gray"],
+     InfraSubstrateStyle["Medium"] === InfraSubstrateStyle["GrayOpaque"],
+     InfraSubstrateStyle["Large"] === InfraSubstrateStyle["GrayFaint"],
+     Sort[First /@ InfraSubstrateStyle["GrayFaint"]],
+     Options[Graph[GridGraph[{5, 5}], Sequence @@ InfraSubstrateStyle["Gray"]], EdgeStyle][[1, 2]] =!= Automatic},
+    {True, True, True, {EdgeStyle, VertexSize, VertexStyle}, True},
+    TestID -> "InfraSubstrateStyle-palette"
 ]
 
 (* the roster is classified by what a substrate models; the flat list carries every name *)
