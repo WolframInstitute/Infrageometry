@@ -212,48 +212,69 @@ VerificationTest[
 (* ===== 5a. Mesh Tests ===== *)
 
 VerificationTest[
-    With[{g = InteriorMeshGraph @ MeshRegion[
+    With[{g = BoundarylessGraph @ MeshRegion[
         {{0}, {1}, {2}, {3}},
         Line /@ {{1, 2}, {2, 3}, {3, 4}}
     ]},
         Sort[VertexList[g]] == {1, 2, 3, 4} && Sort[List @@@ EdgeList[g]] == {{1, 2}, {2, 3}, {3, 4}}
     ],
     True,
-    TestID -> "InteriorMeshGraph-Path"
+    TestID -> "BoundarylessGraph-Mesh-Path"
 ]
 
 VerificationTest[
-    With[{g = InteriorMeshGraph @ MeshRegion[
+    With[{g = BoundarylessGraph @ MeshRegion[
         {{0, 0}, {1, 0}, {1, 1}, {0, 1}, {1/2, 1/2}},
         Triangle /@ {{1, 2, 5}, {2, 3, 5}, {3, 4, 5}, {4, 1, 5}}
     ]},
-        Sort[VertexList[g]] == {1, 2, 3, 4, 5} && Sort[Sort /@ (List @@@ EdgeList[g])] == {{1, 5}, {2, 5}, {3, 5}, {4, 5}}
+        VertexList[g] == {5} && EdgeList[g] == {}
     ],
     True,
-    TestID -> "InteriorMeshGraph-Disk"
+    TestID -> "BoundarylessGraph-Mesh-Disk"
 ]
 
 VerificationTest[
-    With[{g = InteriorMeshGraph @ MeshRegion[
+    With[{g = BoundarylessGraph @ MeshRegion[
         {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}},
         Triangle /@ {{1, 2, 3}, {1, 2, 4}, {1, 3, 4}, {2, 3, 4}}
     ]},
         Sort[VertexList[g]] == {1, 2, 3, 4} && Length[EdgeList[g]] == 6
     ],
     True,
-    TestID -> "InteriorMeshGraph-ClosedSurface"
+    TestID -> "BoundarylessGraph-Mesh-ClosedSurface"
 ]
 
 VerificationTest[
-    (* solid tetrahedron split into 4 sub-tets around interior vertex 5: only the 4 spokes survive *)
-    With[{g = InteriorMeshGraph @ MeshRegion[
+    (* solid tetrahedron split into 4 sub-tets around interior vertex 5: the surface is deleted, vertex 5 remains *)
+    With[{g = BoundarylessGraph @ MeshRegion[
         {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {1/4, 1/4, 1/4}},
         Tetrahedron /@ {{1, 2, 3, 5}, {1, 2, 4, 5}, {1, 3, 4, 5}, {2, 3, 4, 5}}
     ]},
-        Sort[VertexList[g]] == {1, 2, 3, 4, 5} && Sort[Sort /@ (List @@@ EdgeList[g])] == {{1, 5}, {2, 5}, {3, 5}, {4, 5}}
+        VertexList[g] == {5} && EdgeList[g] == {}
     ],
     True,
-    TestID -> "InteriorMeshGraph-SolidVolume"
+    TestID -> "BoundarylessGraph-Mesh-SolidVolume"
+]
+
+(* the exact surface detector: the disk's rim, and the whole boundary of the solid tetrahedron *)
+VerificationTest[
+    {GraphExteriorBoundary @ MeshRegion[
+        {{0, 0}, {1, 0}, {1, 1}, {0, 1}, {1/2, 1/2}},
+        Triangle /@ {{1, 2, 5}, {2, 3, 5}, {3, 4, 5}, {4, 1, 5}}],
+     GraphExteriorBoundary @ MeshRegion[
+        {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {1/4, 1/4, 1/4}},
+        Tetrahedron /@ {{1, 2, 3, 5}, {1, 2, 4, 5}, {1, 3, 4, 5}, {2, 3, 4, 5}}]},
+    {{1, 2, 3, 4}, {1, 2, 3, 4}},
+    TestID -> "GraphExteriorBoundary-mesh-surface"
+]
+
+(* the degree detector on a lattice: MaxDegree finds exactly the rim, a closed lattice has no rim *)
+VerificationTest[
+    {Sort @ GraphExteriorBoundary[GridGraph[{5, 5}], Method -> "MaxDegree"] ==
+       Sort @ Pick[VertexList @ #, Thread[VertexDegree @ # < 4]] & @ GridGraph[{5, 5}],
+     GraphExteriorBoundary[TorusGraph[{5, 5}]]},
+    {True, {}},
+    TestID -> "GraphExteriorBoundary-degree-rim"
 ]
 
 VerificationTest[
@@ -1783,35 +1804,35 @@ VerificationTest[
 ]
 
 
-(* ===== InteriorGraph ===== *)
+(* ===== BoundarylessGraph ===== *)
 
-(* Defining property: connected, and no surviving edge has both endpoints below the average degree *)
+(* Defining property: connected, and no surviving vertex lies in the exterior boundary *)
 VerificationTest[
     With[{g = GridGraph[{5, 5}]},
-        {deg = AssociationThread[VertexList[g], VertexDegree[g]], h = InteriorGraph[g]},
-        {avg = Mean[N @ Values @ deg]},
-        {ConnectedGraphQ[h], AnyTrue[EdgeList[h], deg[#[[1]]] < avg && deg[#[[2]]] < avg &]}
+        {h = BoundarylessGraph[g]},
+        {ConnectedGraphQ[h], IntersectingQ[VertexList[h], GraphExteriorBoundary[g]],
+         IsomorphicGraphQ[h, GridGraph[{3, 3}]]}
     ],
-    {True, False},
-    TestID -> "InteriorGraph-degree-boundary-stripped"
+    {True, False, True},
+    TestID -> "BoundarylessGraph-exterior-boundary-deleted"
 ]
 
 (* A substrate embedded in R^3 stays in R^3, every surviving vertex at its original position *)
 VerificationTest[
     With[{g = Graph3D @ GridGraph[{3, 3, 3}]},
-        {h = InteriorGraph[g]},
+        {h = BoundarylessGraph[g]},
         {Last @ Dimensions @ GraphEmbedding[h],
          GraphEmbedding[h] === Lookup[AssociationThread[VertexList[g], GraphEmbedding[g]], VertexList[h]]}
     ],
     {3, True},
-    TestID -> "InteriorGraph-3D-coordinates"
+    TestID -> "BoundarylessGraph-3D-coordinates"
 ]
 
 (* A planar substrate stays planar *)
 VerificationTest[
-    Last @ Dimensions @ GraphEmbedding @ InteriorGraph @ GridGraph[{5, 5}],
+    Last @ Dimensions @ GraphEmbedding @ BoundarylessGraph @ GridGraph[{5, 5}],
     2,
-    TestID -> "InteriorGraph-2D-coordinates"
+    TestID -> "BoundarylessGraph-2D-coordinates"
 ]
 
 
@@ -3005,28 +3026,26 @@ VerificationTest[
 
 (* ===================== InfraSubstrate ===================== *)
 
-(* the grid substrate is exactly the interior of the grid: rim edges stripped (no edge joins
-   two rim vertices), the whiskers stay, the corners fall off *)
+(* the grid substrate is exactly the interior of the grid: the degree-deficient rim is
+   deleted, leaving the inner grid *)
 VerificationTest[
     With[{int = InfraSubstrate["Grid", {9, 9}]},
-      {rim = Pick[VertexList @ #, Thread[VertexDegree @ # < 4]] & @ GridGraph[{9, 9}]},
-      {IsomorphicGraphQ[Subgraph[int, Complement[VertexList @ int, rim]], GridGraph[{7, 7}]],
-       Select[EdgeList @ int, SubsetQ[rim, List @@ #] &] === {},
+      {IsomorphicGraphQ[int, GridGraph[{7, 7}]],
        VertexCount @ int,
-       IsomorphicGraphQ[int, InteriorGraph @ GridGraph[{9, 9}]]}],
-    {True, True, 77, True},
+       IsomorphicGraphQ[int, BoundarylessGraph @ GridGraph[{9, 9}]]}],
+    {True, 49, True},
     TestID -> "InfraSubstrate-grid-exact"
 ]
 
-(* the strip of a tiling patch deletes exactly the edges joining two below-average-degree
-   vertices of the full patch and keeps the largest component *)
+(* the strip of a tiling patch deletes exactly the below-average-degree vertices of the
+   full patch and keeps the largest component *)
 VerificationTest[
     With[{full = TessellationNeighborhoodGraph[{3, 6}, 6], int = InfraSubstrate["Triangular", "Small"]},
-      {low = Pick[VertexList @ full, Thread[VertexDegree @ full < Mean[N @ VertexDegree @ full]]]},
+      {low = GraphExteriorBoundary[full]},
       {SubsetQ[VertexList @ full, VertexList @ int],
-       Select[EdgeList @ int, SubsetQ[low, List @@ #] &] === {},
+       IntersectingQ[VertexList @ int, low],
        ConnectedGraphQ @ int}],
-    {True, True, True},
+    {True, False, True},
     TestID -> "InfraSubstrate-interior-tiling-strip"
 ]
 
@@ -3127,10 +3146,10 @@ VerificationTest[
 (* MaxDegree interior: a lattice's boundary is its degree-deficient rim, so the
    interior of an 11x11 grid is the inner 9x9 grid and of a 7^3 cube the 5^3 *)
 VerificationTest[
-  {VertexCount[InteriorGraph[GridGraph[{11, 11}], Method -> "MaxDegree"]],
-   VertexCount[InteriorGraph[GridGraph[{7, 7, 7}], Method -> "MaxDegree"]]},
+  {VertexCount[BoundarylessGraph[GridGraph[{11, 11}], Method -> "MaxDegree"]],
+   VertexCount[BoundarylessGraph[GridGraph[{7, 7, 7}], Method -> "MaxDegree"]]},
   {81, 125},
-  TestID -> "InteriorGraph-MaxDegree-lattice-interior"
+  TestID -> "BoundarylessGraph-MaxDegree-lattice-interior"
 ]
 
 EndTestSection[]

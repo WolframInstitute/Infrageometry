@@ -27,12 +27,12 @@ $substrateNames = {
 };
 
 substrate[ "Plane", size_ ] :=
-  trimPendants @ InteriorMeshGraph @ DiscretizeRegion[ Rectangle[ ],
+  trimPendants @ BoundarylessGraph @ DiscretizeRegion[ Rectangle[ ],
     MaxCellMeasure -> size /. { "Small" -> 0.02, "Medium" -> 0.005, "Large" -> 0.001 },
     PrecisionGoal -> Infinity ]
 
 substrate[ "Box", size_ ] :=
-  trimPendants @ InteriorMeshGraph @ DiscretizeRegion[ Cuboid[ ],
+  trimPendants @ BoundarylessGraph @ DiscretizeRegion[ Cuboid[ ],
     MaxCellMeasure -> size /. { "Small" -> 0.01, "Medium" -> 0.002, "Large" -> 0.001 },
     PrecisionGoal -> Infinity ]
 
@@ -41,30 +41,30 @@ substrate[ "Sphere", size_ ] :=
     MaxCellMeasure -> size /. { "Small" -> 0.5, "Medium" -> 0.1, "Large" -> 0.02 } ]
 
 substrate[ "Triangular", size_ ] :=
-  InteriorGraph @ TessellationNeighborhoodGraph[ { 3, 6 }, size /. { "Small" -> 6, "Medium" -> 9, "Large" -> 12 } ]
+  BoundarylessGraph @ TessellationNeighborhoodGraph[ { 3, 6 }, size /. { "Small" -> 6, "Medium" -> 9, "Large" -> 12 } ]
 
 substrate[ "Square", size_ ] :=
-  InteriorGraph @ TessellationNeighborhoodGraph[ { 4, 4 }, size /. { "Small" -> 6, "Medium" -> 9, "Large" -> 12 } ]
+  BoundarylessGraph @ TessellationNeighborhoodGraph[ { 4, 4 }, size /. { "Small" -> 6, "Medium" -> 9, "Large" -> 12 } ]
 
 substrate[ "Hexagonal", size_ ] :=
-  InteriorGraph @ TessellationNeighborhoodGraph[ { 6, 3 }, size /. { "Small" -> 6, "Medium" -> 9, "Large" -> 12 } ]
+  BoundarylessGraph @ TessellationNeighborhoodGraph[ { 6, 3 }, size /. { "Small" -> 6, "Medium" -> 9, "Large" -> 12 } ]
 
 substrate[ "Spherical", size_ ] :=
   TessellationNeighborhoodGraph[ { 3, 5 }, size /. { "Small" -> 5, "Medium" -> 6, "Large" -> 8 } ]
 
 substrate[ "Hyperbolic", size_ ] :=
-  InteriorGraph @ TessellationNeighborhoodGraph[ { 3, 7 }, size /. { "Small" -> 4, "Medium" -> 5, "Large" -> 6 } ]
+  BoundarylessGraph @ TessellationNeighborhoodGraph[ { 3, 7 }, size /. { "Small" -> 4, "Medium" -> 5, "Large" -> 6 } ]
 
 substrate[ "InflatedSquare", size_ ] := InflateGraph @ substrate[ "Square", size ]
 
 substrate[ "Grid", size_ ] :=
-  InteriorGraph @ GridGraph[ size /. { "Small" -> { 9, 9 }, "Medium" -> { 15, 15 }, "Large" -> { 25, 25 } } ]
+  BoundarylessGraph @ GridGraph[ size /. { "Small" -> { 9, 9 }, "Medium" -> { 15, 15 }, "Large" -> { 25, 25 } } ]
 
 (* GridGraph indexes with the first dimension fastest, and without explicit coordinates a 3D
    grid falls back to a 2D spring layout *)
 substrate[ "Cube", size_ ] :=
   With[ { dims = size /. { "Small" -> { 5, 5, 5 }, "Medium" -> { 7, 7, 7 }, "Large" -> { 9, 9, 9 } } },
-    InteriorGraph @ Graph[ GridGraph @ dims, VertexCoordinates -> Reverse /@ Tuples[ Range /@ Reverse @ dims ] ] ]
+    BoundarylessGraph @ Graph[ GridGraph @ dims, VertexCoordinates -> Reverse /@ Tuples[ Range /@ Reverse @ dims ] ] ]
 
 substrate[ "TorusSquare", size_ ] :=
   torusEmbedded[ "Square", size /. { "Small" -> { 8, 6 }, "Medium" -> { 20, 15 }, "Large" -> { 40, 30 } } ]

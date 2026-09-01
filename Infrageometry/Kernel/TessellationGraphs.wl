@@ -28,6 +28,7 @@ PackageScope[tessellationFacesGraph]
 PackageScope[graphDistanceBall]
 PackageScope[euclideanDisk]
 PackageScope[hyperbolicDisk]
+PackageScope[withGraphOptions]
 PackageScope[sphericalDisk]
 PackageScope[euclideanRectangle]
 PackageScope[euclideanReflect]
@@ -824,3 +825,8 @@ LowIndexMaps[p_, q_, maxIndex_] := Module[{tabs, recs},
   Map[Function[rec, With[{perms = rec[[1]], idx = rec[[2]]},
     <|"Index" -> idx, "Generators" -> (PermutationCycles /@ perms), "Skeleton" -> RotationMapGraph[perms],
       "Regular" -> regularActionQ[perms, idx], "Genus" -> 1 - (idx/q - idx/2 + idx/p)/2|>]], recs]];
+
+
+(* apply forwarded Graph options to a constructed graph, passing a non-graph result
+   (e.g. $Failed from a deferred constructor) straight through *)
+withGraphOptions[g_, opts___] := If[GraphQ[g], Graph[g, Sequence @@ FilterRules[{opts}, Options[Graph]]], g]
