@@ -1,6 +1,7 @@
 Package["WolframInstitute`Infrageometry`"]
 
 PackageExport[InfraSubstrate]
+PackageExport[InfraSubstrateStyle]
 PackageExport[AmbientGraphStyle]
 
 
@@ -44,9 +45,14 @@ substrate[ "BoxPatch", size_ ] :=
     MaxCellMeasure -> size /. { "Small" -> 0.01, "Medium" -> 0.002, "Large" -> 0.001 },
     PrecisionGoal -> Infinity ]
 
+(* DiscretizeRegion ignores MaxCellMeasure on special surface regions unless PrecisionGoal
+   is also given, and then only in the {"Area" -> m} spec form; the low goal leaves refined
+   vertices off the unit sphere, so they are normalized back onto it *)
 substrate[ "SphereMesh", size_ ] :=
-  IndexGraph @ MeshConnectivityGraph @ DiscretizeRegion[ Sphere[ ],
-    MaxCellMeasure -> size /. { "Small" -> 0.5, "Medium" -> 0.1, "Large" -> 0.02 } ]
+  With[ { mr = DiscretizeRegion[ Sphere[ ],
+      MaxCellMeasure -> { "Area" -> size /. { "Small" -> 0.5, "Medium" -> 0.1, "Large" -> 0.02 } },
+      PrecisionGoal -> 1 ] },
+    Graph[ IndexGraph @ MeshConnectivityGraph @ mr, VertexCoordinates -> Normalize /@ MeshCoordinates @ mr ] ]
 
 substrate[ "TriangularPatch", size_ ] :=
   BoundarylessGraph[ TessellationNeighborhoodGraph[ { 3, 6 }, size /. { "Small" -> 6, "Medium" -> 9, "Large" -> 12 } ], Method -> "MaxDegree" ]
@@ -217,6 +223,24 @@ hypergraphGraph[ state_ ] :=
 registryUniverse[ id_ ] := registryUniverse[ id ] =
   <| "Rule" -> First @ Flatten[ { ResourceFunction[ "WolframModelData" ][ id, "Rule" ] }, 2 ],
      "Init" -> ResourceFunction[ "WolframModelData" ][ id, "InitialCondition" ] |>
+
+
+(* ===================== InfraSubstrateStyle ===================== *)
+
+(* InfraSubstrateStyle[g, style] applies the substrate backdrop styling to ANY graph, so
+   a hand-built object -- a Wolfram-model final state included -- draws exactly like the
+   roster substrates.  style Automatic (default) picks the ambient gray by vertex count,
+   the same rule InfraSubstrate uses for a raw spec; a list of hyperedges goes through
+   the same 2-section conversion as the wm substrates.  Graph options are forwarded. *)
+
+InfraSubstrateStyle[ g_Graph, style : ( _String | Automatic ) : Automatic,
+    opts : OptionsPattern[ Graph ] ] :=
+  Graph[ g, FilterRules[ { opts }, Options @ Graph ],
+    Sequence @@ AmbientGraphStyle @ Replace[ style, Automatic :> defaultAmbientStyle[ g, None ] ] ]
+
+InfraSubstrateStyle[ state : { __List }, style : ( _String | Automatic ) : Automatic,
+    opts : OptionsPattern[ Graph ] ] :=
+  InfraSubstrateStyle[ hypergraphGraph @ state, style, opts ]
 
 
 (* ===================== Ambient styles ===================== *)

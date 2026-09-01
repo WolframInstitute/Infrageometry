@@ -3128,6 +3128,31 @@ VerificationTest[
     TestID -> "InfraSubstrate-tiers-increase"
 ]
 
+(* InfraSubstrateStyle applies the backdrop styling to any graph -- density-picked gray by
+   default, named style on request -- and takes a hand-built hyperedge state directly *)
+VerificationTest[
+    With[{g = InfraSubstrateStyle @ GridGraph[{7, 7}],
+          h = InfraSubstrateStyle[GridGraph[{40, 40}], "Gray"],
+          w = InfraSubstrateStyle @ {{1, 2}, {2, 3}, {3, 1}, {1, 2, 4}}},
+      {Options[g, EdgeStyle][[1, 2]] === {AmbientGraphStyle["Gray"][[1, 2]]},
+       Options[h, EdgeStyle][[1, 2]] === {AmbientGraphStyle["Gray"][[1, 2]]},
+       Options[InfraSubstrateStyle @ GridGraph[{40, 40}], EdgeStyle][[1, 2]] === {AmbientGraphStyle["GrayFaint"][[1, 2]]},
+       GraphQ[w] && VertexCount[w] == 4}],
+    {True, True, True, True},
+    TestID -> "InfraSubstrateStyle-any-graph"
+]
+
+(* the sphere mesh honours its tier: the {"Area" -> m} + PrecisionGoal spec form is the one
+   DiscretizeRegion respects on Sphere[], and every vertex sits on the unit sphere *)
+VerificationTest[
+    With[{small = InfraSubstrate["SphereMesh", "Small", "KeepCoordinates" -> True],
+          medium = InfraSubstrate["SphereMesh", "Medium", "KeepCoordinates" -> True]},
+      {VertexCount[small] < VertexCount[medium],
+       Max[Abs[Norm /@ GraphEmbedding[small] - 1]] < 1.*^-6}],
+    {True, True},
+    TestID -> "InfraSubstrate-sphere-mesh-tiers"
+]
+
 (* the roster is classified by what a substrate models; the flat list carries every name *)
 VerificationTest[
     With[{classes = InfraSubstrate[], names = InfraSubstrate[All]},
