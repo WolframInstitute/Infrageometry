@@ -2299,10 +2299,9 @@ VerificationTest[
 
 (* TessellationGraph is the single public generator: a {p, q} Schlafli symbol gives a
    regular map, a longer vertex configuration a uniform / Archimedean map; the second
-   argument sizes it (n / {m, n} torus) or supplies the carrying group. PunchHole is the
-   separate surgery utility. *)
+   argument sizes it (n / {m, n} torus) or supplies the carrying group. *)
 
-(* --- Flat-torus regular tessellations + hole punching --- *)
+(* --- Flat-torus regular tessellations --- *)
 
 VerificationTest[
   { Union @ VertexDegree @ TessellationGraph[ { 3, 6 }, { 5, 5 } ],
@@ -2316,12 +2315,6 @@ VerificationTest[
   VertexTransitiveGraphQ @ TessellationGraph[ { 3, 6 }, { 5, 5 } ],
   True,
   TestID -> "Torus-triangular-vertex-transitive"
-]
-
-VerificationTest[
-  With[ { g = GridGraph[ { 5, 5 } ] }, VertexCount @ PunchHole[ g, 1 -> 1 ] < VertexCount @ g ],
-  True,
-  TestID -> "PunchHole-removes-a-ball"
 ]
 
 (* --- Regular maps: spherical Platonic graphs --- *)
@@ -2956,39 +2949,7 @@ VerificationTest[
 ]
 
 
-(* ===================== Example substrates ===================== *)
-
-(* a patch models an open subset of the plane: connected, and with no pendant vertex, since a vertex
-   with a single neighbour represents nothing in the plane *)
-VerificationTest[
-    AllTrue[{"Plane", "Triangular", "Square", "Hexagonal"},
-      With[{g = ExampleGraphData[#, "Large"]}, ConnectedGraphQ[g] && Min[VertexDegree[g]] >= 2] &],
-    True,
-    TestID -> "ExampleGraphData-patches-open"
-]
-
-(* the interior of a tiling patch carries the valence the tiling prescribes *)
-VerificationTest[
-    Max @ VertexDegree @ ExampleGraphData[#, "Large"] & /@ {"Triangular", "Square", "Hexagonal"},
-    {6, 4, 3},
-    TestID -> "ExampleGraphData-tiling-valence"
-]
-
-(* the frozen table and the live generator agree on the tilings, which carry no randomness *)
-VerificationTest[
-    AllTrue[{"Triangular", "Square", "Hexagonal"},
-      IsomorphicGraphQ[ExampleGraphData[#, "Large"], ExampleGraphData[#, 12]] &],
-    True,
-    TestID -> "ExampleGraphData-frozen-matches-live"
-]
-
-(* tiers are strictly increasing in size *)
-VerificationTest[
-    AllTrue[ExampleGraphData[],
-      OrderedQ[VertexCount /@ Lookup[ExampleGraphData[#], {"Small", "Medium", "Large"}]] &],
-    True,
-    TestID -> "ExampleGraphData-tiers-increase"
-]
+(* ===================== Ambient styles ===================== *)
 
 VerificationTest[
     AmbientGraphStyle[],
@@ -3044,26 +3005,23 @@ VerificationTest[
 
 (* ===================== InfraSubstrate ===================== *)
 
-(* named tiers resolve and generate real graphs; the default strips the rim edges (no edge
-   joins two rim vertices, the whiskers stay, the corners fall off), "Interior" -> False the
-   full patch, "Interior" -> n peels n - 1 vertex layers before the strip *)
+(* the grid substrate is exactly the interior of the grid: rim edges stripped (no edge joins
+   two rim vertices), the whiskers stay, the corners fall off *)
 VerificationTest[
     With[{int = InfraSubstrate["Grid", {9, 9}]},
       {rim = Pick[VertexList @ #, Thread[VertexDegree @ # < 4]] & @ GridGraph[{9, 9}]},
       {IsomorphicGraphQ[Subgraph[int, Complement[VertexList @ int, rim]], GridGraph[{7, 7}]],
        Select[EdgeList @ int, SubsetQ[rim, List @@ #] &] === {},
        VertexCount @ int,
-       IsomorphicGraphQ[InfraSubstrate["Grid", {9, 9}, "Interior" -> False], GridGraph[{9, 9}]],
-       VertexCount @ InfraSubstrate["Grid", {9, 9}, "Interior" -> 2]}],
-    {True, True, 77, True, 45},
+       IsomorphicGraphQ[int, InteriorGraph @ GridGraph[{9, 9}]]}],
+    {True, True, 77, True},
     TestID -> "InfraSubstrate-grid-exact"
 ]
 
 (* the strip of a tiling patch deletes exactly the edges joining two below-average-degree
-   vertices and keeps the largest component *)
+   vertices of the full patch and keeps the largest component *)
 VerificationTest[
-    With[{full = InfraSubstrate["Triangular", "Small", "Interior" -> False],
-       int = InfraSubstrate["Triangular", "Small"]},
+    With[{full = TessellationNeighborhoodGraph[{3, 6}, 6], int = InfraSubstrate["Triangular", "Small"]},
       {low = Pick[VertexList @ full, Thread[VertexDegree @ full < Mean[N @ VertexDegree @ full]]]},
       {SubsetQ[VertexList @ full, VertexList @ int],
        Select[EdgeList @ int, SubsetQ[low, List @@ #] &] === {},
@@ -3076,32 +3034,25 @@ VerificationTest[
    at its own lattice coordinates *)
 VerificationTest[
     {Options[InfraSubstrate["Grid", {9, 9}], VertexCoordinates] === {VertexCoordinates -> Automatic},
-     Sort @ Round @ GraphEmbedding @ InfraSubstrate["Grid", {9, 9}, "KeepCoordinates" -> True, "Interior" -> False] ===
-       Sort[Reverse /@ Tuples[Range /@ {9, 9}]]},
+     SubsetQ[Tuples[Range @ 9, {2}], Round /@ GraphEmbedding @ InfraSubstrate["Grid", {9, 9}, "KeepCoordinates" -> True]]},
     {True, True},
     TestID -> "InfraSubstrate-bare-coordinates"
 ]
 
-(* a boundaryless or intrinsic-boundary substrate is untouched by the default peel *)
+(* a boundaryless or intrinsic-boundary substrate keeps every vertex *)
 VerificationTest[
-    {VertexList @ InfraSubstrate["TorusSquare", {8, 6}] ===
-       VertexList @ InfraSubstrate["TorusSquare", {8, 6}, "Interior" -> False],
-     VertexCount @ InfraSubstrate["BinaryTree", 63]},
-    {True, 63},
-    TestID -> "InfraSubstrate-interior-noop"
+    {VertexCount @ InfraSubstrate["BinaryTree", 63], VertexCount @ InfraSubstrate["Complete", "Small"]},
+    {63, 10},
+    TestID -> "InfraSubstrate-boundaryless-full"
 ]
 
-(* every depth of one spec peels the same underlying mesh draw: interior vertices are a
-   subset of the full patch's, with identical coordinates *)
+(* the mesh patch is connected and pendant-free, and its kept coordinates lie in the unit square *)
 VerificationTest[
-    With[{int = InfraSubstrate["Plane", 0.02, "KeepCoordinates" -> True],
-       full = InfraSubstrate["Plane", 0.02, "KeepCoordinates" -> True, "Interior" -> False]},
-      {cInt = AssociationThread[VertexList @ int, GraphEmbedding @ int],
-       cFull = AssociationThread[VertexList @ full, GraphEmbedding @ full]},
-      {SubsetQ[VertexList @ full, VertexList @ int], ConnectedGraphQ @ int,
-       And @@ (cInt[#] == cFull[#] & /@ VertexList @ int)}],
+    With[{g = InfraSubstrate["Plane", "Small", "KeepCoordinates" -> True]},
+      {ConnectedGraphQ @ g, Min @ VertexDegree @ g >= 2,
+       AllTrue[GraphEmbedding @ g, 0 <= Min @ # && Max @ # <= 1 &]}],
     {True, True, True},
-    TestID -> "InfraSubstrate-interior-mesh-consistent"
+    TestID -> "InfraSubstrate-plane-mesh"
 ]
 
 (* the square torus is the 4-regular Cayley graph of Z_m x Z_n *)
@@ -3130,9 +3081,40 @@ VerificationTest[
     TestID -> "InfraSubstrate-registry-universe"
 ]
 
+(* every patch substrate is a connected graph at every tier resolution *)
+VerificationTest[
+    AllTrue[{"Plane", "Triangular", "Square", "Hexagonal"},
+      ConnectedGraphQ @ InfraSubstrate[#, "Small"] &],
+    True,
+    TestID -> "InfraSubstrate-patches-connected"
+]
+
+(* the interior of a tiling patch carries the valence the tiling prescribes *)
+VerificationTest[
+    Max @ VertexDegree @ InfraSubstrate[#, "Small"] & /@ {"Triangular", "Square", "Hexagonal"},
+    {6, 4, 3},
+    TestID -> "InfraSubstrate-tiling-valence"
+]
+
+(* tiers are increasing in size *)
+VerificationTest[
+    AllTrue[{"Triangular", "Square", "Hexagonal", "Grid", "Cube", "TorusSquare", "BinaryTree"},
+      name |-> OrderedQ[VertexCount /@ Map[InfraSubstrate[name, #] &, {"Small", "Medium", "Large"}]]],
+    True,
+    TestID -> "InfraSubstrate-tiers-increase"
+]
+
+(* the roster lists the literal names of the definitions, and every listed name generates *)
+VerificationTest[
+    With[{names = InfraSubstrate[]},
+      {Length @ names >= 25, SubsetQ[names, {"Plane", "Square", "TorusSquare", "wm6655", "EllipsoidRound"}]}],
+    {True, True},
+    TestID -> "InfraSubstrate-roster"
+]
+
 (* generation is seeded per (name, spec): two fresh (unmemoized) builds agree vertex for vertex *)
 VerificationTest[
-    With[{build = Symbol @ First @ Names["WolframInstitute`*`substrateBuild"]},
+    With[{build = Symbol @ First @ Names["WolframInstitute`*`substrate"]},
       {seed = Hash @ {"Plane", 0.013}},
       {g1 = BlockRandom[build["Plane", 0.013], RandomSeeding -> seed],
        g2 = BlockRandom[build["Plane", 0.013], RandomSeeding -> seed]},

@@ -3,7 +3,7 @@ PacletObject[
     "Name" -> "WolframInstitute/Infrageometry",
     "Description" -> "Discrete geometry of combinatorial objects",
     "Creator" -> "Nikolay Murzin",
-    "Version" -> "1.0.45",
+    "Version" -> "1.0.46",
     "WolframVersion" -> "14.3+",
     "PublisherID" -> "WolframInstitute",
     "License" -> "MIT",
@@ -19,13 +19,6 @@ PacletObject[
         "Documentation",
         "Root" -> "Documentation",
         "Language" -> "English"
-      },
-      {
-        "Asset",
-        "Root" -> "Assets",
-        "Assets" -> {
-          {"ExampleGraphs", "ExampleGraphs.wxf"}
-        }
       }
     }
   |>
