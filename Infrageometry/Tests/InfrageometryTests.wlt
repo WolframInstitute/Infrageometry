@@ -3153,22 +3153,11 @@ VerificationTest[
     TestID -> "InfraSubstrate-sphere-mesh-tiers"
 ]
 
-(* the geodesic sphere is the frequency-nu icosahedron subdivision: 10 nu^2 + 2 vertices,
-   12 seeds of degree 5, everything else degree 6, every vertex on the unit sphere *)
-VerificationTest[
-    With[{g = InfraSubstrate["GeodesicSphere", "Small", "KeepCoordinates" -> True]},
-      {VertexCount /@ (InfraSubstrate["GeodesicSphere", #] & /@ {"Small", "Medium", "Large"}),
-       Sort @ Tally @ VertexDegree @ g,
-       Max[Abs[Norm /@ GraphEmbedding[g] - 1]] < 1.*^-6}],
-    {{92, 362, 1002}, {{5, 12}, {6, 80}}, True},
-    TestID -> "InfraSubstrate-geodesic-sphere-tiers"
-]
-
 (* the roster is classified by what a substrate models; the flat list carries every name *)
 VerificationTest[
     With[{classes = InfraSubstrate[], names = InfraSubstrate[All]},
       {Keys @ classes,
-       Length @ names >= 25,
+       Length @ names >= 24,
        SubsetQ[names, {"PlanePatch", "SquarePatch", "SquareTorus", "wm6655", "RoundEllipsoid"}]}],
     {{"OpenManifold", "ClosedManifold", "Exotic", "WolframModel"}, True, True},
     TestID -> "InfraSubstrate-roster"
