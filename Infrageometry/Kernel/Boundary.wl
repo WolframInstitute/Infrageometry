@@ -71,18 +71,20 @@ meshSurfaceVertices[mr_MeshRegion] := With[
 
 (* ===================== Boundaryless graph ===================== *)
 
-(* BoundarylessGraph[x]: delete the exterior boundary and return the largest
-   connected component of the subgraph induced on the interior, carrying the
-   original coordinates over -- the graph made to look boundaryless to the
-   observer.  One deletion rule for both forms; only the boundary detector
-   differs (exact surface for a MeshRegion, degree heuristic for a Graph). *)
+(* BoundarylessGraph[x]: delete every edge joining two exterior-boundary
+   vertices -- the rim contour -- then drop only the vertices this isolates.
+   No other vertex is removed: a boundary vertex with an inward edge survives
+   as a whisker, so the result models an OPEN window onto the geometry, with
+   no visible boundary contour.  One rule for both forms; only the boundary
+   detector differs (exact surface for a MeshRegion, degree heuristic for a
+   Graph). *)
 
 Options[BoundarylessGraph] = Join[{Method -> "AverageDegree", "KeepCoordinates" -> True}, Options[Graph]];
 
 BoundarylessGraph[g_Graph, opts : OptionsPattern[]] :=
 	With[
 		{coords = AssociationThread[VertexList[g], GraphEmbedding[g]]},
-		{h = interiorComponent[g, VertexList[g], GraphExteriorBoundary[g, Method -> OptionValue[Method]]]},
+		{h = rimEdgeTrim[g, GraphExteriorBoundary[g, Method -> OptionValue[Method]]]},
 		If[Length @ First @ coords === 3, Graph3D, Graph][h,
 			Sequence @@ FilterRules[{opts}, Options[Graph]],
 			Sequence @@ If[TrueQ @ OptionValue["KeepCoordinates"],
@@ -92,14 +94,16 @@ BoundarylessGraph[g_Graph, opts : OptionsPattern[]] :=
 BoundarylessGraph[mr_MeshRegion, opts : OptionsPattern[]] :=
 	With[
 		{coords = MeshCoordinates[mr], edges = UndirectedEdge @@@ (First /@ MeshCells[mr, 1])},
-		{h = interiorComponent[Graph[Range @ Length @ coords, edges], Range @ Length @ coords, GraphExteriorBoundary[mr]]},
+		{h = rimEdgeTrim[Graph[Range @ Length @ coords, edges], GraphExteriorBoundary[mr]]},
 		Graph[h,
 			Sequence @@ FilterRules[{opts}, Options[Graph]],
 			Sequence @@ If[TrueQ @ OptionValue["KeepCoordinates"],
 				{VertexCoordinates -> coords[[VertexList[h]]]}, {}]]
 	]
 
-interiorComponent[g_, vertices_, boundary_] :=
-	With[{h = Subgraph[g, Complement[vertices, boundary]]},
-		If[VertexCount[h] == 0, h, First @ MaximalBy[ConnectedGraphComponents[h], VertexCount]]
+rimEdgeTrim[g_, boundary_] :=
+	With[
+		{bQ = Association @ Thread[boundary -> True]},
+		{h = EdgeDelete[g, Select[EdgeList[g], TrueQ[bQ[#[[1]]]] && TrueQ[bQ[#[[2]]]] &]]},
+		VertexDelete[h, Pick[VertexList[h], VertexDegree[h], 0]]
 	]

@@ -8,6 +8,7 @@ PackageExport[AmbientGraphStyle]
 
 (* InfraSubstrate[name, size, style] is the named example substrate at tier "Small" | "Medium" |
    "Large" or a raw spec, drawn as an AmbientGraphStyle backdrop for a construction on top of it.
+   InfraSubstrate[] lists the roster by class; InfraSubstrate[All] is the flat name list.
    Generation is seeded per (name, size), so repeated calls return the same graph.
 
    The roster below is the definition: one substrate[name, size] line per name, the tier table
@@ -15,69 +16,76 @@ PackageExport[AmbientGraphStyle]
    interior strip, a kept embedding, special coordinates -- written into the definition itself.
    To add a substrate, add a line and its name to the list; to change one, edit its line. *)
 
-$substrateNames = {
-  "Plane", "Box", "Sphere",
-  "Triangular", "Square", "Hexagonal", "Spherical", "Hyperbolic", "InflatedSquare",
-  "Grid", "Cube",
-  "TorusSquare", "TorusTriangular", "TorusHexagonal",
-  "BinaryTree", "Complete", "DilutedTree",
-  "Sierpinski", "Buckyball",
-  "wm6655", "wm8619", "wm1811",
-  "EllipsoidRound", "EllipsoidProtruse", "EllipsoidTriaxial"
-};
+(* The roster is classified by what a substrate models: an OPEN manifold (a boundaryless
+   patch -- an open subset of an unbounded or cut geometry, delivered with the rim contour
+   edges removed), a CLOSED manifold (a compact tessellated surface, nothing to strip), an
+   exotic graph (no manifold model), or a Wolfram-model universe. *)
 
-substrate[ "Plane", size_ ] :=
+$substrateClasses = <|
+  "OpenManifold" -> {
+    "PlanePatch", "BoxPatch",
+    "TriangularPatch", "SquarePatch", "HexagonalPatch", "HyperbolicPatch", "InflatedSquarePatch",
+    "SquareGridPatch", "CubicGridPatch" },
+  "ClosedManifold" -> {
+    "SphereMesh", "GeodesicSphere",
+    "SquareTorus", "TriangularTorus", "HexagonalTorus",
+    "RoundEllipsoid", "ProlateEllipsoid", "TriaxialEllipsoid", "Buckyball" },
+  "Exotic" -> { "BinaryTree", "DilutedTree", "CompleteGraph", "SierpinskiTriangle" },
+  "WolframModel" -> { "wm6655", "wm8619", "wm1811" }
+|>;
+
+substrate[ "PlanePatch", size_ ] :=
   trimPendants @ BoundarylessGraph @ DiscretizeRegion[ Rectangle[ ],
     MaxCellMeasure -> size /. { "Small" -> 0.02, "Medium" -> 0.005, "Large" -> 0.001 },
     PrecisionGoal -> Infinity ]
 
-substrate[ "Box", size_ ] :=
+substrate[ "BoxPatch", size_ ] :=
   trimPendants @ BoundarylessGraph @ DiscretizeRegion[ Cuboid[ ],
     MaxCellMeasure -> size /. { "Small" -> 0.01, "Medium" -> 0.002, "Large" -> 0.001 },
     PrecisionGoal -> Infinity ]
 
-substrate[ "Sphere", size_ ] :=
+substrate[ "SphereMesh", size_ ] :=
   IndexGraph @ MeshConnectivityGraph @ DiscretizeRegion[ Sphere[ ],
     MaxCellMeasure -> size /. { "Small" -> 0.5, "Medium" -> 0.1, "Large" -> 0.02 } ]
 
-substrate[ "Triangular", size_ ] :=
-  BoundarylessGraph @ TessellationNeighborhoodGraph[ { 3, 6 }, size /. { "Small" -> 6, "Medium" -> 9, "Large" -> 12 } ]
+substrate[ "TriangularPatch", size_ ] :=
+  BoundarylessGraph[ TessellationNeighborhoodGraph[ { 3, 6 }, size /. { "Small" -> 6, "Medium" -> 9, "Large" -> 12 } ], Method -> "MaxDegree" ]
 
-substrate[ "Square", size_ ] :=
-  BoundarylessGraph @ TessellationNeighborhoodGraph[ { 4, 4 }, size /. { "Small" -> 6, "Medium" -> 9, "Large" -> 12 } ]
+substrate[ "SquarePatch", size_ ] :=
+  BoundarylessGraph[ TessellationNeighborhoodGraph[ { 4, 4 }, size /. { "Small" -> 6, "Medium" -> 9, "Large" -> 12 } ], Method -> "MaxDegree" ]
 
-substrate[ "Hexagonal", size_ ] :=
-  BoundarylessGraph @ TessellationNeighborhoodGraph[ { 6, 3 }, size /. { "Small" -> 6, "Medium" -> 9, "Large" -> 12 } ]
+substrate[ "HexagonalPatch", size_ ] :=
+  BoundarylessGraph[ TessellationNeighborhoodGraph[ { 6, 3 }, size /. { "Small" -> 6, "Medium" -> 9, "Large" -> 12 } ], Method -> "MaxDegree" ]
 
-substrate[ "Spherical", size_ ] :=
+substrate[ "GeodesicSphere", size_ ] :=
   TessellationNeighborhoodGraph[ { 3, 5 }, size /. { "Small" -> 5, "Medium" -> 6, "Large" -> 8 } ]
 
-substrate[ "Hyperbolic", size_ ] :=
-  BoundarylessGraph @ TessellationNeighborhoodGraph[ { 3, 7 }, size /. { "Small" -> 4, "Medium" -> 5, "Large" -> 6 } ]
+substrate[ "HyperbolicPatch", size_ ] :=
+  BoundarylessGraph[ TessellationNeighborhoodGraph[ { 3, 7 }, size /. { "Small" -> 4, "Medium" -> 5, "Large" -> 6 } ], Method -> "MaxDegree" ]
 
-substrate[ "InflatedSquare", size_ ] := InflateGraph @ substrate[ "Square", size ]
+substrate[ "InflatedSquarePatch", size_ ] := InflateGraph @ substrate[ "SquarePatch", size ]
 
-substrate[ "Grid", size_ ] :=
-  BoundarylessGraph @ GridGraph[ size /. { "Small" -> { 9, 9 }, "Medium" -> { 15, 15 }, "Large" -> { 25, 25 } } ]
+substrate[ "SquareGridPatch", size_ ] :=
+  BoundarylessGraph[ GridGraph[ size /. { "Small" -> { 9, 9 }, "Medium" -> { 15, 15 }, "Large" -> { 25, 25 } } ], Method -> "MaxDegree" ]
 
 (* GridGraph indexes with the first dimension fastest, and without explicit coordinates a 3D
    grid falls back to a 2D spring layout *)
-substrate[ "Cube", size_ ] :=
+substrate[ "CubicGridPatch", size_ ] :=
   With[ { dims = size /. { "Small" -> { 5, 5, 5 }, "Medium" -> { 7, 7, 7 }, "Large" -> { 9, 9, 9 } } },
-    BoundarylessGraph @ Graph[ GridGraph @ dims, VertexCoordinates -> Reverse /@ Tuples[ Range /@ Reverse @ dims ] ] ]
+    BoundarylessGraph[ Graph[ GridGraph @ dims, VertexCoordinates -> Reverse /@ Tuples[ Range /@ Reverse @ dims ] ], Method -> "MaxDegree" ] ]
 
-substrate[ "TorusSquare", size_ ] :=
+substrate[ "SquareTorus", size_ ] :=
   torusEmbedded[ "Square", size /. { "Small" -> { 8, 6 }, "Medium" -> { 20, 15 }, "Large" -> { 40, 30 } } ]
 
-substrate[ "TorusTriangular", size_ ] :=
+substrate[ "TriangularTorus", size_ ] :=
   torusEmbedded[ "Triangular", size /. { "Small" -> { 8, 6 }, "Medium" -> { 20, 15 }, "Large" -> { 40, 30 } } ]
 
-substrate[ "TorusHexagonal", size_ ] :=
+substrate[ "HexagonalTorus", size_ ] :=
   torusEmbedded[ "Hexagonal", size /. { "Small" -> { 8, 6 }, "Medium" -> { 20, 15 }, "Large" -> { 40, 30 } } ]
 
 substrate[ "BinaryTree", size_ ] := KaryTree[ size /. { "Small" -> 63, "Medium" -> 127, "Large" -> 255 } ]
 
-substrate[ "Complete", size_ ] := CompleteGraph[ size /. { "Small" -> 10, "Medium" -> 20, "Large" -> 40 } ]
+substrate[ "CompleteGraph", size_ ] := CompleteGraph[ size /. { "Small" -> 10, "Medium" -> 20, "Large" -> 40 } ]
 
 (* intermediate growth 2^(r^alpha): branch 2 exactly at the depths hit by Ceiling[k^(1/alpha)] *)
 substrate[ "DilutedTree", size_ ] :=
@@ -86,7 +94,7 @@ substrate[ "DilutedTree", size_ ] :=
       If[ MemberQ[ Ceiling[ Range[ Last @ spec ]^( 1 / First @ spec ) ], level ], 2, 1 ],
       { level, Last @ spec } ] ]
 
-substrate[ "Sierpinski", size_ ] :=
+substrate[ "SierpinskiTriangle", size_ ] :=
   IndexGraph @ MeshConnectivityGraph @ SierpinskiMesh[ size /. { "Small" -> 4, "Medium" -> 5, "Large" -> 6 } ]
 
 (* BuckyballGraph's 3D-ness lives in GraphLayout "Dimension" -> 3, which any Graph re-wrap
@@ -118,15 +126,15 @@ substrate[ "wm1811", size_ ] :=
     { { 1, 1, 1 }, { 1, 1, 1 } },
     size /. { "Small" -> 100, "Medium" -> 500, "Large" -> 1000 }, "FinalState" ]
 
-substrate[ "EllipsoidRound", size_ ] :=
+substrate[ "RoundEllipsoid", size_ ] :=
   UniformLengthGraph[ BoundaryDiscretizeRegion @ Ellipsoid[ { 0, 0, 0 }, { 1, 1, 1 } ],
     size /. { "Small" -> 100, "Medium" -> 300, "Large" -> 600 }, "KeepCoordinates" -> True ]
 
-substrate[ "EllipsoidProtruse", size_ ] :=
+substrate[ "ProlateEllipsoid", size_ ] :=
   UniformLengthGraph[ BoundaryDiscretizeRegion @ Ellipsoid[ { 0, 0, 0 }, { 5, 1, 1 } ],
     size /. { "Small" -> 100, "Medium" -> 300, "Large" -> 600 }, "KeepCoordinates" -> True ]
 
-substrate[ "EllipsoidTriaxial", size_ ] :=
+substrate[ "TriaxialEllipsoid", size_ ] :=
   UniformLengthGraph[ BoundaryDiscretizeRegion @ Ellipsoid[ { 0, 0, 0 }, { 4, 2, 1 } ],
     size /. { "Small" -> 100, "Medium" -> 300, "Large" -> 600 }, "KeepCoordinates" -> True ]
 
@@ -139,7 +147,9 @@ substrate[ id_String /; StringMatchQ[ id, "wm" ~~ DigitCharacter .. ], size_ ] :
 
 (* ===================== The wrapper ===================== *)
 
-InfraSubstrate[ ] := $substrateNames
+InfraSubstrate[ ] := $substrateClasses
+
+InfraSubstrate[ All ] := Catenate @ Values @ $substrateClasses
 
 InfraSubstrate[ name_String ] := InfraSubstrate[ name, "Medium" ]
 

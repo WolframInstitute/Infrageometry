@@ -227,7 +227,7 @@ VerificationTest[
         {{0, 0}, {1, 0}, {1, 1}, {0, 1}, {1/2, 1/2}},
         Triangle /@ {{1, 2, 5}, {2, 3, 5}, {3, 4, 5}, {4, 1, 5}}
     ]},
-        VertexList[g] == {5} && EdgeList[g] == {}
+        Sort[VertexList[g]] == {1, 2, 3, 4, 5} && Sort[Sort /@ (List @@@ EdgeList[g])] == {{1, 5}, {2, 5}, {3, 5}, {4, 5}}
     ],
     True,
     TestID -> "BoundarylessGraph-Mesh-Disk"
@@ -245,12 +245,12 @@ VerificationTest[
 ]
 
 VerificationTest[
-    (* solid tetrahedron split into 4 sub-tets around interior vertex 5: the surface is deleted, vertex 5 remains *)
+    (* solid tetrahedron split into 4 sub-tets around interior vertex 5: the surface contour is deleted, the 4 spokes survive as whiskers *)
     With[{g = BoundarylessGraph @ MeshRegion[
         {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {1/4, 1/4, 1/4}},
         Tetrahedron /@ {{1, 2, 3, 5}, {1, 2, 4, 5}, {1, 3, 4, 5}, {2, 3, 4, 5}}
     ]},
-        VertexList[g] == {5} && EdgeList[g] == {}
+        Sort[VertexList[g]] == {1, 2, 3, 4, 5} && Sort[Sort /@ (List @@@ EdgeList[g])] == {{1, 5}, {2, 5}, {3, 5}, {4, 5}}
     ],
     True,
     TestID -> "BoundarylessGraph-Mesh-SolidVolume"
@@ -1806,15 +1806,18 @@ VerificationTest[
 
 (* ===== BoundarylessGraph ===== *)
 
-(* Defining property: connected, and no surviving vertex lies in the exterior boundary *)
+(* Defining property: no surviving edge joins two exterior-boundary vertices, boundary
+   vertices with an inward edge survive as whiskers, only isolated vertices (the corners)
+   are dropped *)
 VerificationTest[
     With[{g = GridGraph[{5, 5}]},
-        {h = BoundarylessGraph[g]},
-        {ConnectedGraphQ[h], IntersectingQ[VertexList[h], GraphExteriorBoundary[g]],
-         IsomorphicGraphQ[h, GridGraph[{3, 3}]]}
+        {b = GraphExteriorBoundary[g], h = BoundarylessGraph[g]},
+        {ConnectedGraphQ[h],
+         Select[EdgeList[h], SubsetQ[b, List @@ #] &] === {},
+         VertexCount[h]}
     ],
-    {True, False, True},
-    TestID -> "BoundarylessGraph-exterior-boundary-deleted"
+    {True, True, 21},
+    TestID -> "BoundarylessGraph-rim-contour-deleted"
 ]
 
 (* A substrate embedded in R^3 stays in R^3, every surviving vertex at its original position *)
@@ -3026,48 +3029,50 @@ VerificationTest[
 
 (* ===================== InfraSubstrate ===================== *)
 
-(* the grid substrate is exactly the interior of the grid: the degree-deficient rim is
-   deleted, leaving the inner grid *)
+(* the grid substrate is the grid with its rim contour removed: no edge joins two rim
+   vertices, the whiskers stay, the corners fall off *)
 VerificationTest[
-    With[{int = InfraSubstrate["Grid", {9, 9}]},
-      {IsomorphicGraphQ[int, GridGraph[{7, 7}]],
+    With[{int = InfraSubstrate["SquareGridPatch", {9, 9}]},
+      {rim = Pick[VertexList @ #, Thread[VertexDegree @ # < 4]] & @ GridGraph[{9, 9}]},
+      {IsomorphicGraphQ[Subgraph[int, Complement[VertexList @ int, rim]], GridGraph[{7, 7}]],
+       Select[EdgeList @ int, SubsetQ[rim, List @@ #] &] === {},
        VertexCount @ int,
-       IsomorphicGraphQ[int, BoundarylessGraph @ GridGraph[{9, 9}]]}],
-    {True, 49, True},
+       IsomorphicGraphQ[int, BoundarylessGraph[GridGraph[{9, 9}], Method -> "MaxDegree"]]}],
+    {True, True, 77, True},
     TestID -> "InfraSubstrate-grid-exact"
 ]
 
-(* the strip of a tiling patch deletes exactly the below-average-degree vertices of the
-   full patch and keeps the largest component *)
+(* the strip of a tiling patch deletes exactly the edges joining two degree-deficient
+   vertices of the full patch, then the vertices this isolates *)
 VerificationTest[
-    With[{full = TessellationNeighborhoodGraph[{3, 6}, 6], int = InfraSubstrate["Triangular", "Small"]},
-      {low = GraphExteriorBoundary[full]},
+    With[{full = TessellationNeighborhoodGraph[{3, 6}, 6], int = InfraSubstrate["TriangularPatch", "Small"]},
+      {rim = GraphExteriorBoundary[full, Method -> "MaxDegree"]},
       {SubsetQ[VertexList @ full, VertexList @ int],
-       IntersectingQ[VertexList @ int, low],
+       Select[EdgeList @ int, SubsetQ[rim, List @@ #] &] === {},
        ConnectedGraphQ @ int}],
-    {True, False, True},
+    {True, True, True},
     TestID -> "InfraSubstrate-interior-tiling-strip"
 ]
 
 (* a substrate is bare combinatorics by default; "KeepCoordinates" -> True draws the grid
    at its own lattice coordinates *)
 VerificationTest[
-    {Options[InfraSubstrate["Grid", {9, 9}], VertexCoordinates] === {VertexCoordinates -> Automatic},
-     SubsetQ[Tuples[Range @ 9, {2}], Round /@ GraphEmbedding @ InfraSubstrate["Grid", {9, 9}, "KeepCoordinates" -> True]]},
+    {Options[InfraSubstrate["SquareGridPatch", {9, 9}], VertexCoordinates] === {VertexCoordinates -> Automatic},
+     SubsetQ[Tuples[Range @ 9, {2}], Round /@ GraphEmbedding @ InfraSubstrate["SquareGridPatch", {9, 9}, "KeepCoordinates" -> True]]},
     {True, True},
     TestID -> "InfraSubstrate-bare-coordinates"
 ]
 
 (* a boundaryless or intrinsic-boundary substrate keeps every vertex *)
 VerificationTest[
-    {VertexCount @ InfraSubstrate["BinaryTree", 63], VertexCount @ InfraSubstrate["Complete", "Small"]},
+    {VertexCount @ InfraSubstrate["BinaryTree", 63], VertexCount @ InfraSubstrate["CompleteGraph", "Small"]},
     {63, 10},
     TestID -> "InfraSubstrate-boundaryless-full"
 ]
 
 (* the mesh patch is connected and pendant-free, and its kept coordinates lie in the unit square *)
 VerificationTest[
-    With[{g = InfraSubstrate["Plane", "Small", "KeepCoordinates" -> True]},
+    With[{g = InfraSubstrate["PlanePatch", "Small", "KeepCoordinates" -> True]},
       {ConnectedGraphQ @ g, Min @ VertexDegree @ g >= 2,
        AllTrue[GraphEmbedding @ g, 0 <= Min @ # && Max @ # <= 1 &]}],
     {True, True, True},
@@ -3076,7 +3081,7 @@ VerificationTest[
 
 (* the square torus is the 4-regular Cayley graph of Z_m x Z_n *)
 VerificationTest[
-    With[{g = InfraSubstrate["TorusSquare", {8, 6}]},
+    With[{g = InfraSubstrate["SquareTorus", {8, 6}]},
       {VertexCount @ g, Union @ VertexDegree @ g, GraphDiameter @ g}],
     {48, {4}, 7},
     TestID -> "InfraSubstrate-torus-square"
@@ -3102,7 +3107,7 @@ VerificationTest[
 
 (* every patch substrate is a connected graph at every tier resolution *)
 VerificationTest[
-    AllTrue[{"Plane", "Triangular", "Square", "Hexagonal"},
+    AllTrue[{"PlanePatch", "TriangularPatch", "SquarePatch", "HexagonalPatch"},
       ConnectedGraphQ @ InfraSubstrate[#, "Small"] &],
     True,
     TestID -> "InfraSubstrate-patches-connected"
@@ -3110,45 +3115,49 @@ VerificationTest[
 
 (* the interior of a tiling patch carries the valence the tiling prescribes *)
 VerificationTest[
-    Max @ VertexDegree @ InfraSubstrate[#, "Small"] & /@ {"Triangular", "Square", "Hexagonal"},
+    Max @ VertexDegree @ InfraSubstrate[#, "Small"] & /@ {"TriangularPatch", "SquarePatch", "HexagonalPatch"},
     {6, 4, 3},
     TestID -> "InfraSubstrate-tiling-valence"
 ]
 
 (* tiers are increasing in size *)
 VerificationTest[
-    AllTrue[{"Triangular", "Square", "Hexagonal", "Grid", "Cube", "TorusSquare", "BinaryTree"},
+    AllTrue[{"TriangularPatch", "SquarePatch", "HexagonalPatch", "SquareGridPatch", "CubicGridPatch", "SquareTorus", "BinaryTree"},
       name |-> OrderedQ[VertexCount /@ Map[InfraSubstrate[name, #] &, {"Small", "Medium", "Large"}]]],
     True,
     TestID -> "InfraSubstrate-tiers-increase"
 ]
 
-(* the roster lists the literal names of the definitions, and every listed name generates *)
+(* the roster is classified by what a substrate models; the flat list carries every name *)
 VerificationTest[
-    With[{names = InfraSubstrate[]},
-      {Length @ names >= 25, SubsetQ[names, {"Plane", "Square", "TorusSquare", "wm6655", "EllipsoidRound"}]}],
-    {True, True},
+    With[{classes = InfraSubstrate[], names = InfraSubstrate[All]},
+      {Keys @ classes,
+       Length @ names >= 25,
+       SubsetQ[names, {"PlanePatch", "SquarePatch", "SquareTorus", "wm6655", "RoundEllipsoid"}]}],
+    {{"OpenManifold", "ClosedManifold", "Exotic", "WolframModel"}, True, True},
     TestID -> "InfraSubstrate-roster"
 ]
 
 (* generation is seeded per (name, spec): two fresh (unmemoized) builds agree vertex for vertex *)
 VerificationTest[
     With[{build = Symbol @ First @ Names["WolframInstitute`*`substrate"]},
-      {seed = Hash @ {"Plane", 0.013}},
-      {g1 = BlockRandom[build["Plane", 0.013], RandomSeeding -> seed],
-       g2 = BlockRandom[build["Plane", 0.013], RandomSeeding -> seed]},
+      {seed = Hash @ {"PlanePatch", 0.013}},
+      {g1 = BlockRandom[build["PlanePatch", 0.013], RandomSeeding -> seed],
+       g2 = BlockRandom[build["PlanePatch", 0.013], RandomSeeding -> seed]},
       {VertexList @ g1 === VertexList @ g2, EdgeList @ g1 === EdgeList @ g2}],
     {True, True},
     TestID -> "InfraSubstrate-seeded-generation"
 ]
 
 
-(* MaxDegree interior: a lattice's boundary is its degree-deficient rim, so the
-   interior of an 11x11 grid is the inner 9x9 grid and of a 7^3 cube the 5^3 *)
+(* MaxDegree rim trim: the boundary is the degree-deficient rim; its contour edges go,
+   rim vertices with an inward edge stay as whiskers, the rest are dropped as isolated.
+   11x11 grid: 9x9 interior + 36 whiskers; 7^3 cube: 5^3 interior + 150 face whiskers
+   (the edge and corner vertices have no interior neighbour and fall off) *)
 VerificationTest[
   {VertexCount[BoundarylessGraph[GridGraph[{11, 11}], Method -> "MaxDegree"]],
    VertexCount[BoundarylessGraph[GridGraph[{7, 7, 7}], Method -> "MaxDegree"]]},
-  {81, 125},
+  {117, 275},
   TestID -> "BoundarylessGraph-MaxDegree-lattice-interior"
 ]
 
