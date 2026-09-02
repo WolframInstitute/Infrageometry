@@ -3379,47 +3379,69 @@ VerificationTest[
 	TestID -> "GraphEccentricities-is-vertex-eccentricity-in-order"
 ]
 
-(* The absolute band is the sublevel set of e in hops: k = radius is the center, k the
-   diameter is the whole graph, and it is monotone between. *)
 VerificationTest[
 	With[
 		{g = GridGraph[{5, 7}]},
-		{r = GraphRadius[g], d = GraphDiameter[g]},
-		{pools = Sort @ VertexList @ EccentricitySubgraph[g, #] & /@ Range[r, d]},
-		First[pools] === Sort[GraphCenter[g]] && Last[pools] === Sort[VertexList[g]] &&
-			AllTrue[Partition[pools, 2, 1], Apply[SubsetQ[#2, #1] &]] &&
-			AllTrue[Transpose[{pools, Range[r, d]}],
-				Apply[{pool, k} |-> AllTrue[pool, v |-> VertexEccentricity[g, v] <= k]]]
+		Sort @ VertexList @ CenterGraph[g, 0] === Sort @ GraphCenter[g]
 	],
 	True,
-	TestID -> "EccentricitySubgraph-monotone-sublevel-in-hops"
+	TestID -> "CenterGraph-at-zero-is-the-center"
 ]
 
-(* The two bands are the same short ladder: every relative band is an absolute one. *)
 VerificationTest[
 	With[
 		{g = GridGraph[{5, 7}]},
-		{r = GraphRadius[g], d = GraphDiameter[g]},
-		AllTrue[Range[r, d],
-			k |-> Sort @ VertexList @ EccentricitySubgraph[g, k] ===
-				Sort @ VertexList @ RelativeEccentricitySubgraph[g, (k - r)/(d - r)]]
+		Sort @ VertexList @ CenterGraph[g, 1] === Sort @ VertexList[g] &&
+			Sort @ VertexList @ CenterGraph[g] === Sort @ VertexList[g] &&
+			Sort @ VertexList @ CenterGraph[g, 3] === Sort @ VertexList[g] &&
+			Sort @ VertexList @ CenterGraph[g, -1] === Sort @ GraphCenter[g]
 	],
 	True,
-	TestID -> "EccentricitySubgraph-and-relative-agree-level-by-level"
+	TestID -> "CenterGraph-endpoints-and-clipping"
 ]
 
-(* The band keeps g's labels and each kept vertex's own coordinate. *)
+VerificationTest[
+	With[
+		{g = GridGraph[{5, 7}]},
+		{r = GraphRadius[g]},
+		{pools = Sort @ VertexList @ CenterGraph[g, #/r] & /@ Range[0, r]},
+		AllTrue[Partition[pools, 2, 1], Apply[SubsetQ[#2, #1] &]] &&
+			AllTrue[Transpose[{pools, Range[0, r]}],
+				Apply[{pool, k} |-> AllTrue[pool, v |-> GraphDistance[g, v, First @ GraphCenter[g]] <= k + r]]]
+	],
+	True,
+	TestID -> "CenterGraph-monotone-in-q"
+]
+
 VerificationTest[
 	With[
 		{g = GridGraph[{5, 5}, VertexCoordinates -> Tuples[Range[5], 2]]},
-		{h = EccentricitySubgraph[g, GraphRadius[g] + 1]},
+		{h = CenterGraph[g, 1/2]},
 		{coords = AssociationThread[VertexList[g], GraphEmbedding[g]]},
 		SubsetQ[VertexList[g], VertexList[h]] &&
 			GraphEmbedding[h] === Lookup[coords, VertexList[h]] &&
 			AllTrue[EdgeList[h], EdgeQ[g, #] &]
 	],
 	True,
-	TestID -> "EccentricitySubgraph-keeps-labels-and-coordinates"
+	TestID -> "CenterGraph-keeps-labels-and-coordinates"
+]
+
+VerificationTest[
+	With[
+		{g = CycleGraph[9]},
+		AllTrue[{0, 1/2, 1}, q |-> Sort @ VertexList @ CenterGraph[g, q] === Sort @ VertexList[g]]
+	],
+	True,
+	TestID -> "CenterGraph-vertex-transitive-is-its-own-center"
+]
+
+VerificationTest[
+	With[
+		{g = GraphDisjointUnion[PathGraph[Range[4]], PathGraph[Range[3]]]},
+		CenterGraph[g, 1/2] === g
+	],
+	True,
+	TestID -> "CenterGraph-disconnected-returns-the-graph"
 ]
 
 EndTestSection[]

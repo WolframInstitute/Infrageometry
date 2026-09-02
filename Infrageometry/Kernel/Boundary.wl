@@ -5,7 +5,7 @@ PackageExport[GraphInterior]
 PackageExport[GraphExteriorBoundary]
 PackageExport[BoundarylessGraph]
 PackageExport[GraphEccentricities]
-PackageExport[EccentricitySubgraph]
+PackageExport[CenterGraph]
 PackageExport[RelativeEccentricity]
 PackageExport[RelativeEccentricitySubgraph]
 PackageScope[meshSurfaceVertices]
@@ -31,7 +31,6 @@ GraphBoundary[g_Graph, subset_List] :=
 		Select[subset, IntersectingQ[AdjacencyList[g, #], outside] &]
 	]
 
-(* GraphInterior[g, S]: S \ GraphBoundary[g, S], same two input forms. *)
 GraphInterior[g_Graph, h_Graph] :=
 	Complement[VertexList[h], GraphBoundary[g, h]]
 
@@ -153,15 +152,8 @@ RelativeEccentricitySubgraph[g_Graph, band : (_?NumericQ | {_?NumericQ, _?Numeri
 	]
 
 
-(* EccentricitySubgraph[g, band]: the same cut on the raw eccentricity, in hops -- the
-   induced subgraph on {v : lo <= e(v) <= hi}, a bare k meaning e(v) <= k. Prefer this to
-   the relative form when you are reading one graph: e is what the observer counts, and
-   between GraphRadius[g] and GraphDiameter[g] it has only D - r + 1 values anyway, so the
-   rescaled dial is that same short ladder wearing a fraction. The relative form earns its
-   place only when one number has to mean the same depth on substrates of different size. *)
-
-EccentricitySubgraph[g_Graph, band : (_?NumericQ | {_?NumericQ, _?NumericQ}) : Infinity] :=
-	With[
-		{range = Replace[band, k_?NumericQ :> {0, k}]},
-		Subgraph[g, Pick[VertexList[g], range[[1]] <= # <= range[[2]] & /@ GraphEccentricities[g]]]
+CenterGraph[g_Graph, q : _?NumericQ : 1] :=
+	If[! ConnectedGraphQ[g],
+		g,
+		NeighborhoodGraph[g, GraphCenter[g], Floor[Clip[q, {0, 1}] * GraphRadius[g]]]
 	]
