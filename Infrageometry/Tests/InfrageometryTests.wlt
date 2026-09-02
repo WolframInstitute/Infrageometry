@@ -2981,6 +2981,24 @@ VerificationTest[
     TestID -> "InfraSubstrateStyle-names"
 ]
 
+(* a style is one dot: at a fixed image size the same style renders the same on-screen radius
+   on a 6-cycle, a 144-vertex grid and a tree, because the scaled size is a fraction of the
+   picture.  The default sizing is a fraction of the graph's own nearest-neighbour spacing
+   instead, and when the size was written as an undocumented VertexSize spec it silently fell
+   back to that, every substrate drawing its own dot between 2.5 and 12.8 pixels -- a ratio of
+   5, against the 1.3 the scaled sizes hold here *)
+VerificationTest[
+    With[{radius = g |-> Median @ Values @ ComponentMeasurements[
+        ColorNegate @ Binarize[ColorConvert[Rasterize[Show[
+              Graph[Graph[g, Sequence @@ InfraSubstrateStyle["Gray"]], EdgeStyle -> Opacity[0]],
+              ImageSize -> 200], "Image", Background -> White], "Grayscale"], 0.97],
+        "EquivalentDiskRadius"]},
+      {radii = radius /@ {CycleGraph[6], GridGraph[{12, 12}], KaryTree[40], PetersenGraph[]}},
+      Max[radii] / Min[radii] < 1.5],
+    True,
+    TestID -> "InfraSubstrateStyle-one-dot-per-graph"
+]
+
 
 (* ===================== Inflation ===================== *)
 
@@ -3024,6 +3042,18 @@ VerificationTest[
       {Min @ Values @ sizes >= 1, Max @ Values @ sizes <= 4, Length @ sizes == 20}],
     {True, True, True},
     TestID -> "InflateGraph-fiber-size-range"
+]
+
+(* the jitter lives in a ball of the base embedding's own dimension, so a fiber over a 3D base
+   gets numeric 3D coordinates within the jitter radius of its base vertex *)
+VerificationTest[
+    SeedRandom[11]; With[{base = Graph[GridGraph[{4, 4, 4}], VertexCoordinates -> Reverse /@ Tuples[Range @ 4, {3}]]},
+      {coords = AssociationThread[VertexList @ #, GraphEmbedding @ #] & @ InflateGraph[base, "ExtraVertices" -> 2]},
+      {Union[Length /@ Values @ coords],
+       AllTrue[Values @ coords, VectorQ[#, NumericQ] &],
+       Max @ KeyValueMap[Norm[#2 - coords[First @ #1]] &, KeySelect[coords, MatchQ[InflatedVertex[_, _]]]] < 0.31}],
+    {{3}, True, True},
+    TestID -> "InflateGraph-jitter-ambient-dimension"
 ]
 
 
@@ -3096,16 +3126,16 @@ VerificationTest[
     TestID -> "InfraSubstrate-diluted-growth"
 ]
 
-(* a registry universe is named by its wm number and its tier is a generation count, so the tier
+(* a registry universe is named by its wm number and its size is a generation count, so the size
    and the count it stands for must give the same graph *)
 VerificationTest[
-    With[{tier = InfraSubstrate["wm6655", "Small"], raw = InfraSubstrate["wm6655", 7]},
-      {VertexList @ tier === VertexList @ raw, EdgeList @ tier === EdgeList @ raw, ConnectedGraphQ @ tier}],
+    With[{named = InfraSubstrate["wm6655", "Small"], raw = InfraSubstrate["wm6655", 7]},
+      {VertexList @ named === VertexList @ raw, EdgeList @ named === EdgeList @ raw, ConnectedGraphQ @ named}],
     {True, True, True},
     TestID -> "InfraSubstrate-registry-universe"
 ]
 
-(* every patch substrate is a connected graph at every tier resolution *)
+(* every patch substrate is a connected graph at every named size *)
 VerificationTest[
     AllTrue[{"PlanePatch", "TriangularPatch", "SquarePatch", "HexagonalPatch"},
       ConnectedGraphQ @ InfraSubstrate[#, "Small"] &],
@@ -3120,15 +3150,16 @@ VerificationTest[
     TestID -> "InfraSubstrate-tiling-valence"
 ]
 
-(* tiers are increasing in size *)
+(* the three named sizes are increasing *)
 VerificationTest[
-    AllTrue[{"TriangularPatch", "SquarePatch", "HexagonalPatch", "SquareGridPatch", "CubicGridPatch", "SquareTorus", "BinaryTree"},
+    AllTrue[{"TriangularPatch", "SquarePatch", "HexagonalPatch", "SquareGridPatch", "CubicGridPatch",
+             "SquareTorus", "BinaryTree", "SierpinskiTriangle", "MengerCarpet", "MengerSponge", "UniformLengthSphere"},
       name |-> OrderedQ[VertexCount /@ Map[InfraSubstrate[name, #] &, {"Small", "Medium", "Large"}]]],
     True,
-    TestID -> "InfraSubstrate-tiers-increase"
+    TestID -> "InfraSubstrate-sizes-increase"
 ]
 
-(* the sphere mesh honours its tier: the {"Area" -> m} + PrecisionGoal spec form is the one
+(* the sphere mesh honours its size: the {"Area" -> m} + PrecisionGoal spec form is the one
    DiscretizeRegion respects on Sphere[], and every vertex sits on the unit sphere *)
 VerificationTest[
     With[{small = InfraSubstrate["SphereMesh", "Small", "KeepCoordinates" -> True],
@@ -3136,11 +3167,41 @@ VerificationTest[
       {VertexCount[small] < VertexCount[medium],
        Max[Abs[Norm /@ GraphEmbedding[small] - 1]] < 1.*^-6}],
     {True, True},
-    TestID -> "InfraSubstrate-sphere-mesh-tiers"
+    TestID -> "InfraSubstrate-sphere-mesh-sizes"
+]
+
+(* "Inflate" inflates any substrate: the base survives as the induced subgraph, the fibers carry
+   coordinates of the substrate's own dimension, and the amount is part of the memo key and of the
+   seed, so it neither collides in the cache nor drifts between calls *)
+VerificationTest[
+    With[{bare = InfraSubstrate["CubicGridPatch", "Small"]},
+      {inf = InfraSubstrate["CubicGridPatch", "Small", "Inflate" -> 2, "KeepCoordinates" -> True]},
+      {IsomorphicGraphQ[Subgraph[inf, VertexList @ bare], bare],
+       VertexCount @ inf === 3 VertexCount @ bare,
+       VertexCount @ InfraSubstrate["CubicGridPatch", "Small", "Inflate" -> 4] === 5 VertexCount @ bare,
+       Union[Length /@ GraphEmbedding @ inf],
+       AllTrue[GraphEmbedding @ inf, VectorQ[#, NumericQ] &],
+       EdgeList @ inf === EdgeList @ InfraSubstrate["CubicGridPatch", "Small", "Inflate" -> 2]}],
+    {True, True, True, {3}, True, True},
+    TestID -> "InfraSubstrate-inflate-any-substrate"
+]
+
+(* the bare amount is shorthand for "ExtraVertices" -- a constant or a {min, max} range -- and the
+   rule-list form reaches InflateGraph's remaining knobs, "Density" -> 0 leaving the fibers apart *)
+VerificationTest[
+    With[{base = InfraSubstrate["SquarePatch", "Small"]},
+      {fibers = g |-> Length /@ GroupBy[Cases[VertexList @ g, InflatedVertex[v_, _] :> v], Identity]},
+      {apart = InfraSubstrate["SquarePatch", "Small", "Inflate" -> {"ExtraVertices" -> 2, "Density" -> 0}]},
+      {Union @ Values @ fibers @ InfraSubstrate["SquarePatch", "Small", "Inflate" -> 2],
+       MinMax @ Values @ fibers @ InfraSubstrate["SquarePatch", "Small", "Inflate" -> {1, 3}],
+       Length @ fibers @ apart === VertexCount @ base,
+       Cases[EdgeList @ apart, UndirectedEdge[InflatedVertex[a_, _], InflatedVertex[b_, _]] /; a =!= b] === {}}],
+    {{2}, {1, 3}, True, True},
+    TestID -> "InfraSubstrate-inflate-option-forms"
 ]
 
 (* InfraSubstrateStyle is the palette: the named option list splices into any graph
-   construction, and the tier names alias the looks *)
+   construction, and the size names alias the looks *)
 VerificationTest[
     {InfraSubstrateStyle["Small"] === InfraSubstrateStyle["Gray"],
      InfraSubstrateStyle["Medium"] === InfraSubstrateStyle["GrayOpaque"],
@@ -3156,8 +3217,9 @@ VerificationTest[
     With[{classes = InfraSubstrate[], names = InfraSubstrate[All]},
       {Keys @ classes,
        Length @ names >= 24,
-       SubsetQ[names, {"PlanePatch", "SquarePatch", "SquareTorus", "wm6655", "RoundEllipsoid"}]}],
-    {{"OpenManifold", "ClosedManifold", "Exotic", "WolframModel"}, True, True},
+       SubsetQ[names, {"PlanePatch", "SquarePatch", "SquareTorus", "wm6655", "UniformLengthSphere",
+         "MengerCarpet", "MengerSponge"}]}],
+    {{"OpenManifold", "ClosedManifold", "Fractal", "Exotic", "WolframModel"}, True, True},
     TestID -> "InfraSubstrate-roster"
 ]
 

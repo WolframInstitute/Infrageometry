@@ -98,16 +98,17 @@ inflationSample[ n_?NumericQ ] := Round @ n
 
 inflationSample[ { a_, b_ } ] := RandomInteger[ { Round @ a, Round @ b } ]
 
-(* fiber vertices are scattered close to their base vertex, at a fraction of the mean edge length,
-   so the inflated graph still reads as a thickened patch of the plane rather than as spikes flung
-   outward by the layout engine *)
+(* fiber vertices are scattered close to their base vertex, at a fraction of the mean edge length
+   and inside a ball of the embedding's own dimension, so the inflated graph still reads as a
+   thickened patch rather than as spikes flung outward by the layout engine *)
 inflationCoordinates[ g_, fibers_ ] :=
   With[ { coords = AssociationThread[ VertexList @ g, GraphEmbedding @ g ] },
     { scale = 0.3 Mean[ EuclideanDistance @@ Lookup[ coords, List @@ # ] & /@ EdgeList @ g ] },
+    { jitter = Ball[ ConstantArray[ 0, Length @ First @ coords ], scale ] },
     Normal @ Join[
       coords,
       Association @ Catenate @ KeyValueMap[
-        { v, fiber } |-> ( # -> coords[ v ] + RandomPoint @ Disk[ { 0, 0 }, scale ] & /@ fiber ),
+        { v, fiber } |-> ( # -> coords[ v ] + RandomPoint @ jitter & /@ fiber ),
         fibers ] ]
   ]
 

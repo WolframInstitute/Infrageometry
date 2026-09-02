@@ -6,35 +6,41 @@ PackageExport[InfraSubstrateStyle]
 
 (* ===================== InfraSubstrate ===================== *)
 
-(* InfraSubstrate[name, size, style] is the named example substrate at tier "Small" | "Medium" |
+(* InfraSubstrate[name, size, style] is the named example substrate at size "Small" | "Medium" |
    "Large" or a raw spec, drawn as an InfraSubstrateStyle backdrop for a construction on top of it.
    InfraSubstrate[] lists the roster by class; InfraSubstrate[All] is the flat name list.
-   Generation is seeded per (name, size), so repeated calls return the same graph.
+   Generation is seeded per (name, size, inflation), so repeated calls return the same graph.
 
-   Tiers are calibrated to a common ladder of roughly 100 / 300 / 1000 vertices (about
-   x3 per step, so the percentual growth corresponds across substrates), as closely as
+   Any substrate inflates: "Inflate" -> amount grows a fiber of that many extra vertices over
+   every vertex through InflateGraph, and "Inflate" -> {opts} passes its full option list.  So
+   local dimensional noise is a knob on the whole roster rather than a substrate of its own.
+
+   The three named sizes are calibrated to a common ladder of roughly 100 / 300 / 1000 vertices
+   (about x3 per step, so the percentual growth corresponds across substrates), as closely as
    each generator's granularity allows -- exceptions are noted on their lines.
 
-   The roster below is the definition: one substrate[name, size] line per name, the tier table
+   The roster below is the definition: one substrate[name, size] line per name, the size table
    inline (a raw spec passes through the replacement untouched), and every exception -- an
    interior strip, a kept embedding, special coordinates -- written into the definition itself.
    To add a substrate, add a line and its name to the list; to change one, edit its line. *)
 
 (* The roster is classified by what a substrate models: an OPEN manifold (a boundaryless
    patch -- an open subset of an unbounded or cut geometry, delivered with the rim contour
-   edges removed), a CLOSED manifold (a compact tessellated surface, nothing to strip), an
-   exotic graph (no manifold model), or a Wolfram-model universe. *)
+   edges removed), a CLOSED manifold (a compact tessellated surface, nothing to strip), a
+   FRACTAL (self-similar, a Hausdorff dimension between the integers), an exotic graph (no
+   manifold model and no scaling law), or a Wolfram-model universe. *)
 
 $substrateClasses = <|
   "OpenManifold" -> {
     "PlanePatch", "BoxPatch",
-    "TriangularPatch", "SquarePatch", "HexagonalPatch", "HyperbolicPatch", "InflatedSquarePatch",
+    "TriangularPatch", "SquarePatch", "HexagonalPatch", "HyperbolicPatch",
     "SquareGridPatch", "CubicGridPatch" },
   "ClosedManifold" -> {
     "SphereMesh",
     "SquareTorus", "TriangularTorus", "HexagonalTorus",
-    "RoundEllipsoid", "ProlateEllipsoid", "TriaxialEllipsoid", "Buckyball" },
-  "Exotic" -> { "BinaryTree", "DilutedTree", "CompleteGraph", "SierpinskiTriangle" },
+    "UniformLengthSphere", "ProlateUniformLengthEllipsoid", "TriaxialUniformLengthEllipsoid", "Buckyball" },
+  "Fractal" -> { "SierpinskiTriangle", "MengerCarpet", "MengerSponge" },
+  "Exotic" -> { "BinaryTree", "DilutedTree", "CompleteGraph" },
   "WolframModel" -> { "wm6655", "wm8619", "wm1811" }
 |>;
 
@@ -68,10 +74,6 @@ substrate[ "HexagonalPatch", size_ ] :=
 
 substrate[ "HyperbolicPatch", size_ ] :=
   BoundarylessGraph[ TessellationNeighborhoodGraph[ { 3, 7 }, size /. { "Small" -> 3, "Medium" -> 4, "Large" -> 5 } ], Method -> "MaxDegree" ]
-
-(* inflation roughly doubles a patch, so it takes its own smaller radii *)
-substrate[ "InflatedSquarePatch", size_ ] :=
-  InflateGraph @ substrate[ "SquarePatch", size /. { "Small" -> 5, "Medium" -> 8, "Large" -> 15 } ]
 
 substrate[ "SquareGridPatch", size_ ] :=
   BoundarylessGraph[ GridGraph[ size /. { "Small" -> { 10, 10 }, "Medium" -> { 17, 17 }, "Large" -> { 32, 32 } } ], Method -> "MaxDegree" ]
@@ -107,6 +109,16 @@ substrate[ "DilutedTree", size_ ] :=
 substrate[ "SierpinskiTriangle", size_ ] :=
   IndexGraph @ MeshConnectivityGraph @ SierpinskiMesh[ size /. { "Small" -> 4, "Medium" -> 5, "Large" -> 6 } ]
 
+(* the plane carpet, Hausdorff dimension log 8 / log 3 against the triangle's log 3 / log 2.
+   Both Menger substrates multiply by about 7 a level, so neither can hold the x3 ladder and
+   each simply takes its three widest drawable levels: 96 / 688 / 5280 here, 64 / 896 / 15616
+   for the sponge, whose top level is the heaviest object in the roster by an order *)
+substrate[ "MengerCarpet", size_ ] :=
+  IndexGraph @ MeshConnectivityGraph @ MengerMesh[ size /. { "Small" -> 2, "Medium" -> 3, "Large" -> 4 } ]
+
+substrate[ "MengerSponge", size_ ] :=
+  IndexGraph @ MeshConnectivityGraph @ MengerMesh[ size /. { "Small" -> 1, "Medium" -> 2, "Large" -> 3 }, 3 ]
+
 (* BuckyballGraph's 3D-ness lives in GraphLayout "Dimension" -> 3, which any Graph re-wrap
    resets to a 2D layout -- bake the embedding explicitly *)
 substrate[ "Buckyball", size_ ] :=
@@ -136,15 +148,15 @@ substrate[ "wm1811", size_ ] :=
     { { 1, 1, 1 }, { 1, 1, 1 } },
     size /. { "Small" -> 100, "Medium" -> 300, "Large" -> 1000 }, "FinalState" ]
 
-substrate[ "RoundEllipsoid", size_ ] :=
+substrate[ "UniformLengthSphere", size_ ] :=
   UniformLengthGraph[ BoundaryDiscretizeRegion @ Ellipsoid[ { 0, 0, 0 }, { 1, 1, 1 } ],
     size /. { "Small" -> 100, "Medium" -> 300, "Large" -> 1000 }, "KeepCoordinates" -> True ]
 
-substrate[ "ProlateEllipsoid", size_ ] :=
+substrate[ "ProlateUniformLengthEllipsoid", size_ ] :=
   UniformLengthGraph[ BoundaryDiscretizeRegion @ Ellipsoid[ { 0, 0, 0 }, { 5, 1, 1 } ],
     size /. { "Small" -> 100, "Medium" -> 300, "Large" -> 1000 }, "KeepCoordinates" -> True ]
 
-substrate[ "TriaxialEllipsoid", size_ ] :=
+substrate[ "TriaxialUniformLengthEllipsoid", size_ ] :=
   UniformLengthGraph[ BoundaryDiscretizeRegion @ Ellipsoid[ { 0, 0, 0 }, { 4, 2, 1 } ],
     size /. { "Small" -> 100, "Medium" -> 300, "Large" -> 1000 }, "KeepCoordinates" -> True ]
 
@@ -163,20 +175,31 @@ InfraSubstrate[ All ] := Catenate @ Values @ $substrateClasses
 
 InfraSubstrate[ name_String ] := InfraSubstrate[ name, "Medium" ]
 
-Options[ InfraSubstrate ] = { "KeepCoordinates" -> False };
+Options[ InfraSubstrate ] = { "KeepCoordinates" -> False, "Inflate" -> None };
 
 InfraSubstrate[ name_String, size_, style : ( _String | Automatic ) : Automatic,
     opts : OptionsPattern[ { InfraSubstrate, Graph } ] ] :=
   With[
-    { g = substrateGraph[ name, size ] },
+    { own = FilterRules[ { opts }, Options @ InfraSubstrate ] },
+    { inflate = OptionValue[ InfraSubstrate, own, "Inflate" ] },
+    { g = substrateGraph[ name, size, inflate ],
+      keep = TrueQ @ OptionValue[ InfraSubstrate, own, "KeepCoordinates" ] },
     Graph[ g, FilterRules[ { opts }, Options @ Graph ],
-      substrateCoordinates[ g, TrueQ @ OptionValue[ InfraSubstrate,
-        FilterRules[ { opts }, Options @ InfraSubstrate ], "KeepCoordinates" ] ],
-      Sequence @@ InfraSubstrateStyle @ Replace[ style, Automatic :> defaultAmbientStyle[ g, size ] ] ] ]
+      substrateCoordinates[ g, keep ],
+      Sequence @@ InfraSubstrateStyle @ Replace[ style,
+        Automatic :> defaultAmbientStyle[ g, If[ inflate === None, size, Automatic ] ] ] ] ]
 
-(* memoized: substrates are rebuilt across many figure cells, and seeding makes the cache honest *)
-substrateGraph[ name_, size_ ] := substrateGraph[ name, size ] =
-  BlockRandom[ substrate[ name, size ], RandomSeeding -> Hash @ { name, size } ]
+(* memoized: substrates are rebuilt across many figure cells, and seeding makes the cache honest --
+   the inflation amount is part of the key and of the seed, so two amounts neither collide in the
+   cache nor drift between calls *)
+substrateGraph[ name_, size_, inflate_ ] := substrateGraph[ name, size, inflate ] =
+  BlockRandom[
+    If[ inflate === None,
+      substrate[ name, size ],
+      InflateGraph[ substrate[ name, size ],
+        Sequence @@ Replace[ inflate,
+          amount : Except[ { ___Rule } ] :> { "ExtraVertices" -> amount } ] ] ],
+    RandomSeeding -> Hash @ { name, size, inflate } ]
 
 (* a substrate is bare combinatorics by default: a stored embedding is discarded and a spring
    layout of its own dimension places the vertices; "KeepCoordinates" -> True draws the
@@ -192,7 +215,8 @@ substrateCoordinates[ g_Graph, _ ] :=
         "Dimension" -> Last @ Dimensions @ GraphEmbedding @ g } } ]
 
 (* the denser the picture, the fainter the backdrop must be for a construction drawn over it
-   to read; a raw spec is placed on that scale by its vertex count *)
+   to read; a raw spec is placed on that scale by its vertex count, and so is an inflated
+   substrate, whose named size no longer says how dense it is *)
 defaultAmbientStyle[ _, "Small" ] := "Gray"
 defaultAmbientStyle[ _, "Medium" ] := "GrayOpaque"
 defaultAmbientStyle[ _, "Large" ] := "GrayFaint"
@@ -235,28 +259,42 @@ registryUniverse[ id_ ] := registryUniverse[ id ] =
    highlighted construction drawn on top of it stands out; splice it in with
    Graph[g, Sequence @@ InfraSubstrateStyle["GrayFaint"]]. *)
 
-(* The vertex size is absolute ({"AbsolutePointSize", 4}) and identical in every style, so
-   the dots read the same across all graphs and tiers; a highlight mark stays legible above
-   them with AbsolutePointSize[5].  Vertices are outlined disks (EdgeForm) over a faint
-   fill; the opacity ladder steps down as the picture gets denser, "GrayFaint" being the
-   reference styling for the large graphs. *)
+(* The vertex size is scaled -- a fraction of the coordinate diagonal -- so one style draws
+   one dot on a 100-vertex patch and on a 1000-vertex plane, which the default sizing does
+   not: every other VertexSize value is a fraction of the graph's own nearest-neighbour
+   spacing, so the dot tracks the density instead of the picture.  Vertices are outlined
+   disks (EdgeForm) over a faint fill.  Both ladders step down as the picture gets denser,
+   "GrayFaint" being the reference styling for the large graphs, since one value across all
+   three turns a 1000-vertex substrate into touching rings with the edges swallowed.
+
+   Scaled is a fraction of the picture, not of the page: enlarge a figure and the dot grows
+   with it, while an InfraSceneHighlight mark drawn over it stays at its AbsolutePointSize.
+   The two only keep their relative size at one ImageSize. *)
+
+substrateStyle[ edge_, fill_, rim_, dot_ ] := {
+  EdgeStyle -> Directive[ StandardGray, Opacity[ edge ] ],
+  VertexStyle -> Directive[ StandardGray, Opacity[ fill ], EdgeForm[ { GrayLevel[ 0 ], Opacity[ rim ] } ] ],
+  VertexSize -> { "Scaled", dot } }
+
+(* The colours and the shape of the spec are Jeremy's design sheet verbatim -- StandardGray
+   edges, a StandardGray fill under a black EdgeForm rim -- and so is the 0.35 top of the edge
+   ladder.  The one departure: his vertices sit at 0.13 under 0.35 edges, which leaves the dot
+   invisible on anything drawn in three dimensions, so the vertex channel is lifted just past
+   the edges instead of far past them.  The dot is what an observer stands on and the edge only
+   says which dots are adjacent, so the vertices lead; keeping the lead small is what holds the
+   backdrop to his gray web.  This also removes any need to style by embedding dimension -- the
+   same numbers carry the plane patch, the torus and the tetrahedralised box. *)
 
 infraSubstrateStyles = <|
   "Default"    -> { },
-  "GrayFaint"  -> { EdgeStyle -> Directive[ StandardGray, Opacity[ 0.35 ] ],
-                    VertexStyle -> Directive[ StandardGray, Opacity[ 0.13 ], EdgeForm[ { GrayLevel[ 0 ], Opacity[ 0.25 ] } ] ],
-                    VertexSize -> { "AbsolutePointSize", 4 } },
-  "GrayOpaque" -> { EdgeStyle -> Directive[ StandardGray, Opacity[ 0.5 ] ],
-                    VertexStyle -> Directive[ StandardGray, Opacity[ 0.2 ], EdgeForm[ { GrayLevel[ 0 ], Opacity[ 0.35 ] } ] ],
-                    VertexSize -> { "AbsolutePointSize", 4 } },
-  "Gray"       -> { EdgeStyle -> Directive[ StandardGray, Opacity[ 0.7 ] ],
-                    VertexStyle -> Directive[ StandardGray, Opacity[ 0.3 ], EdgeForm[ { GrayLevel[ 0 ], Opacity[ 0.5 ] } ] ],
-                    VertexSize -> { "AbsolutePointSize", 4 } }
+  "GrayFaint"  -> substrateStyle[ 0.22, 0.33, 0.45, 0.006 ],
+  "GrayOpaque" -> substrateStyle[ 0.3, 0.45, 0.6, 0.009 ],
+  "Gray"       -> substrateStyle[ 0.35, 0.5, 0.65, 0.013 ]
 |>;
 
 InfraSubstrateStyle[ ] := Keys @ infraSubstrateStyles
 
-(* the tier names are accepted as aliases, so a hand-drawn figure can ask for the same
-   look its tier would get: Small -> "Gray", Medium -> "GrayOpaque", Large -> "GrayFaint" *)
+(* the size names are accepted as aliases, so a hand-drawn figure can ask for the same
+   look its size would get: Small -> "Gray", Medium -> "GrayOpaque", Large -> "GrayFaint" *)
 InfraSubstrateStyle[ name_String ] := infraSubstrateStyles @ Replace[ name,
   { "Small" -> "Gray", "Medium" -> "GrayOpaque", "Large" -> "GrayFaint" } ]
