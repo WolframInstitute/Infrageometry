@@ -10,15 +10,15 @@ PackageExport[InfraSubstrateCode]
 
 $substrateClasses = <|
   "OpenManifold" -> {
-    "PlanePatch", "BoxPatch",
-    "TriangularPatch", "SquarePatch", "HexagonalPatch", "HyperbolicPatch",
-    "SquareGridPatch", "CubicGridPatch" },
+    "SquareMeshGraph", "CubeMeshGraph",
+    "TriangularTilingGraph", "SquareTilingGraph", "HexagonalTilingGraph", "HyperbolicTilingGraph",
+    "SquareGridGraph", "CubicGridGraph" },
   "ClosedManifold" -> {
-    "SphereMesh",
-    "SquareTorus", "TriangularTorus", "HexagonalTorus",
-    "UniformLengthSphere", "ProlateUniformLengthEllipsoid", "TriaxialUniformLengthEllipsoid", "Buckyball" },
-  "Fractal" -> { "SierpinskiTriangle", "MengerCarpet", "MengerSponge" },
-  "Exotic" -> { "BinaryTree", "DilutedTree", "CompleteGraph" },
+    "SphereMeshGraph",
+    "SquareTorusGraph", "TriangularTorusGraph", "HexagonalTorusGraph",
+    "UniformLengthSphereGraph", "UniformLengthProlateEllipsoidGraph", "UniformLengthTriaxialEllipsoidGraph", "BuckyballGraph" },
+  "Fractal" -> { "SierpinskiTriangleGraph", "MengerCarpetGraph", "MengerSpongeGraph" },
+  "Exotic" -> { "BinaryTreeGraph", "DilutedTreeGraph", "CompleteGraph" },
   "WolframModel" -> { "wm6655", "wm8619", "wm1811" }
 |>;
 
@@ -98,13 +98,13 @@ substrateCode[ name_, size_, inflate_ ] :=
     HoldComplete[ head_, rest__ ] :> HoldComplete @ head[ rest ]
 
 (* removing the rim leaves a few dangling spikes on a mesh; one deletion pass reaches them all *)
-substrateCode[ "PlanePatch", size_ ] :=
+substrateCode[ "SquareMeshGraph", size_ ] :=
   With[ { measure = size /. { "Small" -> 0.0085, "Medium" -> 0.0028, "Large" -> 0.00082 } },
     HoldComplete @ With[
       { mesh = BoundarylessGraph @ DiscretizeRegion[ Rectangle[ ], MaxCellMeasure -> measure, PrecisionGoal -> Infinity ] },
       VertexDelete[ mesh, Pick[ VertexList @ mesh, VertexDegree @ mesh, 1 ] ] ] ]
 
-substrateCode[ "BoxPatch", size_ ] :=
+substrateCode[ "CubeMeshGraph", size_ ] :=
   With[ { measure = size /. { "Small" -> 0.004, "Medium" -> 0.00133, "Large" -> 0.0004 } },
     HoldComplete @ With[
       { mesh = BoundarylessGraph @ DiscretizeRegion[ Cuboid[ ], MaxCellMeasure -> measure, PrecisionGoal -> Infinity ] },
@@ -113,36 +113,36 @@ substrateCode[ "BoxPatch", size_ ] :=
 (* DiscretizeRegion ignores MaxCellMeasure on a special surface region unless PrecisionGoal is
    given too, and then only in the {"Area" -> m} form; the low goal leaves refined vertices off
    the unit sphere, so they are normalized back onto it *)
-substrateCode[ "SphereMesh", size_ ] :=
+substrateCode[ "SphereMeshGraph", size_ ] :=
   With[ { area = size /. { "Small" -> 0.5, "Medium" -> 0.1, "Large" -> 0.02 } },
     HoldComplete @ With[
       { mesh = DiscretizeRegion[ Sphere[ ], MaxCellMeasure -> { "Area" -> area }, PrecisionGoal -> 1 ] },
       Graph[ IndexGraph @ MeshConnectivityGraph @ mesh,
         VertexCoordinates -> Normalize /@ MeshCoordinates @ mesh ] ] ]
 
-substrateCode[ "TriangularPatch", size_ ] :=
+substrateCode[ "TriangularTilingGraph", size_ ] :=
   With[ { radius = size /. { "Small" -> 5, "Medium" -> 9, "Large" -> 16 } },
     HoldComplete @ BoundarylessGraph[ TessellationNeighborhoodGraph[ { 3, 6 }, radius ], Method -> "MaxDegree" ] ]
 
-substrateCode[ "SquarePatch", size_ ] :=
+substrateCode[ "SquareTilingGraph", size_ ] :=
   With[ { radius = size /. { "Small" -> 7, "Medium" -> 12, "Large" -> 22 } },
     HoldComplete @ BoundarylessGraph[ TessellationNeighborhoodGraph[ { 4, 4 }, radius ], Method -> "MaxDegree" ] ]
 
-substrateCode[ "HexagonalPatch", size_ ] :=
+substrateCode[ "HexagonalTilingGraph", size_ ] :=
   With[ { radius = size /. { "Small" -> 8, "Medium" -> 14, "Large" -> 25 } },
     HoldComplete @ BoundarylessGraph[ TessellationNeighborhoodGraph[ { 6, 3 }, radius ], Method -> "MaxDegree" ] ]
 
-substrateCode[ "HyperbolicPatch", size_ ] :=
+substrateCode[ "HyperbolicTilingGraph", size_ ] :=
   With[ { radius = size /. { "Small" -> 3, "Medium" -> 4, "Large" -> 5 } },
     HoldComplete @ BoundarylessGraph[ TessellationNeighborhoodGraph[ { 3, 7 }, radius ], Method -> "MaxDegree" ] ]
 
-substrateCode[ "SquareGridPatch", size_ ] :=
+substrateCode[ "SquareGridGraph", size_ ] :=
   With[ { dims = size /. { "Small" -> { 10, 10 }, "Medium" -> { 17, 17 }, "Large" -> { 32, 32 } } },
     HoldComplete @ BoundarylessGraph[ GridGraph @ dims, Method -> "MaxDegree" ] ]
 
 (* GridGraph indexes with the first dimension fastest, and without explicit coordinates a 3D
    grid falls back to a 2D spring layout *)
-substrateCode[ "CubicGridPatch", size_ ] :=
+substrateCode[ "CubicGridGraph", size_ ] :=
   With[ { dims = size /. { "Small" -> { 5, 5, 5 }, "Medium" -> { 7, 7, 7 }, "Large" -> { 10, 10, 10 } } },
     HoldComplete @ BoundarylessGraph[
       Graph[ GridGraph @ dims, VertexCoordinates -> Reverse /@ Tuples[ Range /@ Reverse @ dims ] ],
@@ -151,10 +151,10 @@ substrateCode[ "CubicGridPatch", size_ ] :=
 (* the tessellation names a torus vertex by its cell and, on the two-vertex cells, its
    sublattice, which offsets it by half a cell; the honeycomb carries two vertices per cell,
    so its torus takes half-size dims *)
-substrateCode[ name : "SquareTorus" | "TriangularTorus" | "HexagonalTorus", size_ ] :=
+substrateCode[ name : "SquareTorusGraph" | "TriangularTorusGraph" | "HexagonalTorusGraph", size_ ] :=
   With[
-    { shape = StringDelete[ name, "Torus" ],
-      dims = size /. If[ name === "HexagonalTorus",
+    { shape = StringDelete[ name, "TorusGraph" ],
+      dims = size /. If[ name === "HexagonalTorusGraph",
         { "Small" -> { 7, 7 }, "Medium" -> { 15, 10 }, "Large" -> { 25, 20 } },
         { "Small" -> { 10, 10 }, "Medium" -> { 20, 15 }, "Large" -> { 40, 25 } } ] },
     { m = First @ dims, n = Last @ dims },
@@ -166,40 +166,40 @@ substrateCode[ name : "SquareTorus" | "TriangularTorus" | "HexagonalTorus", size
           { ( 1 + 0.4 Cos[ w ] ) Cos[ u ], ( 1 + 0.4 Cos[ w ] ) Sin[ u ], 0.4 Sin[ w ] } ],
         VertexList @ torus ] ] ] ]
 
-substrateCode[ "UniformLengthSphere", size_ ] :=
+substrateCode[ "UniformLengthSphereGraph", size_ ] :=
   With[ { count = size /. { "Small" -> 100, "Medium" -> 300, "Large" -> 1000 } },
     HoldComplete @ UniformLengthGraph[ BoundaryDiscretizeRegion @ Ellipsoid[ { 0, 0, 0 }, { 1, 1, 1 } ],
       count, "KeepCoordinates" -> True ] ]
 
-substrateCode[ "ProlateUniformLengthEllipsoid", size_ ] :=
+substrateCode[ "UniformLengthProlateEllipsoidGraph", size_ ] :=
   With[ { count = size /. { "Small" -> 100, "Medium" -> 300, "Large" -> 1000 } },
     HoldComplete @ UniformLengthGraph[ BoundaryDiscretizeRegion @ Ellipsoid[ { 0, 0, 0 }, { 5, 1, 1 } ],
       count, "KeepCoordinates" -> True ] ]
 
-substrateCode[ "TriaxialUniformLengthEllipsoid", size_ ] :=
+substrateCode[ "UniformLengthTriaxialEllipsoidGraph", size_ ] :=
   With[ { count = size /. { "Small" -> 100, "Medium" -> 300, "Large" -> 1000 } },
     HoldComplete @ UniformLengthGraph[ BoundaryDiscretizeRegion @ Ellipsoid[ { 0, 0, 0 }, { 4, 2, 1 } ],
       count, "KeepCoordinates" -> True ] ]
 
-substrateCode[ "Buckyball", size_ ] :=
+substrateCode[ "BuckyballGraph", size_ ] :=
   With[ { steps = size /. { "Small" -> 1, "Medium" -> 2, "Large" -> 4 } },
     HoldComplete @ With[
       { ball = ResourceFunction[ "BuckyballGraph" ][ steps ] },
       Graph[ ball, VertexCoordinates -> GraphEmbedding @ ball ] ] ]
 
-substrateCode[ "SierpinskiTriangle", size_ ] :=
+substrateCode[ "SierpinskiTriangleGraph", size_ ] :=
   With[ { steps = size /. { "Small" -> 4, "Medium" -> 5, "Large" -> 6 } },
     HoldComplete @ IndexGraph @ MeshConnectivityGraph @ SierpinskiMesh @ steps ]
 
-substrateCode[ "MengerCarpet", size_ ] :=
+substrateCode[ "MengerCarpetGraph", size_ ] :=
   With[ { steps = size /. { "Small" -> 2, "Medium" -> 3, "Large" -> 4 } },
     HoldComplete @ IndexGraph @ MeshConnectivityGraph @ MengerMesh @ steps ]
 
-substrateCode[ "MengerSponge", size_ ] :=
+substrateCode[ "MengerSpongeGraph", size_ ] :=
   With[ { steps = size /. { "Small" -> 1, "Medium" -> 2, "Large" -> 3 } },
     HoldComplete @ IndexGraph @ MeshConnectivityGraph @ MengerMesh[ steps, 3 ] ]
 
-substrateCode[ "BinaryTree", size_ ] :=
+substrateCode[ "BinaryTreeGraph", size_ ] :=
   With[ { count = size /. { "Small" -> 63, "Medium" -> 255, "Large" -> 1023 } },
     HoldComplete @ KaryTree @ count ]
 
@@ -209,7 +209,7 @@ substrateCode[ "CompleteGraph", size_ ] :=
 
 (* the branching sequence doubles on the levels whose index is a perfect power 1/exponent, so
    the tree grows subexponentially: its ball of radius r carries about r^(1/exponent) branchings *)
-substrateCode[ "DilutedTree", size_ ] :=
+substrateCode[ "DilutedTreeGraph", size_ ] :=
   With[ { spec = size /. { "Small" -> { 1/2, 16 }, "Medium" -> { 1/2, 26 }, "Large" -> { 1/2, 42 } } },
     { exponent = First @ spec, depth = Last @ spec },
     HoldComplete @ BranchingSequenceTree @ Table[

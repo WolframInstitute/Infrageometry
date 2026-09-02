@@ -3031,7 +3031,7 @@ VerificationTest[
 (* the grid substrate is the grid with its rim contour removed: no edge joins two rim
    vertices, the whiskers stay, the corners fall off *)
 VerificationTest[
-    With[{int = InfraSubstrate["SquareGridPatch", {9, 9}]},
+    With[{int = InfraSubstrate["SquareGridGraph", {9, 9}]},
       {rim = Pick[VertexList @ #, Thread[VertexDegree @ # < 4]] & @ GridGraph[{9, 9}]},
       {IsomorphicGraphQ[Subgraph[int, Complement[VertexList @ int, rim]], GridGraph[{7, 7}]],
        Select[EdgeList @ int, SubsetQ[rim, List @@ #] &] === {},
@@ -3044,7 +3044,7 @@ VerificationTest[
 (* the strip of a tiling patch deletes exactly the edges joining two degree-deficient
    vertices of the full patch, then the vertices this isolates *)
 VerificationTest[
-    With[{full = TessellationNeighborhoodGraph[{3, 6}, 6], int = InfraSubstrate["TriangularPatch", "Small"]},
+    With[{full = TessellationNeighborhoodGraph[{3, 6}, 6], int = InfraSubstrate["TriangularTilingGraph", "Small"]},
       {rim = GraphExteriorBoundary[full, Method -> "MaxDegree"]},
       {SubsetQ[VertexList @ full, VertexList @ int],
        Select[EdgeList @ int, SubsetQ[rim, List @@ #] &] === {},
@@ -3056,22 +3056,22 @@ VerificationTest[
 (* a substrate is bare combinatorics by default; "KeepCoordinates" -> True draws the grid
    at its own lattice coordinates *)
 VerificationTest[
-    {Options[InfraSubstrate["SquareGridPatch", {9, 9}], VertexCoordinates] === {VertexCoordinates -> Automatic},
-     SubsetQ[Tuples[Range @ 9, {2}], Round /@ GraphEmbedding @ InfraSubstrate["SquareGridPatch", {9, 9}, "KeepCoordinates" -> True]]},
+    {Options[InfraSubstrate["SquareGridGraph", {9, 9}], VertexCoordinates] === {VertexCoordinates -> Automatic},
+     SubsetQ[Tuples[Range @ 9, {2}], Round /@ GraphEmbedding @ InfraSubstrate["SquareGridGraph", {9, 9}, "KeepCoordinates" -> True]]},
     {True, True},
     TestID -> "InfraSubstrate-bare-coordinates"
 ]
 
 (* a boundaryless or intrinsic-boundary substrate keeps every vertex *)
 VerificationTest[
-    {VertexCount @ InfraSubstrate["BinaryTree", 63], VertexCount @ InfraSubstrate["CompleteGraph", "Small"]},
+    {VertexCount @ InfraSubstrate["BinaryTreeGraph", 63], VertexCount @ InfraSubstrate["CompleteGraph", "Small"]},
     {63, 10},
     TestID -> "InfraSubstrate-boundaryless-full"
 ]
 
 (* the mesh patch is connected and pendant-free, and its kept coordinates lie in the unit square *)
 VerificationTest[
-    With[{g = InfraSubstrate["PlanePatch", "Small", "KeepCoordinates" -> True]},
+    With[{g = InfraSubstrate["SquareMeshGraph", "Small", "KeepCoordinates" -> True]},
       {ConnectedGraphQ @ g, Min @ VertexDegree @ g >= 2,
        AllTrue[GraphEmbedding @ g, 0 <= Min @ # && Max @ # <= 1 &]}],
     {True, True, True},
@@ -3080,7 +3080,7 @@ VerificationTest[
 
 (* the square torus is the 4-regular Cayley graph of Z_m x Z_n *)
 VerificationTest[
-    With[{g = InfraSubstrate["SquareTorus", {8, 6}]},
+    With[{g = InfraSubstrate["SquareTorusGraph", {8, 6}]},
       {VertexCount @ g, Union @ VertexDegree @ g, GraphDiameter @ g}],
     {48, {4}, 7},
     TestID -> "InfraSubstrate-torus-square"
@@ -3088,7 +3088,7 @@ VerificationTest[
 
 (* diluted tree: branch 2 exactly at depths Ceiling[k^(1/alpha)], so the shell at depth r has 2^#{branch depths <= r} vertices *)
 VerificationTest[
-    With[{g = InfraSubstrate["DilutedTree", {1/2, 20}]},
+    With[{g = InfraSubstrate["DilutedTreeGraph", {1/2, 20}]},
       {shells = Values @ KeySort @ Counts @ GraphDistance[g, {0, 1}]},
       shells === Table[2^Length @ Select[Union @ Select[Ceiling[Range[20]^2], LessEqualThan @ 20], LessEqualThan @ r], {r, 0, 20}]],
     True,
@@ -3106,7 +3106,7 @@ VerificationTest[
 
 (* every patch substrate is a connected graph at every named size *)
 VerificationTest[
-    AllTrue[{"PlanePatch", "TriangularPatch", "SquarePatch", "HexagonalPatch"},
+    AllTrue[{"SquareMeshGraph", "TriangularTilingGraph", "SquareTilingGraph", "HexagonalTilingGraph"},
       ConnectedGraphQ @ InfraSubstrate[#, "Small"] &],
     True,
     TestID -> "InfraSubstrate-patches-connected"
@@ -3114,15 +3114,15 @@ VerificationTest[
 
 (* the interior of a tiling patch carries the valence the tiling prescribes *)
 VerificationTest[
-    Max @ VertexDegree @ InfraSubstrate[#, "Small"] & /@ {"TriangularPatch", "SquarePatch", "HexagonalPatch"},
+    Max @ VertexDegree @ InfraSubstrate[#, "Small"] & /@ {"TriangularTilingGraph", "SquareTilingGraph", "HexagonalTilingGraph"},
     {6, 4, 3},
     TestID -> "InfraSubstrate-tiling-valence"
 ]
 
 (* the three named sizes are increasing *)
 VerificationTest[
-    AllTrue[{"TriangularPatch", "SquarePatch", "HexagonalPatch", "SquareGridPatch", "CubicGridPatch",
-             "SquareTorus", "BinaryTree", "SierpinskiTriangle", "MengerCarpet", "MengerSponge", "UniformLengthSphere"},
+    AllTrue[{"TriangularTilingGraph", "SquareTilingGraph", "HexagonalTilingGraph", "SquareGridGraph", "CubicGridGraph",
+             "SquareTorusGraph", "BinaryTreeGraph", "SierpinskiTriangleGraph", "MengerCarpetGraph", "MengerSpongeGraph", "UniformLengthSphereGraph"},
       name |-> OrderedQ[VertexCount /@ Map[InfraSubstrate[name, #] &, {"Small", "Medium", "Large"}]]],
     True,
     TestID -> "InfraSubstrate-sizes-increase"
@@ -3131,8 +3131,8 @@ VerificationTest[
 (* the sphere mesh honours its size: the {"Area" -> m} + PrecisionGoal spec form is the one
    DiscretizeRegion respects on Sphere[], and every vertex sits on the unit sphere *)
 VerificationTest[
-    With[{small = InfraSubstrate["SphereMesh", "Small", "KeepCoordinates" -> True],
-          medium = InfraSubstrate["SphereMesh", "Medium", "KeepCoordinates" -> True]},
+    With[{small = InfraSubstrate["SphereMeshGraph", "Small", "KeepCoordinates" -> True],
+          medium = InfraSubstrate["SphereMeshGraph", "Medium", "KeepCoordinates" -> True]},
       {VertexCount[small] < VertexCount[medium],
        Max[Abs[Norm /@ GraphEmbedding[small] - 1]] < 1.*^-6}],
     {True, True},
@@ -3143,14 +3143,14 @@ VerificationTest[
    coordinates of the substrate's own dimension, and the fiber draw is governed by the seed, so
    the same seed re-draws the same inflation *)
 VerificationTest[
-    With[{bare = InfraSubstrate["CubicGridPatch", "Small"]},
-      {inf = (SeedRandom[2]; InfraSubstrate["CubicGridPatch", "Small", "Inflate" -> 2, "KeepCoordinates" -> True])},
+    With[{bare = InfraSubstrate["CubicGridGraph", "Small"]},
+      {inf = (SeedRandom[2]; InfraSubstrate["CubicGridGraph", "Small", "Inflate" -> 2, "KeepCoordinates" -> True])},
       {IsomorphicGraphQ[Subgraph[inf, VertexList @ bare], bare],
        VertexCount @ inf === 3 VertexCount @ bare,
-       VertexCount @ InfraSubstrate["CubicGridPatch", "Small", "Inflate" -> 4] === 5 VertexCount @ bare,
+       VertexCount @ InfraSubstrate["CubicGridGraph", "Small", "Inflate" -> 4] === 5 VertexCount @ bare,
        Union[Length /@ GraphEmbedding @ inf],
        AllTrue[GraphEmbedding @ inf, VectorQ[#, NumericQ] &],
-       EdgeList @ inf === EdgeList @ (SeedRandom[2]; InfraSubstrate["CubicGridPatch", "Small", "Inflate" -> 2, "KeepCoordinates" -> True])}],
+       EdgeList @ inf === EdgeList @ (SeedRandom[2]; InfraSubstrate["CubicGridGraph", "Small", "Inflate" -> 2, "KeepCoordinates" -> True])}],
     {True, True, True, {3}, True, True},
     TestID -> "InfraSubstrate-inflate-any-substrate"
 ]
@@ -3158,11 +3158,11 @@ VerificationTest[
 (* the bare amount is shorthand for "ExtraVertices" -- a constant or a {min, max} range -- and the
    rule-list form reaches InflateGraph's remaining knobs, "Density" -> 0 leaving the fibers apart *)
 VerificationTest[
-    With[{base = InfraSubstrate["SquarePatch", "Small"]},
+    With[{base = InfraSubstrate["SquareTilingGraph", "Small"]},
       {fibers = g |-> Length /@ GroupBy[Cases[VertexList @ g, InflatedVertex[v_, _] :> v], Identity]},
-      {apart = InfraSubstrate["SquarePatch", "Small", "Inflate" -> {"ExtraVertices" -> 2, "Density" -> 0}]},
-      {Union @ Values @ fibers @ InfraSubstrate["SquarePatch", "Small", "Inflate" -> 2],
-       MinMax @ Values @ fibers @ InfraSubstrate["SquarePatch", "Small", "Inflate" -> {1, 3}],
+      {apart = InfraSubstrate["SquareTilingGraph", "Small", "Inflate" -> {"ExtraVertices" -> 2, "Density" -> 0}]},
+      {Union @ Values @ fibers @ InfraSubstrate["SquareTilingGraph", "Small", "Inflate" -> 2],
+       MinMax @ Values @ fibers @ InfraSubstrate["SquareTilingGraph", "Small", "Inflate" -> {1, 3}],
        Length @ fibers @ apart === VertexCount @ base,
        Cases[EdgeList @ apart, UndirectedEdge[InflatedVertex[a_, _], InflatedVertex[b_, _]] /; a =!= b] === {}}],
     {{2}, {1, 3}, True, True},
@@ -3173,7 +3173,7 @@ VerificationTest[
    them: the vertex-count fallback saturates at the "Large" look, so deferring an inflated
    substrate to it would give "Medium" and "Large" one size *)
 VerificationTest[
-    With[{dot = opts |-> VertexSize /. Options[InfraSubstrate["SquarePatch", Sequence @@ opts], VertexSize]},
+    With[{dot = opts |-> VertexSize /. Options[InfraSubstrate["SquareTilingGraph", Sequence @@ opts], VertexSize]},
       {DuplicateFreeQ[dot /@ {{"Small"}, {"Medium"}, {"Large"}}],
        DuplicateFreeQ[dot /@ {{"Small", "Inflate" -> 2}, {"Medium", "Inflate" -> 2}, {"Large", "Inflate" -> 2}}],
        dot[{"Small"}] === dot[{"Small", "Inflate" -> 2}]}],
@@ -3186,9 +3186,9 @@ VerificationTest[
    any other draw.  UniformLengthSphere is the probe because its relaxation is genuinely
    random -- the lattice, tiling, mesh and Wolfram-model lines are deterministic *)
 VerificationTest[
-    With[{draw = seed |-> (SeedRandom[seed]; InfraSubstrate["UniformLengthSphere", "Small"])},
+    With[{draw = seed |-> (SeedRandom[seed]; InfraSubstrate["UniformLengthSphereGraph", "Small"])},
       {draw[1] === draw[1], draw[1] =!= draw[77],
-       SeedRandom[5]; InfraSubstrate["UniformLengthSphere", "Small"] =!= InfraSubstrate["UniformLengthSphere", "Small"]}],
+       SeedRandom[5]; InfraSubstrate["UniformLengthSphereGraph", "Small"] =!= InfraSubstrate["UniformLengthSphereGraph", "Small"]}],
     {True, True, True},
     TestID -> "InfraSubstrate-seeded-from-outside"
 ]
@@ -3202,8 +3202,8 @@ VerificationTest[
    rule, a line with an embedded helper, one with no coordinate clause, and an inflated line with
    kept coordinates *)
 VerificationTest[
-    With[{cases = {{"SquarePatch", "Small"}, {"PlanePatch", "Small"}, {"SquareTorus", "Small"},
-                   {"wm6655", "Small"}, {"CubicGridPatch", "Small", "Inflate" -> 2, "KeepCoordinates" -> True}}},
+    With[{cases = {{"SquareTilingGraph", "Small"}, {"SquareMeshGraph", "Small"}, {"SquareTorusGraph", "Small"},
+                   {"wm6655", "Small"}, {"CubicGridGraph", "Small", "Inflate" -> 2, "KeepCoordinates" -> True}}},
       {roster = Map[name |-> InfraSubstrateCode[name, "Small"], InfraSubstrate[All]]},
       {Map[spec |-> (SeedRandom[3]; InfraSubstrate @@ Insert[spec, "Default", 3]), cases] ===
          Map[spec |-> With[{code = InfraSubstrateCode @@ spec}, SeedRandom[3]; ReleaseHold[code]], cases],
@@ -3219,9 +3219,9 @@ VerificationTest[
    two-argument form is per substrate and falls back to the size default, so a custom look for
    one substrate is one more definition *)
 VerificationTest[
-    {InfraSubstrateStyle["PlanePatch", "Small"] === InfraSubstrateStyle["Small"],
+    {InfraSubstrateStyle["SquareMeshGraph", "Small"] === InfraSubstrateStyle["Small"],
      InfraSubstrateStyle["wm6655", "Large"] === InfraSubstrateStyle["Large"],
-     InfraSubstrateStyle["SquareTorus", "Default"],
+     InfraSubstrateStyle["SquareTorusGraph", "Default"],
      Sort[First /@ InfraSubstrateStyle["Large"]],
      Options[Graph[GridGraph[{5, 5}], Sequence @@ InfraSubstrateStyle["Small"]], EdgeStyle][[1, 2]] =!= Automatic},
     {True, True, {}, {EdgeStyle, VertexSize, VertexStyle}, True},
@@ -3233,8 +3233,8 @@ VerificationTest[
     With[{classes = InfraSubstrate[], names = InfraSubstrate[All]},
       {Keys @ classes,
        Length @ names >= 24,
-       SubsetQ[names, {"PlanePatch", "SquarePatch", "SquareTorus", "wm6655", "UniformLengthSphere",
-         "MengerCarpet", "MengerSponge"}]}],
+       SubsetQ[names, {"SquareMeshGraph", "SquareTilingGraph", "SquareTorusGraph", "wm6655", "UniformLengthSphereGraph",
+         "MengerCarpetGraph", "MengerSpongeGraph"}]}],
     {{"OpenManifold", "ClosedManifold", "Fractal", "Exotic", "WolframModel"}, True, True},
     TestID -> "InfraSubstrate-roster"
 ]
@@ -3243,9 +3243,9 @@ VerificationTest[
    builds of the same raw size spec agree vertex for vertex *)
 VerificationTest[
     With[{build = Symbol @ First @ Names["WolframInstitute`*`substrateCode"]},
-      {seed = Hash @ {"PlanePatch", 0.013}},
-      {g1 = (SeedRandom[seed]; ReleaseHold @ build["PlanePatch", 0.013]),
-       g2 = (SeedRandom[seed]; ReleaseHold @ build["PlanePatch", 0.013])},
+      {seed = Hash @ {"SquareMeshGraph", 0.013}},
+      {g1 = (SeedRandom[seed]; ReleaseHold @ build["SquareMeshGraph", 0.013]),
+       g2 = (SeedRandom[seed]; ReleaseHold @ build["SquareMeshGraph", 0.013])},
       {VertexList @ g1 === VertexList @ g2, EdgeList @ g1 === EdgeList @ g2}],
     {True, True},
     TestID -> "InfraSubstrate-seeded-generation"
