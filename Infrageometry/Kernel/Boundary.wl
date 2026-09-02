@@ -7,7 +7,6 @@ PackageExport[BoundarylessGraph]
 PackageExport[GraphEccentricities]
 PackageExport[CenterGraph]
 PackageExport[RelativeEccentricity]
-PackageExport[RelativeEccentricitySubgraph]
 PackageScope[meshSurfaceVertices]
 
 
@@ -135,20 +134,6 @@ RelativeEccentricity[x : (_Graph | _List)] :=
 		{ecc = GraphEccentricities[x]},
 		{r = Min[ecc], d = Max[ecc]},
 		If[! NumericQ[d] || d == r, ConstantArray[0, Length[ecc]], (ecc - r) / (d - r)]
-	]
-
-
-(* RelativeEccentricitySubgraph[g, band]: the induced subgraph on {v : lo <= t(v) <= hi},
-   the substrate cut to a relative depth. A bare q is the band {0, q}. Subgraph keeps the
-   vertex labels and their coordinates, so a construction carried out on the band is
-   simultaneously an object of g and draws on it unchanged. The rim-stripping cousin
-   BoundarylessGraph cuts absolutely and once; this cuts relatively and by a dial. A band
-   that disconnects is returned disconnected. *)
-
-RelativeEccentricitySubgraph[g_Graph, band : (_?NumericQ | {_?NumericQ, _?NumericQ}) : 1] :=
-	With[
-		{range = Replace[band, q_?NumericQ :> {0, q}]},
-		Subgraph[g, Pick[VertexList[g], range[[1]] <= # <= range[[2]] & /@ RelativeEccentricity[g]]]
 	]
 
 
