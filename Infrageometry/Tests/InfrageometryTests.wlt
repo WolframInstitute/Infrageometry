@@ -3321,4 +3321,61 @@ VerificationTest[
 	TestID -> "RelativeEccentricitySubgraph-band-walks-are-graph-walks"
 ]
 
+(* e is the list form of VertexEccentricity, in VertexList order even when the vertex
+   names are scrambled, and it is bounded by the radius and the diameter. *)
+VerificationTest[
+	With[
+		{g = Graph[RandomSample[Range[24]], EdgeList[GridGraph[{4, 6}]]]},
+		{e = GraphEccentricities[g]},
+		e === (VertexEccentricity[g, #] & /@ VertexList[g]) &&
+			Min[e] === GraphRadius[g] && Max[e] === GraphDiameter[g] &&
+			e === GraphEccentricities[GraphDistanceMatrix[g]]
+	],
+	True,
+	TestID -> "GraphEccentricities-is-vertex-eccentricity-in-order"
+]
+
+(* The absolute band is the sublevel set of e in hops: k = radius is the center, k the
+   diameter is the whole graph, and it is monotone between. *)
+VerificationTest[
+	With[
+		{g = GridGraph[{5, 7}]},
+		{r = GraphRadius[g], d = GraphDiameter[g]},
+		{pools = Sort @ VertexList @ EccentricitySubgraph[g, #] & /@ Range[r, d]},
+		First[pools] === Sort[GraphCenter[g]] && Last[pools] === Sort[VertexList[g]] &&
+			AllTrue[Partition[pools, 2, 1], Apply[SubsetQ[#2, #1] &]] &&
+			AllTrue[Transpose[{pools, Range[r, d]}],
+				Apply[{pool, k} |-> AllTrue[pool, v |-> VertexEccentricity[g, v] <= k]]]
+	],
+	True,
+	TestID -> "EccentricitySubgraph-monotone-sublevel-in-hops"
+]
+
+(* The two bands are the same short ladder: every relative band is an absolute one. *)
+VerificationTest[
+	With[
+		{g = GridGraph[{5, 7}]},
+		{r = GraphRadius[g], d = GraphDiameter[g]},
+		AllTrue[Range[r, d],
+			k |-> Sort @ VertexList @ EccentricitySubgraph[g, k] ===
+				Sort @ VertexList @ RelativeEccentricitySubgraph[g, (k - r)/(d - r)]]
+	],
+	True,
+	TestID -> "EccentricitySubgraph-and-relative-agree-level-by-level"
+]
+
+(* The band keeps g's labels and each kept vertex's own coordinate. *)
+VerificationTest[
+	With[
+		{g = GridGraph[{5, 5}, VertexCoordinates -> Tuples[Range[5], 2]]},
+		{h = EccentricitySubgraph[g, GraphRadius[g] + 1]},
+		{coords = AssociationThread[VertexList[g], GraphEmbedding[g]]},
+		SubsetQ[VertexList[g], VertexList[h]] &&
+			GraphEmbedding[h] === Lookup[coords, VertexList[h]] &&
+			AllTrue[EdgeList[h], EdgeQ[g, #] &]
+	],
+	True,
+	TestID -> "EccentricitySubgraph-keeps-labels-and-coordinates"
+]
+
 EndTestSection[]

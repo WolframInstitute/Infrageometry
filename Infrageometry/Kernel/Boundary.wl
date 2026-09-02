@@ -4,6 +4,8 @@ PackageExport[GraphBoundary]
 PackageExport[GraphInterior]
 PackageExport[GraphExteriorBoundary]
 PackageExport[BoundarylessGraph]
+PackageExport[GraphEccentricities]
+PackageExport[EccentricitySubgraph]
 PackageExport[RelativeEccentricity]
 PackageExport[RelativeEccentricitySubgraph]
 PackageScope[meshSurfaceVertices]
@@ -120,11 +122,18 @@ rimEdgeTrim[g_, boundary_] :=
    or the space is disconnected: there every point is at once center and periphery, and t
    is identically 0. *)
 
-RelativeEccentricity[g_Graph] := RelativeEccentricity @ GraphDistanceMatrix[g]
+(* GraphEccentricities[x]: e(v) = max_w d(v, w), one per point in VertexList / row order --
+   the list form VertexEccentricity lacks (it takes one vertex at a time). Absolute, in
+   hops: the honest quantity, bounded by GraphRadius and GraphDiameter. *)
 
-RelativeEccentricity[distMatrix_List] :=
+GraphEccentricities[g_Graph] := GraphEccentricities @ GraphDistanceMatrix[g]
+
+GraphEccentricities[distMatrix_List] := Max /@ distMatrix
+
+
+RelativeEccentricity[x : (_Graph | _List)] :=
 	With[
-		{ecc = Max /@ distMatrix},
+		{ecc = GraphEccentricities[x]},
 		{r = Min[ecc], d = Max[ecc]},
 		If[! NumericQ[d] || d == r, ConstantArray[0, Length[ecc]], (ecc - r) / (d - r)]
 	]
@@ -141,4 +150,18 @@ RelativeEccentricitySubgraph[g_Graph, band : (_?NumericQ | {_?NumericQ, _?Numeri
 	With[
 		{range = Replace[band, q_?NumericQ :> {0, q}]},
 		Subgraph[g, Pick[VertexList[g], range[[1]] <= # <= range[[2]] & /@ RelativeEccentricity[g]]]
+	]
+
+
+(* EccentricitySubgraph[g, band]: the same cut on the raw eccentricity, in hops -- the
+   induced subgraph on {v : lo <= e(v) <= hi}, a bare k meaning e(v) <= k. Prefer this to
+   the relative form when you are reading one graph: e is what the observer counts, and
+   between GraphRadius[g] and GraphDiameter[g] it has only D - r + 1 values anyway, so the
+   rescaled dial is that same short ladder wearing a fraction. The relative form earns its
+   place only when one number has to mean the same depth on substrates of different size. *)
+
+EccentricitySubgraph[g_Graph, band : (_?NumericQ | {_?NumericQ, _?NumericQ}) : Infinity] :=
+	With[
+		{range = Replace[band, k_?NumericQ :> {0, k}]},
+		Subgraph[g, Pick[VertexList[g], range[[1]] <= # <= range[[2]] & /@ GraphEccentricities[g]]]
 	]
