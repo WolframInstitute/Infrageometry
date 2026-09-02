@@ -3200,6 +3200,18 @@ VerificationTest[
     TestID -> "InfraSubstrate-inflate-option-forms"
 ]
 
+(* the three named sizes draw three distinct dots, and inflating does not merge any two of
+   them: the vertex-count fallback saturates at "GrayFaint", so deferring an inflated
+   substrate to it would give "Medium" and "Large" one size *)
+VerificationTest[
+    With[{dot = opts |-> VertexSize /. Options[InfraSubstrate["SquarePatch", Sequence @@ opts], VertexSize]},
+      {DuplicateFreeQ[dot /@ {{"Small"}, {"Medium"}, {"Large"}}],
+       DuplicateFreeQ[dot /@ {{"Small", "Inflate" -> 2}, {"Medium", "Inflate" -> 2}, {"Large", "Inflate" -> 2}}],
+       dot[{"Small"}] === dot[{"Small", "Inflate" -> 2}]}],
+    {True, True, True},
+    TestID -> "InfraSubstrate-sizes-keep-distinct-dots"
+]
+
 (* InfraSubstrateStyle is the palette: the named option list splices into any graph
    construction, and the size names alias the looks *)
 VerificationTest[

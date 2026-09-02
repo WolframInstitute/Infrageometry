@@ -181,13 +181,11 @@ InfraSubstrate[ name_String, size_, style : ( _String | Automatic ) : Automatic,
     opts : OptionsPattern[ { InfraSubstrate, Graph } ] ] :=
   With[
     { own = FilterRules[ { opts }, Options @ InfraSubstrate ] },
-    { inflate = OptionValue[ InfraSubstrate, own, "Inflate" ] },
-    { g = substrateGraph[ name, size, inflate ],
+    { g = substrateGraph[ name, size, OptionValue[ InfraSubstrate, own, "Inflate" ] ],
       keep = TrueQ @ OptionValue[ InfraSubstrate, own, "KeepCoordinates" ] },
     Graph[ g, FilterRules[ { opts }, Options @ Graph ],
       substrateCoordinates[ g, keep ],
-      Sequence @@ InfraSubstrateStyle @ Replace[ style,
-        Automatic :> defaultAmbientStyle[ g, If[ inflate === None, size, Automatic ] ] ] ] ]
+      Sequence @@ InfraSubstrateStyle @ Replace[ style, Automatic :> defaultAmbientStyle[ g, size ] ] ] ]
 
 (* memoized: substrates are rebuilt across many figure cells, and seeding makes the cache honest --
    the inflation amount is part of the key and of the seed, so two amounts neither collide in the
@@ -215,8 +213,9 @@ substrateCoordinates[ g_Graph, _ ] :=
         "Dimension" -> Last @ Dimensions @ GraphEmbedding @ g } } ]
 
 (* the denser the picture, the fainter the backdrop must be for a construction drawn over it
-   to read; a raw spec is placed on that scale by its vertex count, and so is an inflated
-   substrate, whose named size no longer says how dense it is *)
+   to read; a raw spec is placed on that scale by its vertex count.  A named size keeps its
+   look even inflated: the count branch saturates at "GrayFaint" past 800 vertices, so
+   deferring an inflated substrate to it would draw "Medium" and "Large" with one dot *)
 defaultAmbientStyle[ _, "Small" ] := "Gray"
 defaultAmbientStyle[ _, "Medium" ] := "GrayOpaque"
 defaultAmbientStyle[ _, "Large" ] := "GrayFaint"
