@@ -2,6 +2,7 @@ Package["WolframInstitute`Infrageometry`"]
 
 PackageExport[InfraSubstrate]
 PackageExport[InfraSubstrateStyle]
+PackageExport[InfraSubstrateCode]
 
 
 (* ===================== InfraSubstrate ===================== *)
@@ -220,6 +221,99 @@ defaultAmbientStyle[ _, "Small" ] := "Gray"
 defaultAmbientStyle[ _, "Medium" ] := "GrayOpaque"
 defaultAmbientStyle[ _, "Large" ] := "GrayFaint"
 defaultAmbientStyle[ g_, _ ] := Which[ VertexCount @ g <= 250, "Gray", VertexCount @ g <= 800, "GrayOpaque", True, "GrayFaint" ]
+
+
+(* ===================== InfraSubstrateCode ===================== *)
+
+(* InfraSubstrateCode[name, size, style] is the code behind InfraSubstrate[name, size, style]:
+   one self-contained expression, as a string, evaluating to the identical graph.  The roster
+   line is read off its own down-value rather than transcribed, so the printed code cannot
+   drift from the code that runs; the size table, the generation seed and the layout dimension
+   are baked in, and the private helpers the line calls ride along as local definitions. *)
+
+Options[ InfraSubstrateCode ] = Options[ InfraSubstrate ];
+
+InfraSubstrateCode[ name_String ] := InfraSubstrateCode[ name, "Medium" ]
+
+InfraSubstrateCode[ name_String, size_, style : ( _String | Automatic ) : Automatic,
+    opts : OptionsPattern[ { InfraSubstrate, Graph } ] ] :=
+  With[
+    { own = FilterRules[ { opts }, Options @ InfraSubstrate ],
+      graphOpts = FilterRules[ { opts }, Options @ Graph ] },
+    { inflate = OptionValue[ InfraSubstrate, own, "Inflate" ] },
+    { g = substrateGraph[ name, size, inflate ],
+      generator = substrateGenerator[ name, size, inflate ] },
+    { ambient = Replace[ style, Automatic :> defaultAmbientStyle[ g, size ] ] },
+    { arguments = Join[
+        { "g" },
+        If[ graphOpts === { }, { }, { codeString @ HoldComplete @ graphOpts } ],
+        coordinateCode[ g, TrueQ @ OptionValue[ InfraSubstrate, own, "KeepCoordinates" ] ],
+        { "Sequence @@ InfraSubstrateStyle[" <> codeString @ HoldComplete @ ambient <> "]" } ] },
+    localizeHelpers[
+      "With[{g = BlockRandom[" <> codeString @ generator <>
+        ",\n    RandomSeeding -> " <> ToString @ Hash @ { name, size, inflate } <> "]},\n  Graph[" <>
+        StringRiffle[ arguments, ", " ] <> "]]",
+      generator ]
+  ]
+
+(* the roster line for this name, with the size table collapsed to the value this size selects
+   and the inflation call wrapped around it -- everything substrateGraph feeds to BlockRandom.
+   The collapsed subexpression is not always the bare symbol: "/." binds looser than "->", so
+   MaxCellMeasure -> size /. table is a replacement on the whole rule, and the mesh patches
+   read that way.  The v /; True is what forces the value out -- a plain RuleDelayed right-hand
+   side lands inside the HoldComplete unevaluated, printing the table back verbatim. *)
+substrateGenerator[ name_, size_, inflate_ ] :=
+  With[
+    { clause = FirstCase[ DownValues @ substrate,
+        Verbatim[ RuleDelayed ][ Verbatim[ HoldPattern ][ substrate[ p_, s_ ] ], body_ ] /; MatchQ[ name, p ] :>
+          { First @ s, HoldComplete @ body } ] },
+    { sizeSymbol = First @ clause },
+    { baked = Last[ clause ] /.
+        { HoldPattern[ ReplaceAll[ selected_, table_ ] ] /; ! FreeQ[ Unevaluated @ selected, sizeSymbol ] :>
+            With[ { v = ( selected /. sizeSymbol -> size ) /. table }, v /; True ],
+          sizeSymbol -> size } },
+    If[ inflate === None, baked,
+      Join[ HoldComplete @ InflateGraph, baked,
+        HoldComplete @@ Replace[ inflate, amount : Except[ { ___Rule } ] :> { "ExtraVertices" -> amount } ] ] /.
+        HoldComplete[ head_, rest__ ] :> HoldComplete @ head[ rest ] ]
+  ]
+
+(* InputForm, with the paclet's own contexts dropped so private helpers read as the bare names
+   the emitted Module localizes *)
+codeString[ HoldComplete[ e_ ] ] :=
+  StringDelete[ ToString[ Unevaluated @ e, InputForm ],
+    { "WolframInstitute`Infrageometry`" ~~ Shortest[ ___ ] ~~ "`PackagePrivate`",
+      "WolframInstitute`Infrageometry`" } ]
+
+(* the kept-coordinates clause carries the whole embedding, so it is printed as the call that
+   produced it rather than as a thousand literal points *)
+coordinateCode[ g_, keep_ ] :=
+  Replace[ { substrateCoordinates[ g, keep ] },
+    { { } -> { },
+      { VertexCoordinates -> _List } -> { "VertexCoordinates -> GraphEmbedding[g]" },
+      clauses_ :> Map[ codeString @ HoldComplete @ # &, clauses ] } ]
+
+(* the roster line calls private helpers by name; the emitted Module carries their definitions so
+   the code stands on its own, and the memoized down-values of a cache like registryUniverse are
+   left behind -- they are its contents, not its definition *)
+localizeHelpers[ code_, generator_ ] :=
+  With[
+    { helpers = FixedPoint[
+        hs |-> DeleteDuplicates @ Join[ hs, privateHelpers @ Map[ DownValues, hs ] ],
+        privateHelpers @ generator ] },
+    { definitions = Select[ Catenate[ DownValues /@ helpers ],
+        rule |-> ! FreeQ[ First @ rule, Verbatim @ Pattern ] ] /.
+        Verbatim[ RuleDelayed ][ Verbatim[ HoldPattern ][ lhs_ ], rhs_ ] :> HoldComplete @ SetDelayed[ lhs, rhs ] },
+    If[ helpers === { }, code,
+      "Module[{" <> StringRiffle[ SymbolName /@ helpers, ", " ] <> "},\n  " <>
+        StringRiffle[ codeString /@ definitions, ";\n  " ] <> ";\n  " <>
+        StringReplace[ code, "\n" -> "\n  " ] <> "]" ]
+  ]
+
+privateHelpers[ expr_ ] :=
+  DeleteDuplicates @ Cases[ expr,
+    s_Symbol /; StringEndsQ[ Context @ s, "`PackagePrivate`" ] && DownValues @ s =!= { },
+    Infinity, Heads -> True ]
 
 
 (* ===================== Roster helpers ===================== *)

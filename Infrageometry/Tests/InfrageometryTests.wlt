@@ -3212,6 +3212,21 @@ VerificationTest[
     TestID -> "InfraSubstrate-sizes-keep-distinct-dots"
 ]
 
+(* the emitted code is the code that runs: it evaluates to the identical graph, the size table
+   is collapsed to the value the size selects, and no private context leaks into it.  The five
+   cases cover the shapes -- a bare tiling line, a mesh line whose table hangs off a rule, a
+   line with an embedded helper, one with no coordinate clause at all, and an inflated line *)
+VerificationTest[
+    With[{cases = {{"SquarePatch", "Small"}, {"PlanePatch", "Small"}, {"SquareTorus", "Small"},
+                   {"wm6655", "Small"}, {"CubicGridPatch", "Small", "Inflate" -> 2, "KeepCoordinates" -> True}}},
+      {codes = Map[spec |-> InfraSubstrateCode @@ spec, cases]},
+      {Map[code |-> ToExpression[code], codes] === Map[spec |-> InfraSubstrate @@ spec, cases],
+       AllTrue[codes, code |-> StringFreeQ[code, "PackagePrivate"]],
+       AllTrue[codes, code |-> StringFreeQ[code, "\"Small\" /."]]}],
+    {True, True, True},
+    TestID -> "InfraSubstrateCode-round-trips"
+]
+
 (* InfraSubstrateStyle is the palette: the named option list splices into any graph
    construction, and the size names alias the looks *)
 VerificationTest[
