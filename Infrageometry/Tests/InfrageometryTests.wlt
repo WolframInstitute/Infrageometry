@@ -2,19 +2,12 @@ BeginTestSection["InfrageometryTests"]
 
 (* ===== Test Fixtures ===== *)
 
-(* Triangle complex: {{1},{2},{3},{1,2},{1,3},{2,3},{1,2,3}} *)
 triangle = ComplexClosure[{{1, 2, 3}}]
-(* Edge: {{1},{2},{1,2}} *)
 edge = ComplexClosure[{{1, 2}}]
-(* Tetrahedron *)
 tetrahedron = ComplexClosure[{{1, 2, 3, 4}}]
-(* Empty complex *)
 empty = {}
-(* Two disjoint edges *)
 twoEdges = ComplexClosure[{{1, 2}, {3, 4}}]
-(* Path graph (3 vertices) *)
 path3 = ComplexClosure[{{1, 2}, {2, 3}}]
-(* Circular graph C4 *)
 square = ComplexClosure[{{1, 2}, {2, 3}, {3, 4}, {1, 4}}]
 
 (* ===== 1. ComplexClosure & Indexing ===== *)
@@ -256,7 +249,6 @@ VerificationTest[
     TestID -> "BoundarylessGraph-Mesh-SolidVolume"
 ]
 
-(* the exact surface detector: the disk's rim, and the whole boundary of the solid tetrahedron *)
 VerificationTest[
     {GraphExteriorBoundary @ MeshRegion[
         {{0, 0}, {1, 0}, {1, 1}, {0, 1}, {1/2, 1/2}},
@@ -427,7 +419,6 @@ VerificationTest[
 ]
 
 VerificationTest[
-    (* Barycentric refinement produces a finer complex *)
     Length[BarycentricRefinement[triangle]] > Length[triangle],
     True,
     TestID -> "BarycentricRefinement-Finer"
@@ -455,7 +446,6 @@ VerificationTest[
 ]
 
 VerificationTest[
-    (* D is symmetric *)
     With[{d = DiracHodgeMatrix[triangle]}, d === Transpose[d]],
     True,
     TestID -> "DiracHodgeMatrix-Symmetric"
@@ -547,7 +537,6 @@ VerificationTest[
 ]
 
 VerificationTest[
-    (* Euler = alternating sum of Betti numbers for S^1 *)
     With[{s1 = ComplexClosure[{{1, 2}, {2, 3}, {1, 3}}]},
         ComplexEulerCharacteristic[s1] == Total[(-1) ^ Range[0, Length[BettiVector[s1]] - 1] * BettiVector[s1]]
     ],
@@ -621,7 +610,6 @@ VerificationTest[
 (* ===== 14. Geodesics ===== *)
 
 VerificationTest[
-    (* One geodesic step on a triangle from frame {1,2,3} *)
     ListQ[ComplexGeodesicFlow[triangle, {1, 2, 3}]],
     True,
     TestID -> "GeodesicFlow-ReturnsFrame"
@@ -634,7 +622,6 @@ VerificationTest[
 ]
 
 VerificationTest[
-    (* Orbit is a list of frames *)
     With[{orbit = SimplexOrbit[triangle, {1, 2, 3}]},
         ListQ[orbit] && Length[orbit] >= 2
     ],
@@ -861,7 +848,6 @@ VerificationTest[
 
 
 (* ================================================================ *)
-(* Quantum Calculus — New functionality tests                       *)
 (* ================================================================ *)
 
 (* ===== 21. Wave Equation ===== *)
@@ -881,7 +867,6 @@ VerificationTest[
 ]
 
 VerificationTest[
-    (* Wave propagator is square matrix of correct dimension *)
     Dimensions[WavePropagator[triangle, 0.1]],
     {7, 7},
     TestID -> "Wave-PropagatorDimension"
@@ -904,7 +889,6 @@ VerificationTest[
 ]
 
 VerificationTest[
-    (* DiscreteWaveStep returns pair of vectors *)
     With[{
         n = Length[triangle],
         u = ConstantArray[0., 7], v = ConstantArray[0., 7]
@@ -918,7 +902,6 @@ VerificationTest[
 ]
 
 VerificationTest[
-    (* DiscreteWaveStep functional form returns a Function *)
     Head[DiscreteWaveStep[triangle]],
     Function,
     TestID -> "Wave-DiscreteStepFunction"
@@ -953,7 +936,6 @@ VerificationTest[
 ]
 
 VerificationTest[
-    (* Default m=2 *)
     WuCharacteristic[triangle] == WuCharacteristic[triangle, 2],
     True,
     TestID -> "Wu-DefaultOrder"
@@ -962,7 +944,6 @@ VerificationTest[
 (* ===== 23. Isospectral Deformation ===== *)
 
 VerificationTest[
-    (* Deformed Dirac is a square matrix *)
     SquareMatrixQ[IsospectralDeformation[edge, 0.01, 10]],
     True,
     TestID -> "IsoDef-Square"
@@ -981,7 +962,6 @@ VerificationTest[
 ]
 
 VerificationTest[
-    (* DiracMass returns a vector *)
     VectorQ[DiracMass[edge, 0.01, 10], NumericQ],
     True,
     TestID -> "DiracMass-IsVector"
@@ -997,7 +977,6 @@ VerificationTest[
 (* ===== 24. Connes Distance ===== *)
 
 VerificationTest[
-    (* Connes distance is a square matrix *)
     With[{d = ConnesDistance[edge]},
         SquareMatrixQ[d] && Dimensions[d] == {2, 2}
     ],
@@ -1006,7 +985,6 @@ VerificationTest[
 ]
 
 VerificationTest[
-    (* Connes distance is symmetric *)
     With[{d = ConnesDistance[edge]},
         Max[Abs[d - Transpose[d]]] < 10^-10
     ],
@@ -1015,7 +993,6 @@ VerificationTest[
 ]
 
 VerificationTest[
-    (* Diagonal is zero (self-distance) *)
     With[{d = ConnesDistance[edge]},
         Max[Abs[Diagonal[d]]] < 10^-10
     ],
@@ -1045,7 +1022,6 @@ VerificationTest[
 ]
 
 VerificationTest[
-    (* Lefschetz zeta for identity permutation *)
     NumericQ[LefschetzZetaFunction[triangle, Cycles[{}], 0.1, 5]],
     True,
     TestID -> "LefschetzZeta-Numeric"
@@ -1093,14 +1069,12 @@ VerificationTest[
 ]
 
 VerificationTest[
-    (* Gauss-Bonnet for tetrahedron *)
     Abs[Total[IndexExpectationCurvature[tetrahedron]] - ComplexEulerCharacteristic[tetrahedron]] < 10^-10,
     True,
     TestID -> "IndexCurvature-GaussBonnet-Tetra"
 ]
 
 VerificationTest[
-    (* Gauss-Bonnet for S^1 (chi=0) *)
     With[{s1 = ComplexClosure[{{1, 2}, {2, 3}, {1, 3}}]},
         Abs[Total[IndexExpectationCurvature[s1]] - ComplexEulerCharacteristic[s1]] < 10^-10
     ],
@@ -1984,7 +1958,6 @@ VerificationTest[
     TestID -> "BallHull-singleton-and-ball-fixed"
 ]
 
-(* Subgraph form agrees with the vertex-list form. *)
 VerificationTest[
     With[{g = GridGraph[{6, 4}], s = {1, 6, 22}},
         BallHull[g, Subgraph[g, s]] === BallHull[g, s]
@@ -2321,9 +2294,6 @@ VerificationTest[
 
 (* ===================== Tessellations, regular & uniform maps ===================== *)
 
-(* TessellationGraph is the single public generator: a {p, q} Schlafli symbol gives a
-   regular map, a longer vertex configuration a uniform / Archimedean map; the second
-   argument sizes it (n / {m, n} torus) or supplies the carrying group. *)
 
 (* --- Flat-torus regular tessellations --- *)
 
@@ -2839,7 +2809,6 @@ VerificationTest[
 
 (* ===== Displacements ===== *)
 
-(* displacement fixtures: coordinate grid, cycle step *)
 dispGrid = VertexReplace[GridGraph[{5, 5}], Catenate @ Table[5 j + i + 1 -> {i + 1, j + 1}, {j, 0, 4}, {i, 0, 4}]]
 dispX = AssociationMap[{{Min[#[[1]] + 1, 5], #[[2]]}} &, VertexList @ dispGrid]
 dispY = AssociationMap[{{#[[1]], Min[#[[2]] + 1, 5]}} &, VertexList @ dispGrid]
@@ -2977,7 +2946,7 @@ VerificationTest[
 
 VerificationTest[
     InfraSubstrateStyle[],
-    {"Default", "GrayFaint", "GrayOpaque", "Gray"},
+    {"Default", "Small", "Medium", "Large"},
     TestID -> "InfraSubstrateStyle-names"
 ]
 
@@ -3201,7 +3170,7 @@ VerificationTest[
 ]
 
 (* the three named sizes draw three distinct dots, and inflating does not merge any two of
-   them: the vertex-count fallback saturates at "GrayFaint", so deferring an inflated
+   them: the vertex-count fallback saturates at the "Large" look, so deferring an inflated
    substrate to it would give "Medium" and "Large" one size *)
 VerificationTest[
     With[{dot = opts |-> VertexSize /. Options[InfraSubstrate["SquarePatch", Sequence @@ opts], VertexSize]},
@@ -3317,7 +3286,6 @@ VerificationTest[
 	TestID -> "RelativeEccentricity-degenerate-cases"
 ]
 
-(* The graph form is the distance-matrix form. *)
 VerificationTest[
 	With[{g = GridGraph[{3, 5}]}, RelativeEccentricity[g] === RelativeEccentricity[GraphDistanceMatrix[g]]],
 	True,

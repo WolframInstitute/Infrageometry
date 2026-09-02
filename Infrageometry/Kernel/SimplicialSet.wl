@@ -294,7 +294,6 @@ sparseMatrixEqualOnNonzeroCols[lhs_SparseArray, rhs_SparseArray] :=
   ];
 
 
-(* SimplicialComplexQ checks if the face maps correspond to a simplicial complex *)
 SimplicialComplexQ[SimplicialData[_, faceBlocks_, _]] := 
     Module[ {totalFace, kSimplexCount, totalBoundary, elements},
         AllTrue[ Range[ Length[faceBlocks] ], { k } |-> (

@@ -62,21 +62,9 @@ PackageScope[cosetCanonicalTable]
 PackageScope[uniformCycleQ]
 PackageScope[regularActionQ]
 
-(* Tessellations, encapsulated: every way this paclet builds a tiling graph.
-   TessellationGraph -- compact quotients (regular {p, q} maps, uniform / Archimedean maps,
-   flat tori); TessellationNeighborhoodGraph -- the unwrapped radius-r patch of the infinite
-   tiling; TorusTessellation -- the flat-torus engine. Below them the machinery in the order
-   used: map invariants, Conway operators and Archimedean maps, regular maps as coset graphs
-   (SchlafliTessellation), and the general Todd-Coxeter coset enumeration. *)
 
 (* ===================== The unified tessellation generator ===================== *)
 
-(* TessellationGraph is the single public entry point for every map family below.
-   {p, q} (a 2-integer Schlafli symbol) gives a regular map; a longer vertex
-   configuration gives a uniform / Archimedean map. The second argument selects the
-   realisation: an integer sizes it (n x n flat torus / n-th hyperbolic quotient),
-   an integer pair {m, n} gives a rectangular flat torus, and a finite group or an
-   explicit (r, s) generation carries the coset graph directly. *)
 Options[TessellationGraph] = {Method -> Automatic};
 TessellationGraph[{p_Integer, q_Integer}, n_Integer : 1, opts : OptionsPattern[{TessellationGraph, Graph}]] :=
   withGraphOptions[SchlafliTessellation[{p, q}, n, Sequence @@ FilterRules[{opts}, Options[SchlafliTessellation]]], opts];
@@ -126,8 +114,6 @@ TorusTessellation[ { m_Integer, n_Integer }, "Hexagonal", opts : OptionsPattern[
     ],
     opts
   ]
-
-
 
 
 (* ===================== Unwrapped tessellation patches ===================== *)
@@ -397,8 +383,6 @@ euclideanRectangle[6, 3, m_, n_] :=
       Subgraph[g, Select[VertexList @ g, VertexDegree[g, #] > 1 &]]]];
 
 
-
-
 (* ===================== Map invariants: curvature, Euler characteristic, genus ===================== *)
 
 (* the per-vertex face-size list: a Schlafli {p, q} has q p-gons around each vertex; a
@@ -581,8 +565,6 @@ archimedeanSolidName = <|
   {3, 3, 3, 3, 5} -> "SnubDodecahedron"|>;
 
 
-
-
 (* Regular maps as coset graphs of (2,p,q)-generated groups; see Wiki/Concepts/RegularMaps.md.
    Refs: Coxeter & Moser, Generators and Relations for Discrete Groups (1957);
    Jones & Singerman, Theory of maps on orientable surfaces (1978);
@@ -708,8 +690,6 @@ mobiusPerm[ell_, {a_, b_, c_, d_}] :=
       pts]];
 
 
-
-
 (* ===================== General coset enumeration (Todd-Coxeter / low-index) =====================
 
    The curvature-agnostic method behind every regular map: maps of type {p, q} <-> finite-index
@@ -827,6 +807,4 @@ LowIndexMaps[p_, q_, maxIndex_] := Module[{tabs, recs},
       "Regular" -> regularActionQ[perms, idx], "Genus" -> 1 - (idx/q - idx/2 + idx/p)/2|>]], recs]];
 
 
-(* apply forwarded Graph options to a constructed graph, passing a non-graph result
-   (e.g. $Failed from a deferred constructor) straight through *)
 withGraphOptions[g_, opts___] := If[GraphQ[g], Graph[g, Sequence @@ FilterRules[{opts}, Options[Graph]]], g]

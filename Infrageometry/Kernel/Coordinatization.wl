@@ -21,7 +21,6 @@ PackageScope[resistanceEmbeddingMatrix]
 RadarCoordinates[g_Graph, b_List, v_] /; MemberQ[VertexList[g], v] :=
     GraphDistance[g, v, #] & /@ b
 
-(* association vertex -> radar coordinates over all of g *)
 RadarCoordinates[g_Graph, b_List] :=
     AssociationThread[VertexList[g], Outer[GraphDistance[g, #1, #2] &, VertexList[g], b, 1]]
 
@@ -77,7 +76,6 @@ ResistanceCoordinates[g_Graph, opts : OptionsPattern[]] :=
         ]
     ]
 
-(* coordinates of a single vertex *)
 ResistanceCoordinates[g_Graph, v_, opts : OptionsPattern[]] /; MemberQ[VertexList[g], v] :=
     ResistanceCoordinates[g, opts][v]
 
@@ -163,7 +161,6 @@ FindBallCover[g_Graph, r_ : 1, targets : (_List | All) : All, count : (_Integer 
         ]
     ]
 
-(* do the radius-r balls around the centres s cover the targets (all of V by default)? *)
 BallCoverQ[g_Graph, r_, s_List, targets : (_List | All) : All] :=
     With[
         {vs = VertexList[g], dm = GraphDistanceMatrix[g]},
