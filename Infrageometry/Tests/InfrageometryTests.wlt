@@ -3224,21 +3224,23 @@ VerificationTest[
     TestID -> "InfraSubstrate-seeded-from-outside"
 ]
 
-(* the emitted code is the code that runs: under the same seed it evaluates to the identical
-   graph, the size table is collapsed to the value the size selects, and neither a private
-   context nor a private helper name survives in it.  The five round-trip cases cover the shapes
-   -- a bare tiling line, a mesh line whose table hangs off a rule, a line with an embedded
-   helper, one with no coordinate clause at all, and an inflated line with kept coordinates *)
+(* the emitted code is the code that runs: it is held, so ReleaseHold under the same seed gives
+   the identical graph, and it is readable -- no size table left uncollapsed, no symbol carrying
+   a private context, none carrying the $ that ReplaceAll leaves on a rewritten local.  The five
+   round-trip cases cover the shapes: a bare tiling line, a mesh line whose table hangs off a
+   rule, a line with an embedded helper, one with no coordinate clause, and an inflated line with
+   kept coordinates *)
 VerificationTest[
     With[{cases = {{"SquarePatch", "Small"}, {"PlanePatch", "Small"}, {"SquareTorus", "Small"},
                    {"wm6655", "Small"}, {"CubicGridPatch", "Small", "Inflate" -> 2, "KeepCoordinates" -> True}}},
       {roster = Map[name |-> InfraSubstrateCode[name, "Small"], InfraSubstrate[All]]},
       {Map[spec |-> (SeedRandom[3]; InfraSubstrate @@ spec), cases] ===
-         Map[spec |-> (SeedRandom[3]; ToExpression[InfraSubstrateCode @@ spec]), cases],
-       AllTrue[roster, code |-> StringFreeQ[code, "PackagePrivate"]],
-       AllTrue[roster, code |-> StringFreeQ[code, {"trimPendants", "torusEmbedded", "hypergraphGraph"}]],
-       AllTrue[roster, code |-> StringFreeQ[code, "\"Small\" /."]]}],
-    {True, True, True, True},
+         Map[spec |-> (SeedRandom[3]; ReleaseHold[InfraSubstrateCode @@ spec]), cases],
+       Union[Head /@ roster],
+       Cases[roster, s_Symbol /; StringEndsQ[Context @ Unevaluated @ s, "`PackagePrivate`"], Infinity, Heads -> True],
+       Cases[roster, s_Symbol /; StringEndsQ[SymbolName @ Unevaluated @ s, "$"], Infinity, Heads -> True],
+       Cases[roster, HoldPattern[ReplaceAll[_, _]], Infinity]}],
+    {True, {HoldForm}, {}, {}, {}},
     TestID -> "InfraSubstrateCode-round-trips"
 ]
 

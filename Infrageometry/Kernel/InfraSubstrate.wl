@@ -232,12 +232,12 @@ defaultAmbientStyle[ g_, _ ] := Which[ VertexCount @ g <= 250, "Gray", VertexCou
 (* ===================== InfraSubstrateCode ===================== *)
 
 (* InfraSubstrateCode[name, size, style] is the code behind InfraSubstrate[name, size, style]:
-   the construction with the style applied to it, as one line, which under the same SeedRandom
-   gives the identical graph.  The roster line is read off its own down-value rather than
-   transcribed, so the printed code cannot drift from the code that runs; the size table and the
-   layout dimension are baked in, and a call to a private helper is replaced by the body it
-   stands for, so nothing in the printed code refers to a name the reader cannot see.
-   "KeepCoordinates" is the one clause that has to name the graph twice, so it takes a With. *)
+   one held Graph call that ReleaseHold evaluates to the identical graph.  It is HoldForm, so an
+   output cell shows it as typeset code rather than as a quoted string.  The roster line is read
+   off its own down-value rather than transcribed, so the printed code cannot drift from the code
+   that runs; the size table, the layout dimension and the resolved style are baked in, and a call
+   to a private helper is replaced by the body it stands for, so nothing in the printed code
+   refers to a name the reader cannot see. *)
 
 Options[ InfraSubstrateCode ] = Options[ InfraSubstrate ];
 
@@ -252,16 +252,41 @@ InfraSubstrateCode[ name_String, size_, style : ( _String | Automatic ) : Automa
     { g = substrateGraph[ name, size, inflate ],
       generator = substrateGenerator[ name, size, inflate ] },
     { ambient = Replace[ style, Automatic :> defaultAmbientStyle[ g, size ] ],
-      clauses = coordinateCode[ g, TrueQ @ OptionValue[ InfraSubstrate, own, "KeepCoordinates" ] ] },
-    { arguments = Join[
-        If[ graphOpts === { }, { }, { codeString @ HoldComplete @ graphOpts } ],
-        clauses,
-        { "Sequence @@ InfraSubstrateStyle[" <> codeString @ HoldComplete @ ambient <> "]" } ] },
-    If[ FreeQ[ clauses, "VertexCoordinates -> GraphEmbedding[graph]" ],
-      "Graph[" <> StringRiffle[ Prepend[ arguments, codeString @ generator ], ", " ] <> "]",
-      "With[{graph = " <> codeString @ generator <> "},\n  Graph[" <>
-        StringRiffle[ Prepend[ arguments, "graph" ], ", " ] <> "]]" ]
+      (* the construction already carries its own embedding, and a plain Graph re-wrap keeps it,
+         so the clause that re-bakes it under "KeepCoordinates" -- the whole embedding written
+         out as literal points -- is dropped and the code stays one line *)
+      arguments = DeleteCases[
+        Join[ graphOpts,
+          { substrateCoordinates[ g, TrueQ @ OptionValue[ InfraSubstrate, own, "KeepCoordinates" ] ] } ],
+        VertexCoordinates -> _List ] },
+    Join[ HoldComplete @ Graph, shortNames @ generator, HoldComplete @@ arguments,
+      HoldComplete @ ( Sequence @@ InfraSubstrateStyle @ ambient ) ] /.
+      HoldComplete[ head_, rest__ ] :> HoldForm @ head[ rest ]
   ]
+
+(* An inlined body brings its own bound variables along, and they arrive spelled for the kernel
+   rather than for a reader: the lambda parameters of a private helper carry its private context,
+   and ReplaceAll renames the bound variables of any scoping construct it rewrites, so a With
+   local comes back as g$.  Both are cut to the bare short name.  What the emitted code binds it
+   also shadows, so a caller's own g is untouched by one appearing here.
+
+   Every part of this has to stay unevaluated.  The name is read through Unevaluated because a
+   held Infinity is a symbol whose SymbolName is not one; the clean name is parsed to $renamed
+   rather than to a bare symbol because Rule evaluates its right-hand side, and $renamed holds
+   its argument completely for the same reason -- a caller with a g of their own would otherwise
+   see the value of it substituted into the code. *)
+
+SetAttributes[ $renamed, HoldAllComplete ]
+
+shortNames[ held_ ] :=
+  held /. Map[
+      s |-> s -> ToExpression[
+        StringDelete[ SymbolName @ Unevaluated @ s, "$" ~~ EndOfString ], InputForm, $renamed ],
+      Cases[ held,
+        s_Symbol /; StringEndsQ[ SymbolName @ Unevaluated @ s, "$" ] ||
+          StringEndsQ[ Context @ Unevaluated @ s, "`PackagePrivate`" ],
+        Infinity, Heads -> True ] ] /.
+    $renamed[ x_ ] :> x
 
 (* the roster line for this name, with the size table collapsed to the value this size selects
    and the inflation call wrapped around it -- everything substrateGraph feeds to BlockRandom.
@@ -303,25 +328,6 @@ inliningRules[ expr_ ] :=
         Verbatim[ RuleDelayed ][ lhs_, body_ ] :>
           RuleDelayed[ lhs /. Verbatim[ Blank ][ _ ] -> Blank[ ], $inlined @ body ] }
   ]
-
-(* InputForm, with the paclet's own contexts dropped so exported symbols read as the bare names a
-   loaded paclet resolves, and with the trailing $ that ReplaceAll leaves on the scoped locals of
-   an inlined body taken back off -- the emitted code binds nothing those names could capture *)
-codeString[ HoldComplete[ e_ ] ] :=
-  StringReplace[
-    StringDelete[ ToString[ Unevaluated @ e, InputForm ],
-      { "WolframInstitute`Infrageometry`" ~~ Shortest[ ___ ] ~~ "`PackagePrivate`",
-        "WolframInstitute`Infrageometry`" } ],
-    RegularExpression[ "([A-Za-z][A-Za-z0-9]*)\\$+(?![A-Za-z0-9`])" ] -> "$1" ]
-
-(* the kept-coordinates clause carries the whole embedding, so it is printed as the call that
-   produced it rather than as a thousand literal points -- the one clause that names the graph a
-   second time, and so the one that costs the printed code its single line *)
-coordinateCode[ g_, keep_ ] :=
-  Replace[ { substrateCoordinates[ g, keep ] },
-    { { } -> { },
-      { VertexCoordinates -> _List } -> { "VertexCoordinates -> GraphEmbedding[graph]" },
-      clauses_ :> Map[ codeString @ HoldComplete @ # &, clauses ] } ]
 
 
 (* ===================== Roster helpers ===================== *)
