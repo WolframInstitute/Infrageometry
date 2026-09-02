@@ -10,7 +10,8 @@ PackageExport[InfraSubstrateCode]
 (* InfraSubstrate[name, size, style] is the named example substrate at size "Small" | "Medium" |
    "Large" or a raw spec, drawn as an InfraSubstrateStyle backdrop for a construction on top of it.
    InfraSubstrate[] lists the roster by class; InfraSubstrate[All] is the flat name list.
-   Generation is seeded per (name, size, inflation), so repeated calls return the same graph.
+   A substrate drawn from a random construction is seeded from outside, with SeedRandom, like any
+   other random draw -- that is what recovers a figure in another session or on another machine.
 
    Any substrate inflates: "Inflate" -> amount grows a fiber of that many extra vertices over
    every vertex through InflateGraph, and "Inflate" -> {opts} passes its full option list.  So
@@ -188,17 +189,22 @@ InfraSubstrate[ name_String, size_, style : ( _String | Automatic ) : Automatic,
       substrateCoordinates[ g, keep ],
       Sequence @@ InfraSubstrateStyle @ Replace[ style, Automatic :> defaultAmbientStyle[ g, size ] ] ] ]
 
-(* memoized: substrates are rebuilt across many figure cells, and seeding makes the cache honest --
-   the inflation amount is part of the key and of the seed, so two amounts neither collide in the
-   cache nor drift between calls *)
-substrateGraph[ name_, size_, inflate_ ] := substrateGraph[ name, size, inflate ] =
-  BlockRandom[
-    If[ inflate === None,
-      substrate[ name, size ],
-      InflateGraph[ substrate[ name, size ],
-        Sequence @@ Replace[ inflate,
-          amount : Except[ { ___Rule } ] :> { "ExtraVertices" -> amount } ] ] ],
-    RandomSeeding -> Hash @ { name, size, inflate } ]
+(* A random substrate is a draw like any other: it is seeded from outside, with SeedRandom, which
+   is what makes the same figure recoverable in another session or on another machine.  BlockRandom
+   carries no RandomSeeding of its own -- it is here only to leave the ambient stream where it
+   found it, which is what lets the substrate be a function of the seed rather than of how many
+   draws happened to precede it.  That in turn is what makes the memo honest: the ambient state
+   is part of the key, so re-seeding gives a fresh graph instead of the cached one, while the
+   repeated calls a figure makes across many cells cost one generation. *)
+substrateGraph[ name_, size_, inflate_ ] :=
+  substrateGraph[ name, size, inflate, Hash @ $RandomGeneratorState ]
+
+substrateGraph[ name_, size_, inflate_, state_ ] := substrateGraph[ name, size, inflate, state ] =
+  BlockRandom @ If[ inflate === None,
+    substrate[ name, size ],
+    InflateGraph[ substrate[ name, size ],
+      Sequence @@ Replace[ inflate,
+        amount : Except[ { ___Rule } ] :> { "ExtraVertices" -> amount } ] ] ]
 
 (* a substrate is bare combinatorics by default: a stored embedding is discarded and a spring
    layout of its own dimension places the vertices; "KeepCoordinates" -> True draws the
@@ -226,10 +232,12 @@ defaultAmbientStyle[ g_, _ ] := Which[ VertexCount @ g <= 250, "Gray", VertexCou
 (* ===================== InfraSubstrateCode ===================== *)
 
 (* InfraSubstrateCode[name, size, style] is the code behind InfraSubstrate[name, size, style]:
-   one self-contained expression, as a string, evaluating to the identical graph.  The roster
-   line is read off its own down-value rather than transcribed, so the printed code cannot
-   drift from the code that runs; the size table, the generation seed and the layout dimension
-   are baked in, and the private helpers the line calls ride along as local definitions. *)
+   the construction with the style applied to it, as one line, which under the same SeedRandom
+   gives the identical graph.  The roster line is read off its own down-value rather than
+   transcribed, so the printed code cannot drift from the code that runs; the size table and the
+   layout dimension are baked in, and a call to a private helper is replaced by the body it
+   stands for, so nothing in the printed code refers to a name the reader cannot see.
+   "KeepCoordinates" is the one clause that has to name the graph twice, so it takes a With. *)
 
 Options[ InfraSubstrateCode ] = Options[ InfraSubstrate ];
 
@@ -243,17 +251,16 @@ InfraSubstrateCode[ name_String, size_, style : ( _String | Automatic ) : Automa
     { inflate = OptionValue[ InfraSubstrate, own, "Inflate" ] },
     { g = substrateGraph[ name, size, inflate ],
       generator = substrateGenerator[ name, size, inflate ] },
-    { ambient = Replace[ style, Automatic :> defaultAmbientStyle[ g, size ] ] },
+    { ambient = Replace[ style, Automatic :> defaultAmbientStyle[ g, size ] ],
+      clauses = coordinateCode[ g, TrueQ @ OptionValue[ InfraSubstrate, own, "KeepCoordinates" ] ] },
     { arguments = Join[
-        { "g" },
         If[ graphOpts === { }, { }, { codeString @ HoldComplete @ graphOpts } ],
-        coordinateCode[ g, TrueQ @ OptionValue[ InfraSubstrate, own, "KeepCoordinates" ] ],
+        clauses,
         { "Sequence @@ InfraSubstrateStyle[" <> codeString @ HoldComplete @ ambient <> "]" } ] },
-    localizeHelpers[
-      "With[{g = BlockRandom[" <> codeString @ generator <>
-        ",\n    RandomSeeding -> " <> ToString @ Hash @ { name, size, inflate } <> "]},\n  Graph[" <>
-        StringRiffle[ arguments, ", " ] <> "]]",
-      generator ]
+    If[ FreeQ[ clauses, "VertexCoordinates -> GraphEmbedding[graph]" ],
+      "Graph[" <> StringRiffle[ Prepend[ arguments, codeString @ generator ], ", " ] <> "]",
+      "With[{graph = " <> codeString @ generator <> "},\n  Graph[" <>
+        StringRiffle[ Prepend[ arguments, "graph" ], ", " ] <> "]]" ]
   ]
 
 (* the roster line for this name, with the size table collapsed to the value this size selects
@@ -272,48 +279,49 @@ substrateGenerator[ name_, size_, inflate_ ] :=
         { HoldPattern[ ReplaceAll[ selected_, table_ ] ] /; ! FreeQ[ Unevaluated @ selected, sizeSymbol ] :>
             With[ { v = ( selected /. sizeSymbol -> size ) /. table }, v /; True ],
           sizeSymbol -> size } },
-    If[ inflate === None, baked,
-      Join[ HoldComplete @ InflateGraph, baked,
+    { inlined = FixedPoint[ expr |-> expr /. inliningRules @ expr, baked ] /. $inlined[ x_ ] :> x },
+    If[ inflate === None, inlined,
+      Join[ HoldComplete @ InflateGraph, inlined,
         HoldComplete @@ Replace[ inflate, amount : Except[ { ___Rule } ] :> { "ExtraVertices" -> amount } ] ] /.
         HoldComplete[ head_, rest__ ] :> HoldComplete @ head[ rest ] ]
   ]
 
-(* InputForm, with the paclet's own contexts dropped so private helpers read as the bare names
-   the emitted Module localizes *)
+(* the rules that beta-reduce one layer of private-helper calls, so the printed code carries no
+   name the reader cannot see.  Head constraints are relaxed to plain blanks -- this is syntactic
+   substitution and the argument in the held code is still an unevaluated expression, so g_Graph
+   would never match -- and a memoizing right-hand side is unwrapped to the value it caches.
+   Unlike the size table, these bodies must land unevaluated, which a RuleDelayed inside a
+   HoldComplete does on its own; the $inlined marker only keeps the outer HoldComplete apart. *)
+inliningRules[ expr_ ] :=
+  With[
+    { helpers = DeleteDuplicates @ Cases[ expr,
+        s_Symbol /; StringEndsQ[ Context @ s, "`PackagePrivate`" ] && DownValues @ s =!= { },
+        Infinity, Heads -> True ] },
+    Select[ Catenate[ DownValues /@ helpers ], rule |-> ! FreeQ[ First @ rule, Verbatim @ Pattern ] ] /.
+      { Verbatim[ RuleDelayed ][ lhs_, Verbatim[ Set ][ _, body_ ] ] :>
+          RuleDelayed[ lhs /. Verbatim[ Blank ][ _ ] -> Blank[ ], $inlined @ body ],
+        Verbatim[ RuleDelayed ][ lhs_, body_ ] :>
+          RuleDelayed[ lhs /. Verbatim[ Blank ][ _ ] -> Blank[ ], $inlined @ body ] }
+  ]
+
+(* InputForm, with the paclet's own contexts dropped so exported symbols read as the bare names a
+   loaded paclet resolves, and with the trailing $ that ReplaceAll leaves on the scoped locals of
+   an inlined body taken back off -- the emitted code binds nothing those names could capture *)
 codeString[ HoldComplete[ e_ ] ] :=
-  StringDelete[ ToString[ Unevaluated @ e, InputForm ],
-    { "WolframInstitute`Infrageometry`" ~~ Shortest[ ___ ] ~~ "`PackagePrivate`",
-      "WolframInstitute`Infrageometry`" } ]
+  StringReplace[
+    StringDelete[ ToString[ Unevaluated @ e, InputForm ],
+      { "WolframInstitute`Infrageometry`" ~~ Shortest[ ___ ] ~~ "`PackagePrivate`",
+        "WolframInstitute`Infrageometry`" } ],
+    RegularExpression[ "([A-Za-z][A-Za-z0-9]*)\\$+(?![A-Za-z0-9`])" ] -> "$1" ]
 
 (* the kept-coordinates clause carries the whole embedding, so it is printed as the call that
-   produced it rather than as a thousand literal points *)
+   produced it rather than as a thousand literal points -- the one clause that names the graph a
+   second time, and so the one that costs the printed code its single line *)
 coordinateCode[ g_, keep_ ] :=
   Replace[ { substrateCoordinates[ g, keep ] },
     { { } -> { },
-      { VertexCoordinates -> _List } -> { "VertexCoordinates -> GraphEmbedding[g]" },
+      { VertexCoordinates -> _List } -> { "VertexCoordinates -> GraphEmbedding[graph]" },
       clauses_ :> Map[ codeString @ HoldComplete @ # &, clauses ] } ]
-
-(* the roster line calls private helpers by name; the emitted Module carries their definitions so
-   the code stands on its own, and the memoized down-values of a cache like registryUniverse are
-   left behind -- they are its contents, not its definition *)
-localizeHelpers[ code_, generator_ ] :=
-  With[
-    { helpers = FixedPoint[
-        hs |-> DeleteDuplicates @ Join[ hs, privateHelpers @ Map[ DownValues, hs ] ],
-        privateHelpers @ generator ] },
-    { definitions = Select[ Catenate[ DownValues /@ helpers ],
-        rule |-> ! FreeQ[ First @ rule, Verbatim @ Pattern ] ] /.
-        Verbatim[ RuleDelayed ][ Verbatim[ HoldPattern ][ lhs_ ], rhs_ ] :> HoldComplete @ SetDelayed[ lhs, rhs ] },
-    If[ helpers === { }, code,
-      "Module[{" <> StringRiffle[ SymbolName /@ helpers, ", " ] <> "},\n  " <>
-        StringRiffle[ codeString /@ definitions, ";\n  " ] <> ";\n  " <>
-        StringReplace[ code, "\n" -> "\n  " ] <> "]" ]
-  ]
-
-privateHelpers[ expr_ ] :=
-  DeleteDuplicates @ Cases[ expr,
-    s_Symbol /; StringEndsQ[ Context @ s, "`PackagePrivate`" ] && DownValues @ s =!= { },
-    Infinity, Heads -> True ]
 
 
 (* ===================== Roster helpers ===================== *)
@@ -335,11 +343,14 @@ torusEmbedded[ shape_, { m_, n_ } ] :=
           { ( 1 + 0.4 Cos[ w ] ) Cos[ u ], ( 1 + 0.4 Cos[ w ] ) Sin[ u ], 0.4 Sin[ w ] } ],
         VertexList @ g ] ] ]
 
-(* binary hyperedges are already a graph; higher arities go through the 2-section *)
+(* binary hyperedges are already a graph; higher arities go through the 2-section.  The argument is
+   bound before it is read three times so that InfraSubstrateCode, which inlines this body into the
+   call, prints one evolution rather than three copies of it *)
 hypergraphGraph[ state_ ] :=
-  If[ AllTrue[ state, Length @ # === 2 & ],
-    Graph @ DeleteDuplicates[ UndirectedEdge @@@ Sort /@ DeleteCases[ state, { v_, v_ } ] ],
-    UndirectedGraph @ ResourceFunction[ "HypergraphToGraph" ][ state ] ]
+  With[ { hyperedges = state },
+    If[ AllTrue[ hyperedges, Length @ # === 2 & ],
+      Graph @ DeleteDuplicates[ UndirectedEdge @@@ Sort /@ DeleteCases[ hyperedges, { v_, v_ } ] ],
+      UndirectedGraph @ ResourceFunction[ "HypergraphToGraph" ][ hyperedges ] ] ]
 
 registryUniverse[ id_ ] := registryUniverse[ id ] =
   <| "Rule" -> First @ Flatten[ { ResourceFunction[ "WolframModelData" ][ id, "Rule" ] }, 2 ],
