@@ -2990,7 +2990,7 @@ VerificationTest[
 VerificationTest[
     With[{radius = g |-> Median @ Values @ ComponentMeasurements[
         ColorNegate @ Binarize[ColorConvert[Rasterize[Show[
-              Graph[Graph[g, Sequence @@ InfraSubstrateStyle["Gray"]], EdgeStyle -> Opacity[0]],
+              Graph[Graph[g, Sequence @@ InfraSubstrateStyle["Small"]], EdgeStyle -> Opacity[0]],
               ImageSize -> 200], "Image", Background -> White], "Grayscale"], 0.97],
         "EquivalentDiskRadius"]},
       {radii = radius /@ {CycleGraph[6], GridGraph[{12, 12}], KaryTree[40], PetersenGraph[]}},
@@ -3171,17 +3171,17 @@ VerificationTest[
 ]
 
 (* "Inflate" inflates any substrate: the base survives as the induced subgraph, the fibers carry
-   coordinates of the substrate's own dimension, and the amount is part of the memo key and of the
-   seed, so it neither collides in the cache nor drifts between calls *)
+   coordinates of the substrate's own dimension, and the fiber draw is governed by the seed, so
+   the same seed re-draws the same inflation *)
 VerificationTest[
     With[{bare = InfraSubstrate["CubicGridPatch", "Small"]},
-      {inf = InfraSubstrate["CubicGridPatch", "Small", "Inflate" -> 2, "KeepCoordinates" -> True]},
+      {inf = (SeedRandom[2]; InfraSubstrate["CubicGridPatch", "Small", "Inflate" -> 2, "KeepCoordinates" -> True])},
       {IsomorphicGraphQ[Subgraph[inf, VertexList @ bare], bare],
        VertexCount @ inf === 3 VertexCount @ bare,
        VertexCount @ InfraSubstrate["CubicGridPatch", "Small", "Inflate" -> 4] === 5 VertexCount @ bare,
        Union[Length /@ GraphEmbedding @ inf],
        AllTrue[GraphEmbedding @ inf, VectorQ[#, NumericQ] &],
-       EdgeList @ inf === EdgeList @ InfraSubstrate["CubicGridPatch", "Small", "Inflate" -> 2]}],
+       EdgeList @ inf === EdgeList @ (SeedRandom[2]; InfraSubstrate["CubicGridPatch", "Small", "Inflate" -> 2, "KeepCoordinates" -> True])}],
     {True, True, True, {3}, True, True},
     TestID -> "InfraSubstrate-inflate-any-substrate"
 ]
@@ -3213,19 +3213,21 @@ VerificationTest[
 ]
 
 (* a random substrate is seeded from outside, like any other draw: the same SeedRandom recovers
-   the same graph, a different one draws a different graph, and the repeated calls one figure
-   makes cost a single generation.  UniformLengthSphere is the probe because its relaxation is
-   genuinely random -- the lattice, tiling, mesh and Wolfram-model lines are deterministic *)
+   the same graph, a different one draws a different graph, and a call consumes the stream like
+   any other draw.  UniformLengthSphere is the probe because its relaxation is genuinely
+   random -- the lattice, tiling, mesh and Wolfram-model lines are deterministic *)
 VerificationTest[
     With[{draw = seed |-> (SeedRandom[seed]; InfraSubstrate["UniformLengthSphere", "Small"])},
       {draw[1] === draw[1], draw[1] =!= draw[77],
-       SeedRandom[5]; InfraSubstrate["UniformLengthSphere", "Small"] === InfraSubstrate["UniformLengthSphere", "Small"]}],
+       SeedRandom[5]; InfraSubstrate["UniformLengthSphere", "Small"] =!= InfraSubstrate["UniformLengthSphere", "Small"]}],
     {True, True, True},
     TestID -> "InfraSubstrate-seeded-from-outside"
 ]
 
-(* the emitted code is the code that runs: it is held, so ReleaseHold under the same seed gives
-   the identical graph, and it is readable -- no size table left uncollapsed, no symbol carrying
+(* the emitted code is the code that runs, without the backdrop style: it is held, so seeding
+   and then ReleaseHold gives the graph InfraSubstrate draws at that seed with the "Default"
+   style (building the code itself realizes the graph once, so the seed goes after the build),
+   and it is readable -- no size table left uncollapsed, no symbol carrying
    a private context, none carrying the $ that ReplaceAll leaves on a rewritten local.  The five
    round-trip cases cover the shapes: a bare tiling line, a mesh line whose table hangs off a
    rule, a line with an embedded helper, one with no coordinate clause, and an inflated line with
@@ -3234,8 +3236,8 @@ VerificationTest[
     With[{cases = {{"SquarePatch", "Small"}, {"PlanePatch", "Small"}, {"SquareTorus", "Small"},
                    {"wm6655", "Small"}, {"CubicGridPatch", "Small", "Inflate" -> 2, "KeepCoordinates" -> True}}},
       {roster = Map[name |-> InfraSubstrateCode[name, "Small"], InfraSubstrate[All]]},
-      {Map[spec |-> (SeedRandom[3]; InfraSubstrate @@ spec), cases] ===
-         Map[spec |-> (SeedRandom[3]; ReleaseHold[InfraSubstrateCode @@ spec]), cases],
+      {Map[spec |-> (SeedRandom[3]; InfraSubstrate @@ Insert[spec, "Default", 3]), cases] ===
+         Map[spec |-> With[{code = InfraSubstrateCode @@ spec}, SeedRandom[3]; ReleaseHold[code]], cases],
        Union[Head /@ roster],
        Cases[roster, s_Symbol /; StringEndsQ[Context @ Unevaluated @ s, "`PackagePrivate`"], Infinity, Heads -> True],
        Cases[roster, s_Symbol /; StringEndsQ[SymbolName @ Unevaluated @ s, "$"], Infinity, Heads -> True],
@@ -3244,15 +3246,16 @@ VerificationTest[
     TestID -> "InfraSubstrateCode-round-trips"
 ]
 
-(* InfraSubstrateStyle is the palette: the named option list splices into any graph
-   construction, and the size names alias the looks *)
+(* the styles are named by size and the option list splices into any graph construction; the
+   two-argument form is per substrate and falls back to the size default, so a custom look for
+   one substrate is one more definition *)
 VerificationTest[
-    {InfraSubstrateStyle["Small"] === InfraSubstrateStyle["Gray"],
-     InfraSubstrateStyle["Medium"] === InfraSubstrateStyle["GrayOpaque"],
-     InfraSubstrateStyle["Large"] === InfraSubstrateStyle["GrayFaint"],
-     Sort[First /@ InfraSubstrateStyle["GrayFaint"]],
-     Options[Graph[GridGraph[{5, 5}], Sequence @@ InfraSubstrateStyle["Gray"]], EdgeStyle][[1, 2]] =!= Automatic},
-    {True, True, True, {EdgeStyle, VertexSize, VertexStyle}, True},
+    {InfraSubstrateStyle["PlanePatch", "Small"] === InfraSubstrateStyle["Small"],
+     InfraSubstrateStyle["wm6655", "Large"] === InfraSubstrateStyle["Large"],
+     InfraSubstrateStyle["SquareTorus", "Default"],
+     Sort[First /@ InfraSubstrateStyle["Large"]],
+     Options[Graph[GridGraph[{5, 5}], Sequence @@ InfraSubstrateStyle["Small"]], EdgeStyle][[1, 2]] =!= Automatic},
+    {True, True, {}, {EdgeStyle, VertexSize, VertexStyle}, True},
     TestID -> "InfraSubstrateStyle-palette"
 ]
 
@@ -3267,12 +3270,13 @@ VerificationTest[
     TestID -> "InfraSubstrate-roster"
 ]
 
-(* generation is seeded per (name, spec): two fresh (unmemoized) builds agree vertex for vertex *)
+(* the roster construction is deterministic given the random state: two fresh (unmemoized)
+   builds of the same raw size spec agree vertex for vertex *)
 VerificationTest[
-    With[{build = Symbol @ First @ Names["WolframInstitute`*`substrate"]},
+    With[{build = Symbol @ First @ Names["WolframInstitute`*`substrateCode"]},
       {seed = Hash @ {"PlanePatch", 0.013}},
-      {g1 = BlockRandom[build["PlanePatch", 0.013], RandomSeeding -> seed],
-       g2 = BlockRandom[build["PlanePatch", 0.013], RandomSeeding -> seed]},
+      {g1 = (SeedRandom[seed]; ReleaseHold @ build["PlanePatch", 0.013]),
+       g2 = (SeedRandom[seed]; ReleaseHold @ build["PlanePatch", 0.013])},
       {VertexList @ g1 === VertexList @ g2, EdgeList @ g1 === EdgeList @ g2}],
     {True, True},
     TestID -> "InfraSubstrate-seeded-generation"
