@@ -1174,28 +1174,73 @@ VerificationTest[
 ]
 
 
-(* ===== Synthetic invariants: BallVolumes / ShellAreas / LogDifferenceQuotients ===== *)
+(* ===== Synthetic invariants: BallVolumes / LogDifferenceQuotients ===== *)
 
-(* the closed ball volume is the cumulative shell-area series *)
+(* the three set measures from vertex 1 of the Petersen graph: every vertex of the ball
+   touches the complement until the ball is the whole graph, so WithoutBoundary lags
+   FullCount by one shell and HalfBoundary sits halfway *)
 VerificationTest[
-    BallVolumes[CycleGraph[10], 1] === Accumulate[ShellAreas[CycleGraph[10], 1]],
-    True,
-    TestID -> "BallVolumes-accumulates-ShellAreas"
+    BallVolumes[PetersenGraph[], 1, All, "Measure" -> #] & /@ {"FullCount", "WithoutBoundary", "HalfBoundary"},
+    {{1, 4, 10}, {0, 1, 10}, {1/2, 5/2, 10}},
+    TestID -> "BallVolumes-three-measures-Petersen"
 ]
 
-(* a fixed finite radius window over a vertex list is rectangular: every row has
-   length rmax - rmin + 1 (this is the contract that makes subset statistics Transpose) *)
+(* FullCount - WithoutBoundary is the inner vertex boundary of the ball at every radius *)
 VerificationTest[
-    Dimensions[BallVolumes[GridGraph[{5, 5}], All, {0, 6}]],
+    With[{g = GridGraph[{7, 7}]},
+        {row = GraphDistance[g, 25]},
+        BallVolumes[g, 25, All] - BallVolumes[g, 25, All, "Measure" -> "WithoutBoundary"] ===
+            Table[Length @ GraphBoundary[g, Pick[VertexList[g], Thread[row <= r]]], {r, 0, Max[row]}]
+    ],
+    True,
+    TestID -> "BallVolumes-WithoutBoundary-is-GraphInterior"
+]
+
+(* in the bulk of a lattice the boundary of B_r is the whole shell S_r, so WithoutBoundary
+   is FullCount one radius earlier *)
+VerificationTest[
+    With[{g = GridGraph[{11, 11}]},
+        BallVolumes[g, 61, {1, 4}, "Measure" -> "WithoutBoundary"] === BallVolumes[g, 61, {0, 3}]
+    ],
+    True,
+    TestID -> "BallVolumes-WithoutBoundary-shifts-on-lattice"
+]
+
+(* HalfBoundary on Z^2 and Z^3 is the parity-d part of the Ehrhart polynomial of the
+   cross-polytope, 2 r^2 + 1 and 4/3 r^3 + 8/3 r: the norm-ball volume with no r^(d-1) term *)
+VerificationTest[
+    {BallVolumes[GridGraph[{11, 11}], 61, {1, 4}, "Measure" -> "HalfBoundary"],
+     BallVolumes[GridGraph[{9, 9, 9}], 365, {1, 3}, "Measure" -> "HalfBoundary"]},
+    {Table[2 r^2 + 1, {r, 1, 4}], Table[4/3 r^3 + 8/3 r, {r, 1, 3}]},
+    TestID -> "BallVolumes-HalfBoundary-Ehrhart-parity"
+]
+
+(* Ehrhart-Macdonald reciprocity read off the closed count: the polynomial through the
+   first three Z^2 volumes is 2 x^2 + 2 x + 1 and its values at -r are the open counts |B_{r-1}| *)
+VerificationTest[
+    With[{v = BallVolumes[GridGraph[{11, 11}], 61, {0, 4}]},
+        {ell = InterpolatingPolynomial[Table[{r, v[[r + 1]]}, {r, 0, 2}], x]},
+        {Expand[ell], Table[ell /. x -> -r, {r, 1, 4}] === v[[1 ;; 4]]}
+    ],
+    {1 + 2 x + 2 x^2, True},
+    TestID -> "BallVolumes-Ehrhart-reciprocity-Z2"
+]
+
+(* the triangular and honeycomb lattices: 3 r^2 + 1 and 1 + 3 r^2 / 2 *)
+VerificationTest[
+    With[{tri = IndexGraph @ TessellationGraph[{3, 6}, {16, 16}], hex = IndexGraph @ TessellationGraph[{6, 3}, {14, 14}]},
+        {BallVolumes[tri, 1, {1, 5}, "Measure" -> "HalfBoundary"], BallVolumes[hex, 1, {1, 5}, "Measure" -> "HalfBoundary"]}
+    ],
+    {Table[3 r^2 + 1, {r, 1, 5}], Table[1 + 3 r^2 / 2, {r, 1, 5}]},
+    TestID -> "BallVolumes-HalfBoundary-triangular-honeycomb"
+]
+
+(* a fixed finite radius window over a vertex list is rectangular, rationals included:
+   every row has length rmax - rmin + 1 (the contract that makes subset statistics Transpose) *)
+VerificationTest[
+    Dimensions[BallVolumes[GridGraph[{5, 5}], All, {0, 6}, "Measure" -> "HalfBoundary"]],
     {25, 7},
     TestID -> "BallVolumes-fixed-window-rectangular"
-]
-
-(* shells past eccentricity pad with 0 (empty sphere) *)
-VerificationTest[
-    ShellAreas[PathGraph[Range[5]], 1, {0, 8}],
-    {1, 1, 1, 1, 1, 0, 0, 0, 0},
-    TestID -> "ShellAreas-pad-zero-past-ecc"
 ]
 
 (* the log-difference quotient of a clean power law r^d recovers the exponent d *)
@@ -1205,36 +1250,36 @@ VerificationTest[
     TestID -> "LogDifferenceQuotients-power-law-exponent"
 ]
 
-(* "Front" measure: V(t) = sum_{s<=t} |S_s(v)|.  On a path from an endpoint the front
+(* "ExpandingFront" measure: V(t) = sum_{s<=t} |S_s(v)|.  On a path from an endpoint the front
    is a single vertex marching out and reflecting, so |S_s| == 1 and V(t) == t + 1 *)
 VerificationTest[
-    BallVolumes[PathGraph[Range[7]], 1, {0, 12}, "Measure" -> "Front"],
+    BallVolumes[PathGraph[Range[7]], 1, {0, 12}, "Measure" -> "ExpandingFront"],
     Range[1, 13],
-    TestID -> "BallVolumes-Front-single-vertex-on-path"
+    TestID -> "BallVolumes-ExpandingFront-single-vertex-on-path"
 ]
 
 (* the front starts as the origin alone, so V(0) == 1 for any graph *)
 VerificationTest[
-    BallVolumes[GridGraph[{4, 4}], 5, 0, "Measure" -> "Front"],
+    BallVolumes[GridGraph[{4, 4}], 5, 0, "Measure" -> "ExpandingFront"],
     1,
-    TestID -> "BallVolumes-Front-V0-is-one"
+    TestID -> "BallVolumes-ExpandingFront-V0-is-one"
 ]
 
 (* unlike the metric ball (which saturates at the component size past eccentricity),
    the momentum front keeps sweeping, so V(2 ecc) strictly exceeds |component| *)
 VerificationTest[
-    Last[BallVolumes[CycleGraph[8], 1, All, "Measure" -> "Front"]] > VertexCount[CycleGraph[8]],
+    Last[BallVolumes[CycleGraph[8], 1, All, "Measure" -> "ExpandingFront"]] > VertexCount[CycleGraph[8]],
     True,
-    TestID -> "BallVolumes-Front-propagates-past-ecc"
+    TestID -> "BallVolumes-ExpandingFront-propagates-past-ecc"
 ]
 
 (* V is the running total of the front sizes, which are >= 1 (the front never empties):
    the step differences are exactly the foliation cardinalities, all positive *)
 VerificationTest[
-    With[{v = BallVolumes[CycleGraph[10], 1, {0, 15}, "Measure" -> "Front"]},
+    With[{v = BallVolumes[CycleGraph[10], 1, {0, 15}, "Measure" -> "ExpandingFront"]},
         Min[Differences[v]] >= 1 && OrderedQ[v]],
     True,
-    TestID -> "BallVolumes-Front-monotone-never-empties"
+    TestID -> "BallVolumes-ExpandingFront-monotone-never-empties"
 ]
 
 (* slope-of-mean: average the volume profiles over the vertex slot, then one slope.
@@ -1269,7 +1314,7 @@ VerificationTest[
 
 (* endpoint of a path: shell area A(r) = 1 (one vertex per distance) is a pure r^0 power,
    so the sphere probe reads the manifold dimension n = 1 exactly with S = 0 (the ball probe
-   is no longer exact here: the Hausdorff boundary correction distorts a graph this small) *)
+   is not exact here: the boundary correction distorts a graph this small) *)
 VerificationTest[
     With[{r = VolumeGrowthObservables[PathGraph[Range[5]], 1]},
         {Chop[r["SphereDimension"] - 1], Chop @ r["SphereScalarCurvature"]}
@@ -1278,35 +1323,28 @@ VerificationTest[
     TestID -> "VolumeGrowthObservables-P5-sphere-exact-line"
 ]
 
-(* cycle: d = 1, R = 0; the Automatic window drops the small-r preamble bias
-   q(r) ~ 1 + 1/r and beats the full-range fit on both estimates *)
+(* cycle under the HalfBoundary measure: V(r) = 2 r exactly for r >= 1, so the ball probe
+   reads d = 1 and R = 0 on the Automatic window and on the full range alike *)
 VerificationTest[
     With[{auto = VolumeGrowthObservables[CycleGraph[40], 1], full = VolumeGrowthObservables[CycleGraph[40], 1, All]},
-        {
-            Abs[auto["BallDimension"] - 1] < 0.06,
-            Abs[auto["BallDimension"] - 1] < Abs[full["BallDimension"] - 1],
-            Abs[auto["BallScalarCurvature"]] < Abs[full["BallScalarCurvature"]]
-        }
+        Chop[{auto["BallDimension"] - 1, auto["BallScalarCurvature"], full["BallDimension"] - 1, full["BallScalarCurvature"]}, 10.^-8]
     ],
-    {True, True, True},
-    TestID -> "VolumeGrowthObservables-C40-automatic-beats-full"
+    {0, 0, 0, 0},
+    TestID -> "VolumeGrowthObservables-C40-HalfBoundary-exact"
 ]
 
-(* flat 20x20 square torus: d ~ 2, R ~ 0; Automatic cuts the wrap-around tail.  The ball
-   probe overshoots to ~2.3 on a coarse lattice (lower-order lattice terms bias Gray's
-   intercept; the sphere probe is the exact one here) -- the bound reflects that honest bias *)
+(* flat 20x20 square torus under HalfBoundary: V(r) = 2 r^2 + 1 until the wrap at r = 10, so
+   the Automatic window stays before the wrap and reads d ~ 2, R ~ 0 -- with the honest bias
+   of the constant term, which pulls the quotient below 2 on a coarse lattice (the sphere
+   probe is the exact one here) *)
 VerificationTest[
     With[{g = TessellationGraph[{4, 4}, {20, 20}]},
         {v = First @ VertexList @ g},
-        {auto = VolumeGrowthObservables[g, v], full = VolumeGrowthObservables[g, v, All]},
-        {
-            Abs[auto["BallDimension"] - 2] < 0.35,
-            Abs[auto["BallDimension"] - 2] < Abs[full["BallDimension"] - 2],
-            Abs[auto["BallScalarCurvature"]] < Abs[full["BallScalarCurvature"]]
-        }
+        {auto = VolumeGrowthObservables[g, v]},
+        {Abs[auto["BallDimension"] - 2] < 0.35, Abs[auto["BallScalarCurvature"]] < 0.1, Last[auto["BallWindow"]] <= 10}
     ],
     {True, True, True},
-    TestID -> "VolumeGrowthObservables-torus-automatic-cuts-wrap-tail"
+    TestID -> "VolumeGrowthObservables-torus-window-before-wrap"
 ]
 
 (* the Automatic ball fit is reproducible from its own reported window *)
@@ -1326,11 +1364,21 @@ VerificationTest[
     TestID -> "VolumeGrowthObservables-ball-CurvatureByRadius-length"
 ]
 
-(* positively curved Hamming cube: ball R > 0 on the detected core *)
+(* positively curved Hamming cube: the sphere probe reads S > 0 on the rising shells *)
 VerificationTest[
-    VolumeGrowthObservables[HypercubeGraph[8], 1]["BallScalarCurvature"] > 0,
+    VolumeGrowthObservables[HypercubeGraph[8], 1]["SphereScalarCurvature"] > 0,
     True,
-    TestID -> "VolumeGrowthObservables-Q8-ball-positive-curvature"
+    TestID -> "VolumeGrowthObservables-Q8-sphere-positive-curvature"
+]
+
+(* flat square grid under HalfBoundary: the ball probe reads R = 0 to within 0.02 on the
+   detected window (FullCount and WithoutBoundary carry the r^(d-1) term and miss by ~0.05) *)
+VerificationTest[
+    With[{g = GridGraph[{15, 15}]},
+        Abs[VolumeGrowthObservables[g, First @ GraphCenter @ g]["BallScalarCurvature"]] < 0.02
+    ],
+    True,
+    TestID -> "VolumeGrowthObservables-grid2D-ball-flat"
 ]
 
 (* pinned dimension fits only the slope, on the same detected window *)
@@ -1384,37 +1432,37 @@ VerificationTest[
     TestID -> "VolumeGrowthObservables-torus-sphere-flat"
 ]
 
-(* positive curvature: ball and sphere scalar-curvature estimates share sign (both > 0)
-   on the positively curved Hamming cube -- the dual-probe consistency check *)
+(* negative curvature: ball and sphere scalar-curvature estimates share sign (both < 0)
+   on a radius-5 disk of the hyperbolic {3,7} tessellation -- the dual-probe consistency check *)
 VerificationTest[
-    With[{p = VolumeGrowthObservables[HypercubeGraph[8], 1]},
-        Sign[p["BallScalarCurvature"]] === Sign[p["SphereScalarCurvature"]] === 1
+    With[{p = VolumeGrowthObservables[TessellationNeighborhoodGraph[{3, 7}, 5], 1]},
+        Sign[p["BallScalarCurvature"]] === Sign[p["SphereScalarCurvature"]] === -1
     ],
     True,
-    TestID -> "VolumeGrowthObservables-positive-curvature-sign-agreement"
+    TestID -> "VolumeGrowthObservables-negative-curvature-sign-agreement"
 ]
 
 (* the sphere fit exposes the per-radius area-curvature and mean-curvature profiles *)
 VerificationTest[
     With[{r = VolumeGrowthObservables[HypercubeGraph[8], 1]},
-        {Length[r["SphereCurvatureByRadius"]] === Length[ShellAreas[HypercubeGraph[8], 1]] - 1,
-         Length[r["SphereMeanCurvatureByRadius"]] === Length[ShellAreas[HypercubeGraph[8], 1]] - 1}
+        {Length[r["SphereCurvatureByRadius"]] === Length[BallVolumes[HypercubeGraph[8], 1]] - 1,
+         Length[r["SphereMeanCurvatureByRadius"]] === Length[BallVolumes[HypercubeGraph[8], 1]] - 1}
     ],
     {True, True},
     TestID -> "VolumeGrowthObservables-sphere-profiles-length"
 ]
 
-(* the bundle is self-consistent: the returned "BallVolumes" is the Hausdorff measure that
-   the fit actually consumes (default), and "...LogDifferenceQuotients" is the radius-correct
-   log-log slope of exactly those returned profiles *)
+(* the bundle is self-consistent: the returned "BallVolumes" is the HalfBoundary profile that
+   the fit actually consumes (default), "ShellAreas" the shell counts of the FullCount profile,
+   and "...LogDifferenceQuotients" the radius-correct log-log slope of exactly those profiles *)
 VerificationTest[
     With[{g = GridGraph[{9, 9}]},
         {v = First @ GraphCenter @ g},
         {r = VolumeGrowthObservables[g, v],
          rq = (f |-> Table[(Log[N @ f[[k + 2]]] - Log[N @ f[[k + 1]]]) / (Log[k + 1.] - Log[k]), {k, 1, Length[f] - 2}])},
         {
-            r["ShellAreas"] === ShellAreas[g, v],
-            r["BallVolumes"] === BallVolumes[g, v, All, "Measure" -> "Hausdorff"],
+            r["ShellAreas"] === Prepend[Differences @ BallVolumes[g, v], 1],
+            r["BallVolumes"] === BallVolumes[g, v, All, "Measure" -> "HalfBoundary"],
             Max @ Abs[r["BallLogDifferenceQuotients"] - rq[r["BallVolumes"]]] < 10.^-10,
             Max @ Abs[r["SphereLogDifferenceQuotients"] - rq[r["ShellAreas"]]] < 10.^-10
         }
@@ -1446,13 +1494,13 @@ VerificationTest[
     TestID -> "DimensionCurvatureFit-bare-list-radii-default"
 ]
 
-(* the headline composition: the index-based LogDifferenceQuotients of the Counting ball volume,
+(* the headline composition: the index-based LogDifferenceQuotients of the FullCount ball volume,
    sliced to an inner window and regressed, reads the lattice dimension d = 2 (the off-by-one of
-   the index quotient on Counting is the Hausdorff boundary shift) *)
+   the index quotient on FullCount is the one-radius boundary shift) *)
 VerificationTest[
     With[{g = GridGraph[{21, 21}]},
         {v = First @ GraphCenter @ g},
-        {q = LogDifferenceQuotients[BallVolumes[g, v, All, "Measure" -> "Counting"]]},
+        {q = LogDifferenceQuotients[BallVolumes[g, v, All, "Measure" -> "FullCount"]]},
         {pairs = Select[Transpose[{Range[0, Length[q] - 1], q}], 1 <= #[[1]] <= 7 &]},
         Abs[DimensionCurvatureFit[pairs]["Dimension"] - 2] < 0.4
     ],
@@ -1465,7 +1513,7 @@ VerificationTest[
 VerificationTest[
     With[{g = GridGraph[{15, 15}]},
         {rq = (f |-> Table[(Log[f[[k + 2]]] - Log[f[[k + 1]]]) / (Log[k + 1.] - Log[k]), {k, 1, Length[f] - 2}])},
-        {avg = Exp /@ (MeanAround /@ Transpose[Log[N[BallVolumes[g, All, {0, 8}, "Measure" -> "Hausdorff"]]]])},
+        {avg = Exp /@ (MeanAround /@ Transpose[Log[N[BallVolumes[g, All, {0, 8}, "Measure" -> "WithoutBoundary"]]]])},
         {fit = DimensionCurvatureFit[rq[avg]]},
         {Head[fit["Dimension"]], Head[fit["ScalarCurvature"]]}
     ],
@@ -1519,6 +1567,76 @@ VerificationTest[
     ],
     {True, True, True},
     TestID -> "TubeVolumes-profile-shape"
+]
+
+(* a one-vertex core is the ball: every measure agrees with BallVolumes *)
+VerificationTest[
+    With[{g = GridGraph[{5, 5}]},
+        And @@ (TubeVolumes[g, {13}, All, "Measure" -> #] === BallVolumes[g, 13, All, "Measure" -> #] & /@
+            {"FullCount", "WithoutBoundary", "HalfBoundary", "ExpandingFront"})
+    ],
+    True,
+    TestID -> "TubeVolumes-point-core-is-ball"
+]
+
+(* the target-list form agrees with the pair form target by target, its fixed-radius vector
+   with CylinderVolumes, and a finite window over a shell is rectangular *)
+VerificationTest[
+    With[{g = GridGraph[{7, 7}]},
+        {shell = Pick[VertexList[g], GraphDistance[g, 25], 3]},
+        {TubeVolumes[g, 25, shell, {0, 3}] === (TubeVolumes[g, 25, #, {0, 3}] & /@ shell),
+         TubeVolumes[g, 25, shell, 2] === CylinderVolumes[g, 25, shell, 2],
+         Dimensions @ TubeVolumes[g, 25, shell, {0, 3}, "Measure" -> "HalfBoundary"]}
+    ],
+    {True, True, {12, 4}},
+    TestID -> "TubeVolumes-target-list-matches-pair-form"
+]
+
+(* the torus meridian under HalfBoundary: the two rows at distance s are the boundary, so
+   T(s) = 20 (2 s + 1) becomes 40 s -- the constant term is gone and the mantle reads 2 L s *)
+VerificationTest[
+    With[{torus = GraphProduct[CycleGraph[20], CycleGraph[20], "Cartesian"]},
+        TubeVolumes[torus, Select[VertexList[torus], First[#] === 1 &], {1, 8}, "Measure" -> "HalfBoundary"]
+    ],
+    Table[40 s, {s, 1, 8}],
+    TestID -> "TubeVolumes-torus-meridian-HalfBoundary"
+]
+
+
+(* ===== IntervalVolumes: the interval at slack r against the tube at radius r ===== *)
+
+(* T(p, q; r) is a subset of I(p, q; 2r) on every graph: every pair of the Petersen graph *)
+VerificationTest[
+    With[{g = PetersenGraph[]},
+        And @@ Flatten @ Table[Thread[TubeVolumes[g, p, q, {0, 2}] <= IntervalVolumes[g, p, q, {0, 4}][[1 ;; ;; 2]]], {p, 10}, {q, 10}]
+    ],
+    True,
+    TestID -> "IntervalVolumes-contains-tube-Petersen"
+]
+
+(* strict on the hexagon (no median for 1, 3 and the antipode 5), equality on the modular grid *)
+VerificationTest[
+    {TubeVolumes[CycleGraph[6], 1, 3, 1], IntervalVolumes[CycleGraph[6], 1, 3, 2],
+     TubeVolumes[GridGraph[{5, 5}], 7, 9, {0, 2}] === IntervalVolumes[GridGraph[{5, 5}], 7, 9, {0, 4}][[1 ;; ;; 2]]},
+    {5, 6, True},
+    TestID -> "IntervalVolumes-tube-strict-on-C6-equal-on-grid"
+]
+
+(* on a bipartite graph every slack is even: the odd levels of the interval profile are empty *)
+VerificationTest[
+    With[{v = IntervalVolumes[GridGraph[{7, 7}], 25, 27, {0, 6}]}, Most[v[[1 ;; ;; 2]]] === v[[2 ;; ;; 2]]],
+    True,
+    TestID -> "IntervalVolumes-bipartite-parity"
+]
+
+(* the target-list form agrees with the pair form *)
+VerificationTest[
+    With[{g = GridGraph[{7, 7}]},
+        {shell = Pick[VertexList[g], GraphDistance[g, 25], 3]},
+        IntervalVolumes[g, 25, shell, {0, 4}] === (IntervalVolumes[g, 25, #, {0, 4}] & /@ shell)
+    ],
+    True,
+    TestID -> "IntervalVolumes-target-list-matches-pair-form"
 ]
 
 (* Tube probe: q(s) = (d - 1) - (tau + Ric(v,v))/(3(d+1)) s(s+1); d = 2 makes the

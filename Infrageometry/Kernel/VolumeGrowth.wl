@@ -2,9 +2,9 @@ Package["WolframInstitute`Infrageometry`"]
 
 PackageExport[BallHull]
 PackageExport[BallVolumes]
-PackageExport[ShellAreas]
 PackageExport[CylinderVolumes]
 PackageExport[TubeVolumes]
+PackageExport[IntervalVolumes]
 PackageExport[GeodesicIntervalGraph]
 PackageExport[GeodesicOccupation]
 PackageExport[GeodesicEdgeOccupation]
@@ -39,7 +39,7 @@ BallHull[g_Graph, S_List] :=
    {f(0), ..., f(ecc)}; r_Integer -> the scalar f(r); {rmin, rmax} -> a RECTANGULAR
    window, saturating past the sequence end with pad (so a fixed window over a vertex
    list Transposes cleanly for subset statistics).  pad defaults to the last value
-   (ball volumes saturate at the component size); ShellAreas passes pad = 0. *)
+   (every ball measure saturates at the component size). *)
 windowSaturate[c_, range_] := windowSaturate[c, range, Last[c]]
 
 windowSaturate[c_, range_, pad_] := Switch[range,
@@ -68,28 +68,32 @@ advancingFront[g_Graph, src_List, steps_Integer] :=
 			{src, src}, steps][[All, 2]]
 	]
 
-(* horizon for the "Front" ball-volume measure: a step count, not a radius.  All has no
-   natural end (the front never stops), so default to 2 ecc(v) -- one out-and-back. *)
-frontHorizon[g_, v_, range_] := Switch[range,
-	All,                  2 Max[DeleteCases[GraphDistance[g, v], Infinity]],
-	_Integer,             range,
-	{_Integer, _Integer}, Last[range]
-]
+(* V(t) = sum_{s<=t} |S_s| -- the cumulative passage count of the advancing front from src,
+   the "ExpandingFront" measure: the ball volume in the wrapped sense, indexed by a step
+   count rather than a radius.  All has no natural end (the front never stops), so it
+   defaults to 2 max rho steps -- one out-and-back over the distances rho to src. *)
+frontVolumeProfile[g_, src_List, rho_, range_] :=
+	Accumulate[Length /@ advancingFront[g, src, Switch[range,
+		All,                  2 Max @ DeleteCases[rho, Infinity],
+		_Integer,             range,
+		{_Integer, _Integer}, Last[range]
+	]]]
 
-(* V(t) = sum_{s<=t} |S_s(v)| -- the cumulative passage count of the advancing front,
-   the "ball volume" the front sweeps through time t (grows past eccentricity). *)
-frontVolumeProfile[g_, v_, range_] := Accumulate[Length /@ advancingFront[g, {v}, frontHorizon[g, v, range]]]
+(* V(r) = |B_r(v)| as the List {V(0), ..., V(ecc(v))} (position i is radius i - 1).  Object
+   slot 2 (single vertex, list, or All), radius slot 3 (All -> the full profile; r_Integer
+   -> the scalar V(r); {rmin, rmax} -> the rectangular window).  Option "Measure", with
+   dB_r = GraphBoundary[g, B_r] the vertices of the ball adjacent to its complement:
+     "FullCount"        |B_r|                                              (default)
+     "WithoutBoundary"  |B_r| - |dB_r| = |GraphInterior[g, B_r]|  (= |B_{r-1}| in a lattice bulk)
+     "HalfBoundary"     |B_r| - |dB_r|/2   -- on Z^d the parity-d part of the Ehrhart polynomial
+                        of the cross-polytope, so the r^(d-1) term is gone: 2 r^2 + 1 on Z^2,
+                        4/3 r^3 + 8/3 r on Z^3 (the growth fit's default)
+     "ExpandingFront"   the passage count of the advancing front, slot 3 a step count
+   A vertex v leaves dB_r at r = max_{w in N[v]} d(v0, w), the maximum of the distance over its
+   closed neighbourhood, so the boundary measures are one pass over the adjacency lists
+   instead of one GraphInterior per radius.  The growth invariant feeding VolumeGrowthObservables. *)
 
-(* V(r) = |B_r(v)|, the cumulative vertex count within radius r, as the List
-   {V(0), ..., V(ecc(v))} (position i is radius i - 1).  Object slot 2 (single vertex,
-   list, or All), radius slot 3 (default All -> full profile; r_Integer -> the scalar
-   V(r); {rmin, rmax} -> the rectangular window).  Option "Measure" picks the counting
-   convention: "Counting" = |B_r| (default); "Hausdorff" = |B_r| - |dB_r| =
-   |GraphInterior[B_r]| (boundary-corrected, == the counting measure in the bulk).
-   BallVolumes (default "Counting") == Accumulate[ShellAreas].  The growth invariant
-   feeding VolumeGrowthObservables. *)
-
-Options[BallVolumes] = {"Measure" -> "Counting"};
+Options[BallVolumes] = {"Measure" -> "FullCount"};
 
 BallVolumes[g_Graph, opts : OptionsPattern[]] := BallVolumes[g, All, All, opts]
 
@@ -105,55 +109,35 @@ BallVolumes[g_Graph,
 	OptionsPattern[]
 ] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
 	With[
-		{conv = OptionValue["Measure"], dm = GraphDistanceMatrix[g], vs = VertexList[g]},
-		{idx = PositionIndex[vs], targets = If[vertices === All, vs, vertices]},
-		(windowSaturate[#, range] &) /@ Switch[conv,
-			"Counting",  (Accumulate @ Values @ KeySort @ Counts @ DeleteCases[dm[[idx[#][[1]]]], Infinity] &) /@ targets,
-			"Hausdorff", (With[{row = dm[[idx[#][[1]]]]}, Table[Length @ GraphInterior[g, Pick[vs, Thread[row <= r]]], {r, 0, Max @ DeleteCases[row, Infinity]}]] &) /@ targets,
-			"Front",     (frontVolumeProfile[g, #, range] &) /@ targets
-		]
+		{dm = GraphDistanceMatrix[g], adj = AdjacencyMatrix[g]["AdjacencyLists"], measure = OptionValue["Measure"]},
+		{targets = If[vertices === All, VertexList[g], vertices]},
+		MapThread[
+			{v, rho} |-> With[{bins = {0, Max @ DeleteCases[rho, Infinity] + 1, 1}},
+				{full = Accumulate @ BinCounts[rho, bins]},
+				windowSaturate[Switch[measure,
+					"FullCount",       full,
+					"WithoutBoundary", Accumulate @ BinCounts[MapThread[Max, {rho, Max[rho[[#]]] & /@ adj}], bins],
+					"HalfBoundary",    (full + Accumulate @ BinCounts[MapThread[Max, {rho, Max[rho[[#]]] & /@ adj}], bins]) / 2,
+					"ExpandingFront",  frontVolumeProfile[g, {v}, rho, range]
+				], range]],
+			{targets, dm[[VertexIndex[g, #] & /@ targets]]}]
 	]
 
 BallVolumes[g_Graph,
 	vertex : Except[All | _Rule | _RuleDelayed],
 	range : (_Integer | {_Integer, _Integer} | All),
 	OptionsPattern[]
-] := windowSaturate[
-	Switch[OptionValue["Measure"],
-		"Counting",  Accumulate @ Values @ KeySort @ Counts @ DeleteCases[GraphDistance[g, vertex], Infinity],
-		"Hausdorff", With[{vs = VertexList[g], row = GraphDistance[g, vertex]}, Table[Length @ GraphInterior[g, Pick[vs, Thread[row <= r]]], {r, 0, Max @ DeleteCases[row, Infinity]}]],
-		"Front",     frontVolumeProfile[g, vertex, range]
-	],
-	range
-]
-
-
-(* ===================== Shell areas ===================== *)
-
-(* A(r) = |dB_r(v)| = #{ w : d(v, w) == r } as the List {A(0), ..., A(ecc(v))}: the
-   discrete geodesic-sphere areas, the radial derivative of BallVolumes (default "Counting"
-   == Accumulate[ShellAreas]; the crystallography / OEIS coordination sequence, A(1) =
-   the coordination number).  Same object/range convention as BallVolumes; a finite
-   {rmin, rmax} window is rectangular, padding past eccentricity with 0 (empty sphere). *)
-
-ShellAreas[g_Graph] := ShellAreas[g, All, All]
-
-ShellAreas[g_Graph, pts : (All | _List | Except[_Rule | _RuleDelayed])] := ShellAreas[g, pts, All]
-
-(* all/list form: one GraphDistanceMatrix; single vertex stays on one GraphDistance *)
-ShellAreas[g_Graph,
-	vertices : (_List | All),
-	range : (_Integer | {_Integer, _Integer} | All)
-] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
-	With[{dm = GraphDistanceMatrix[g], vs = VertexList[g]},
-		{idx = PositionIndex[vs]},
-		(windowSaturate[Values @ KeySort @ Counts @ DeleteCases[dm[[idx[#][[1]]]], Infinity], range, 0] &) /@ If[vertices === All, vs, vertices]
+] :=
+	With[{rho = GraphDistance[g, vertex]},
+		{bins = {0, Max @ DeleteCases[rho, Infinity] + 1, 1}},
+		{full = Accumulate @ BinCounts[rho, bins]},
+		windowSaturate[Switch[OptionValue["Measure"],
+			"FullCount",       full,
+			"WithoutBoundary", Accumulate @ BinCounts[MapThread[Max, {rho, Max[rho[[#]]] & /@ AdjacencyMatrix[g]["AdjacencyLists"]}], bins],
+			"HalfBoundary",    (full + Accumulate @ BinCounts[MapThread[Max, {rho, Max[rho[[#]]] & /@ AdjacencyMatrix[g]["AdjacencyLists"]}], bins]) / 2,
+			"ExpandingFront",  frontVolumeProfile[g, {vertex}, rho, range]
+		], range]
 	]
-
-ShellAreas[g_Graph,
-	vertex : Except[All | _Rule | _RuleDelayed],
-	range : (_Integer | {_Integer, _Integer} | All)
-] := windowSaturate[Values @ KeySort @ Counts @ DeleteCases[GraphDistance[g, vertex], Infinity], range, 0]
 
 
 (* ===================== Cylinder volumes ===================== *)
@@ -188,27 +172,99 @@ cylinderVolume[dm_, pi_, qi_, s_] :=
 (* T(s) = |{ w : d(w, S) <= s }|, the tube-volume profile of a vertex set S, as the List
    {T(0), ..., T(sMax)} with T(0) = |S|, saturating at the component of S.  The core S is
    any vertex list -- a geodesic segment, a cycle (capless tube), a submanifold sample;
-   TubeVolumes[g, p, q] takes S = the metric interval I(p, q) (the CylinderVolumes
-   support, so TubeVolumes[g, p, q, s] == CylinderVolumes[g, p, {q}, s]).  Radius slot
-   mirrors BallVolumes: All (default) | s_Integer | {smin, smax} rectangular.  For a
-   geodesic core with direction v, Gray's tube expansion Vol T_s = omega_{n-1} s^(n-1) L
+   TubeVolumes[g, p, q] takes S = the metric interval I(p, q) (so TubeVolumes[g, p, q, s] ==
+   CylinderVolumes[g, p, {q}, s]) and TubeVolumes[g, p, targets] one profile per target q
+   off a single GraphDistanceMatrix, the core rows giving d(., I(p, q)) as a column-wise
+   Min -- the distribution of tube volumes over a shell of p in one call.  Radius slot and
+   option "Measure" as in BallVolumes, with dT_s = GraphBoundary[g, T_s].  For a geodesic
+   core with direction v, Gray's tube expansion Vol T_s = omega_{n-1} s^(n-1) L
    (1 - (tau + Ric(v,v))/(6(n+1)) s^2 + O(s^4)) makes the quotient fit read the Ricci
-   projection: DimensionCurvatureFit[..., "Probe" -> "Tube"].  One BFS from a virtual
-   vertex joined to S -- no distance matrix. *)
+   projection: DimensionCurvatureFit[..., "Probe" -> "Tube"]. *)
 
-TubeVolumes[g_Graph, core_List, range : (_Integer | {_Integer, _Integer} | All) : All] :=
-	With[{aux = Unique["tubeSource"]},
+Options[TubeVolumes] = {"Measure" -> "FullCount"};
+
+(* one BFS from a virtual vertex joined to the core -- no distance matrix *)
+TubeVolumes[g_Graph, core_List, range : (_Integer | {_Integer, _Integer} | All) : All, OptionsPattern[]] /;
+	! MemberQ[VertexList[g], core] :=
+	With[{aux = Unique["tubeSource"], vs = VertexList[g]},
 		{aug = EdgeAdd[VertexAdd[g, {aux}], UndirectedEdge[aux, #] & /@ DeleteDuplicates[core]]},
-		windowSaturate[
-			Accumulate @ Values @ KeySort @ Counts @ DeleteCases[
-				Values @ KeyDrop[AssociationThread[VertexList[aug], GraphDistance[aug, aux]], {aux}] - 1, Infinity],
-			range]
+		{rho = Lookup[AssociationThread[VertexList[aug], GraphDistance[aug, aux]], Key /@ vs] - 1},
+		{bins = {0, Max @ DeleteCases[rho, Infinity] + 1, 1}},
+		{full = Accumulate @ BinCounts[rho, bins]},
+		windowSaturate[Switch[OptionValue["Measure"],
+			"FullCount",       full,
+			"WithoutBoundary", Accumulate @ BinCounts[MapThread[Max, {rho, Max[rho[[#]]] & /@ AdjacencyMatrix[g]["AdjacencyLists"]}], bins],
+			"HalfBoundary",    (full + Accumulate @ BinCounts[MapThread[Max, {rho, Max[rho[[#]]] & /@ AdjacencyMatrix[g]["AdjacencyLists"]}], bins]) / 2,
+			"ExpandingFront",  frontVolumeProfile[g, DeleteDuplicates[core], rho, range]
+		], range]
 	]
 
-TubeVolumes[g_Graph, p : Except[_List], q : Except[_List], range : (_Integer | {_Integer, _Integer} | All) : All] :=
-	With[{vs = VertexList[g]},
-		{dp = AssociationThread[vs, GraphDistance[g, p]], dq = AssociationThread[vs, GraphDistance[g, q]]},
-		TubeVolumes[g, Select[vs, dp[#] + dq[#] == dp[q] &], range]
+TubeVolumes[g_Graph, p_, q_, range : (_Integer | {_Integer, _Integer} | All) : All, opts : OptionsPattern[]] /;
+	MemberQ[VertexList[g], p] && MemberQ[VertexList[g], q] :=
+	With[{vs = VertexList[g], dp = GraphDistance[g, p], dq = GraphDistance[g, q]},
+		TubeVolumes[g, Pick[vs, dp + dq, dp[[VertexIndex[g, q]]]], range, opts]
+	]
+
+TubeVolumes[g_Graph, p_, targets : (_List | All), range : (_Integer | {_Integer, _Integer} | All) : All, OptionsPattern[]] /;
+	MemberQ[VertexList[g], p] && (targets === All || ! MemberQ[VertexList[g], targets]) :=
+	With[
+		{dm = GraphDistanceMatrix[g], adj = AdjacencyMatrix[g]["AdjacencyLists"], vs = VertexList[g], measure = OptionValue["Measure"]},
+		{dp = dm[[VertexIndex[g, p]]], qis = If[targets === All, Range @ Length @ vs, VertexIndex[g, #] & /@ targets]},
+		Table[
+			With[{core = Flatten @ Position[dp + dm[[qi]], dp[[qi]]]},
+				{rho = Min /@ Transpose[dm[[core]]]},
+				{bins = {0, Max @ DeleteCases[rho, Infinity] + 1, 1}},
+				{full = Accumulate @ BinCounts[rho, bins]},
+				windowSaturate[Switch[measure,
+					"FullCount",       full,
+					"WithoutBoundary", Accumulate @ BinCounts[MapThread[Max, {rho, Max[rho[[#]]] & /@ adj}], bins],
+					"HalfBoundary",    (full + Accumulate @ BinCounts[MapThread[Max, {rho, Max[rho[[#]]] & /@ adj}], bins]) / 2,
+					"ExpandingFront",  frontVolumeProfile[g, vs[[core]], rho, range]
+				], range]],
+			{qi, qis}]
+	]
+
+
+(* ===================== Interval volumes ===================== *)
+
+(* |I(p, q; r)| for the interval at slack r, I(p, q; r) = { x : d(p, x) + d(x, q) <= d(p, q) + r }
+   (the two-focus ellipsoid; I(p, q; 0) is the metric interval), as the List {I(0), ..., I(rMax)}
+   indexed by slack.  Two rows of the distance matrix per pair, so IntervalVolumes[g, p, targets]
+   gives a shell's worth of profiles in one call.  T(p, q; r) is a subset of I(p, q; 2r) on every
+   graph, with equality for all p, q, r exactly on modular graphs: only there are the tube and the
+   interval the same observable.  Option "Measure": "FullCount" | "WithoutBoundary" | "HalfBoundary"
+   with dI = GraphBoundary[g, I]; slack is not a radius, so there is no front. *)
+
+Options[IntervalVolumes] = {"Measure" -> "FullCount"};
+
+IntervalVolumes[g_Graph, p_, q_, range : (_Integer | {_Integer, _Integer} | All) : All, OptionsPattern[]] /;
+	MemberQ[VertexList[g], p] && MemberQ[VertexList[g], q] :=
+	With[{dp = GraphDistance[g, p], dq = GraphDistance[g, q]},
+		{rho = dp + dq - dp[[VertexIndex[g, q]]]},
+		{bins = {0, Max @ DeleteCases[rho, Infinity] + 1, 1}},
+		{full = Accumulate @ BinCounts[rho, bins]},
+		windowSaturate[Switch[OptionValue["Measure"],
+			"FullCount",       full,
+			"WithoutBoundary", Accumulate @ BinCounts[MapThread[Max, {rho, Max[rho[[#]]] & /@ AdjacencyMatrix[g]["AdjacencyLists"]}], bins],
+			"HalfBoundary",    (full + Accumulate @ BinCounts[MapThread[Max, {rho, Max[rho[[#]]] & /@ AdjacencyMatrix[g]["AdjacencyLists"]}], bins]) / 2
+		], range]
+	]
+
+IntervalVolumes[g_Graph, p_, targets : (_List | All), range : (_Integer | {_Integer, _Integer} | All) : All, OptionsPattern[]] /;
+	MemberQ[VertexList[g], p] && (targets === All || ! MemberQ[VertexList[g], targets]) :=
+	With[
+		{dm = GraphDistanceMatrix[g], adj = AdjacencyMatrix[g]["AdjacencyLists"], measure = OptionValue["Measure"]},
+		{dp = dm[[VertexIndex[g, p]]], qis = If[targets === All, Range @ Length @ dm, VertexIndex[g, #] & /@ targets]},
+		Table[
+			With[{rho = dp + dm[[qi]] - dp[[qi]]},
+				{bins = {0, Max @ DeleteCases[rho, Infinity] + 1, 1}},
+				{full = Accumulate @ BinCounts[rho, bins]},
+				windowSaturate[Switch[measure,
+					"FullCount",       full,
+					"WithoutBoundary", Accumulate @ BinCounts[MapThread[Max, {rho, Max[rho[[#]]] & /@ adj}], bins],
+					"HalfBoundary",    (full + Accumulate @ BinCounts[MapThread[Max, {rho, Max[rho[[#]]] & /@ adj}], bins]) / 2
+				], range]],
+			{qi, qis}]
 	]
 
 
@@ -308,7 +364,8 @@ LogDifferenceQuotients[w_List] := Log[Ratios[Range[Length[w]]], Ratios[N[w]]]
    curvature -- from the Bishop-Gromov regression of the log-difference quotient q(r) on
    x = r (r+1) (the squared geometric-mean radius), for BOTH growth probes:
      Ball volume V(r):  q -> d - R/(3(d+2)) x   (intercept d, R = -3(d+2) slope);
-     Sphere area A(r) = ShellAreas (Gray: Area(S_r) = sigma_{n-1} r^(n-1)(1 - S/(6 n) r^2)):
+     Sphere area A(r) = V(r) - V(r-1) of the "FullCount" profile, the shell count
+                        (Gray: Area(S_r) = sigma_{n-1} r^(n-1)(1 - S/(6 n) r^2)):
                         q -> (n-1) - S/(3 n) x  (intercept n-1, manifold n = intercept+1, S = -3 n slope).
    Returns the flat association
      <|"BallVolumes", "ShellAreas", "BallLogDifferenceQuotients", "SphereLogDifferenceQuotients",
@@ -326,13 +383,13 @@ LogDifferenceQuotients[w_List] := Log[Ratios[Range[Length[w]]], Ratios[N[w]]]
    the rising part of A(r) since it is non-monotonic on a finite graph).
    Window slot 3: {rmin, rmax}, All, or Automatic (default), the linear core of the (x, q)
    scatter -- the longest radius window whose least-squares residual stays within twice the
-   noise floor.  "Dimension" -> d_Integer pins the intercept; "Measure" ("Counting"
-   (default) | "Hausdorff") picks the ball-volume convention.  The ball dimension /
-   curvature fit internally shifts the profile by one radius (B_{r-1}) so flat lattices
-   read exact integer dimensions; "BallVolumes" still exposes the raw profile.  Vertex
-   slot 2 (single, list, or All). *)
+   noise floor.  "Dimension" -> d_Integer pins the intercept; "Measure" is the BallVolumes
+   measure the ball probe runs on, default "HalfBoundary" -- the radius convention under
+   which a flat lattice's ball volume is the norm-ball volume with no r^(d-1) term; the
+   "BallVolumes" key exposes exactly the profile that was fitted.  Vertex slot 2 (single,
+   list, or All). *)
 
-Options[VolumeGrowthObservables] = {"Measure" -> "Hausdorff", "Dimension" -> Automatic};
+Options[VolumeGrowthObservables] = {"Measure" -> "HalfBoundary", "Dimension" -> Automatic};
 
 VolumeGrowthObservables[g_Graph, opts : OptionsPattern[]] :=
 	VolumeGrowthObservables[g, All, Automatic, opts]
@@ -343,16 +400,19 @@ VolumeGrowthObservables[g_Graph,
 	OptionsPattern[]
 ] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
 	With[{dim = OptionValue["Dimension"]},
-		MapThread[growthParams[#1, #2, window, dim] &,
-			{BallVolumes[g, vertices, All, "Measure" -> OptionValue["Measure"]], ShellAreas[g, vertices, All]}]
+		MapThread[growthParams[#1, Prepend[Differences[#2], First[#2]], window, dim] &,
+			{BallVolumes[g, vertices, All, "Measure" -> OptionValue["Measure"]], BallVolumes[g, vertices, All]}]
 	]
 
 VolumeGrowthObservables[g_Graph,
 	vertex : Except[All | _Rule | _RuleDelayed],
 	window : ({_Integer, _Integer} | All | Automatic) : Automatic,
 	OptionsPattern[]
-] := growthParams[
-	BallVolumes[g, vertex, All, "Measure" -> OptionValue["Measure"]], ShellAreas[g, vertex, All], window, OptionValue["Dimension"]]
+] :=
+	With[{full = BallVolumes[g, vertex, All]},
+		growthParams[BallVolumes[g, vertex, All, "Measure" -> OptionValue["Measure"]],
+			Prepend[Differences[full], First[full]], window, OptionValue["Dimension"]]
+	]
 
 (* DimensionCurvatureFit[{{r, q(r)}, ...}]: fit dimension d and scalar curvature R to log-difference
    quotients q(r) (each the discrete d Log f / d Log r at radius r) by Bishop-Gromov regression on
@@ -368,8 +428,8 @@ VolumeGrowthObservables[g_Graph,
    Fits every supplied point (the caller windows by slicing the quotients); the fit uses
    closed-form normal equations (not LeastSquares) so Around-valued quotients carry their
    spread to Around dimension and curvature.  The caller supplies the quotients, so the
-   convention is its choice: LogDifferenceQuotients (index-based) of a Counting profile,
-   radialQuotients of a Hausdorff profile, ... *)
+   convention is its choice: LogDifferenceQuotients (index-based) of a "FullCount" profile,
+   radialQuotients of a "HalfBoundary" profile, ... *)
 
 Options[DimensionCurvatureFit] = {"Probe" -> "Ball", "Dimension" -> Automatic};
 
@@ -443,14 +503,14 @@ windowedFit[q_, window_, probe_, dimOpt_] := With[
 
 (* both probes' fitted parameters + per-radius profiles on one vertex's (ball volume,
    sphere area) pair: take the radius-consistent quotients of each profile and hand them to
-   windowedFit.  The sphere fit uses the rising part of A(r) for an Automatic window
-   since A(r) is non-monotonic on a finite graph (it peaks near the eccentricity), but the
-   reported sphere profiles stay on the full A(r).  No boundary shift: the ball fit runs on the
-   supplied volume (default Hausdorff, the boundary-corrected |GraphInterior[B_r]| = B_{r-1} on a
-   regular lattice), so "BallVolumes"/"BallLogDifferenceQuotients" are exactly what was fitted *)
+   windowedFit.  Under an Automatic window both fits use the radii up to the peak of A(r):
+   A(r) is non-monotonic on a finite graph (it peaks where the ball meets the rim or wraps
+   around), and past the peak the ball is filling the graph rather than growing.  The reported
+   profiles stay full.  The ball fit runs on the supplied volume (the chosen "Measure", default
+   "HalfBoundary"), so "BallVolumes"/"BallLogDifferenceQuotients" are exactly what was fitted *)
 growthParams[w_, a_, window_, dimOpt_] := With[
-	{qBall = radialQuotients[w], rising = If[window === Automatic, Take[a, First @ Ordering[a, -1]], a]},
-	{ballFit = windowedFit[qBall, window, "Ball", dimOpt], qSph = radialQuotients[rising]},
+	{peak = If[window === Automatic, First @ Ordering[a, -1], Length[a]]},
+	{qBall = radialQuotients[w], ballFit = windowedFit[radialQuotients[Take[w, UpTo[peak]]], window, "Ball", dimOpt], qSph = radialQuotients[Take[a, peak]]},
 	{sphFit = windowedFit[qSph, window, "Sphere", dimOpt]},
 	{bd = ballFit["Dimension"], sd = sphFit["Dimension"]},
 	<|
