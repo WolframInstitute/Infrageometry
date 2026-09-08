@@ -1282,6 +1282,51 @@ VerificationTest[
     TestID -> "BallVolumes-ExpandingFront-monotone-never-empties"
 ]
 
+(* the defining identity, measure for measure: A(r) = V(r) - V(r-1), V(-1) = 0 *)
+VerificationTest[
+    With[{g = GridGraph[{9, 9}]},
+        AllTrue[{"FullCount", "WithoutBoundary", "HalfBoundary", "ExpandingFront"},
+            Accumulate[ShellAreas[g, 41, All, "Measure" -> #]] ===
+                BallVolumes[g, 41, All, "Measure" -> #] &]],
+    True,
+    TestID -> "ShellAreas-accumulates-to-BallVolumes-every-measure"
+]
+
+(* the default is the metric shell count: the OEIS coordination sequence, A(1) the degree *)
+VerificationTest[
+    {ShellAreas[GridGraph[{11, 11}], 61, {0, 4}],
+     ShellAreas[HypercubeGraph[4], 1, All],
+     ShellAreas[CycleGraph[9], 1, All]},
+    {{1, 4, 8, 12, 16}, {1, 4, 6, 4, 1}, {1, 2, 2, 2, 2}},
+    TestID -> "ShellAreas-FullCount-is-the-coordination-sequence"
+]
+
+(* on a lattice the half-boundary shell is the centred count (A(r) + A(r-1))/2, and
+   A(0) = 1/2 because dB_0 = {v} whenever v has a neighbour *)
+VerificationTest[
+    With[{a = ShellAreas[GridGraph[{11, 11}], 61, {0, 4}]},
+        ShellAreas[GridGraph[{11, 11}], 61, {0, 4}, "Measure" -> "HalfBoundary"] ===
+            (a + Prepend[Most[a], 0]) / 2],
+    True,
+    TestID -> "ShellAreas-HalfBoundary-is-the-centred-shell"
+]
+
+(* a fixed window over the vertex slot is rectangular and pads with 0, the empty shell *)
+VerificationTest[
+    {Dimensions[ShellAreas[GridGraph[{5, 5}], All, {0, 6}]],
+     ShellAreas[PathGraph[Range[4]], 1, {0, 6}]},
+    {{25, 7}, {1, 1, 1, 1, 0, 0, 0}},
+    TestID -> "ShellAreas-fixed-window-rectangular-pads-zero"
+]
+
+(* the sphere probe of the growth fit reads exactly this profile *)
+VerificationTest[
+    With[{g = GridGraph[{13, 13}]},
+        VolumeGrowthObservables[g, 85]["ShellAreas"] === ShellAreas[g, 85, All]],
+    True,
+    TestID -> "ShellAreas-is-the-observables-sphere-probe"
+]
+
 (* slope-of-mean: average the volume profiles over the vertex slot, then one slope.
    On a vertex-transitive graph every profile is identical, so it equals the
    single-vertex slope -- aggregation is caller-side composition, no option *)

@@ -2,6 +2,7 @@ Package["WolframInstitute`Infrageometry`"]
 
 PackageExport[BallHull]
 PackageExport[BallVolumes]
+PackageExport[ShellAreas]
 PackageExport[CylinderVolumes]
 PackageExport[TubeVolumes]
 PackageExport[IntervalVolumes]
@@ -68,16 +69,19 @@ advancingFront[g_Graph, src_List, steps_Integer] :=
 			{src, src}, steps][[All, 2]]
 	]
 
+(* how far to run the front for a requested radius range: All has no natural end (the front
+   never stops), so it takes 2 max rho steps -- one out-and-back over the distances rho. *)
+frontSteps[rho_, range_] := Switch[range,
+	All,                  2 Max @ DeleteCases[rho, Infinity],
+	_Integer,             range,
+	{_Integer, _Integer}, Last[range]
+]
+
 (* V(t) = sum_{s<=t} |S_s| -- the cumulative passage count of the advancing front from src,
    the "ExpandingFront" measure: the ball volume in the wrapped sense, indexed by a step
-   count rather than a radius.  All has no natural end (the front never stops), so it
-   defaults to 2 max rho steps -- one out-and-back over the distances rho to src. *)
+   count rather than a radius. *)
 frontVolumeProfile[g_, src_List, rho_, range_] :=
-	Accumulate[Length /@ advancingFront[g, src, Switch[range,
-		All,                  2 Max @ DeleteCases[rho, Infinity],
-		_Integer,             range,
-		{_Integer, _Integer}, Last[range]
-	]]]
+	Accumulate[Length /@ advancingFront[g, src, frontSteps[rho, range]]]
 
 (* V(r) = |B_r(v)| as the List {V(0), ..., V(ecc(v))} (position i is radius i - 1).  Object
    slot 2 (single vertex, list, or All), radius slot 3 (All -> the full profile; r_Integer
@@ -137,6 +141,66 @@ BallVolumes[g_Graph,
 			"HalfBoundary",    (full + Accumulate @ BinCounts[MapThread[Max, {rho, Max[rho[[#]]] & /@ AdjacencyMatrix[g]["AdjacencyLists"]}], bins]) / 2,
 			"ExpandingFront",  frontVolumeProfile[g, {vertex}, rho, range]
 		], range]
+	]
+
+
+(* ===================== Shell areas ===================== *)
+
+(* A(r) = V(r) - V(r-1) as the List {A(0), ..., A(ecc(v))}, with V(-1) = 0: the radial
+   derivative of BallVolumes under the SAME "Measure", so Accumulate[ShellAreas] == BallVolumes
+   measure for measure.  Object slot 2 and radius slot 3 are BallVolumes'; a finite window
+   pads past eccentricity with 0, the empty shell.
+     "FullCount"        |S_r(v)| -- the discrete geodesic-sphere area, the crystallography /
+                        OEIS coordination sequence, A(1) = the coordination number (default)
+     "WithoutBoundary"  the interior shell, |S_r| shifted one radius in a lattice bulk
+     "HalfBoundary"     (A(r) + A(r-1))/2, the centred shell count; A(0) = 1/2, since
+                        dB_0 = {v} whenever v has a neighbour
+     "ExpandingFront"   |F_t|, the size of the advancing front at step t, which continues
+                        past the eccentricity where the metric shell dies
+   Every branch is the direct count -- the histogram of the distance vector, the histogram of
+   its closed-neighbourhood maximum, their mean, the front cardinalities -- so nothing is
+   accumulated and then differenced back: this is BallVolumes' work less one Accumulate.
+   The sphere probe of VolumeGrowthObservables runs on the "FullCount" shell. *)
+
+Options[ShellAreas] = {"Measure" -> "FullCount"};
+
+ShellAreas[g_Graph, opts : OptionsPattern[]] := ShellAreas[g, All, All, opts]
+
+ShellAreas[g_Graph, pts : (All | _List | Except[_Rule | _RuleDelayed]), opts : OptionsPattern[]] :=
+	ShellAreas[g, pts, All, opts]
+
+ShellAreas[g_Graph,
+	vertices : (_List | All),
+	range : (_Integer | {_Integer, _Integer} | All),
+	OptionsPattern[]
+] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
+	With[
+		{dm = GraphDistanceMatrix[g], adj = AdjacencyMatrix[g]["AdjacencyLists"], measure = OptionValue["Measure"]},
+		{targets = If[vertices === All, VertexList[g], vertices]},
+		MapThread[
+			{v, rho} |-> With[{bins = {0, Max @ DeleteCases[rho, Infinity] + 1, 1}},
+				windowSaturate[Switch[measure,
+					"FullCount",       BinCounts[rho, bins],
+					"WithoutBoundary", BinCounts[MapThread[Max, {rho, Max[rho[[#]]] & /@ adj}], bins],
+					"HalfBoundary",    (BinCounts[rho, bins] + BinCounts[MapThread[Max, {rho, Max[rho[[#]]] & /@ adj}], bins]) / 2,
+					"ExpandingFront",  Length /@ advancingFront[g, {v}, frontSteps[rho, range]]
+				], range, 0]],
+			{targets, dm[[VertexIndex[g, #] & /@ targets]]}]
+	]
+
+ShellAreas[g_Graph,
+	vertex : Except[All | _Rule | _RuleDelayed],
+	range : (_Integer | {_Integer, _Integer} | All),
+	OptionsPattern[]
+] :=
+	With[{rho = GraphDistance[g, vertex]},
+		{bins = {0, Max @ DeleteCases[rho, Infinity] + 1, 1}},
+		windowSaturate[Switch[OptionValue["Measure"],
+			"FullCount",       BinCounts[rho, bins],
+			"WithoutBoundary", BinCounts[MapThread[Max, {rho, Max[rho[[#]]] & /@ AdjacencyMatrix[g]["AdjacencyLists"]}], bins],
+			"HalfBoundary",    (BinCounts[rho, bins] + BinCounts[MapThread[Max, {rho, Max[rho[[#]]] & /@ AdjacencyMatrix[g]["AdjacencyLists"]}], bins]) / 2,
+			"ExpandingFront",  Length /@ advancingFront[g, {vertex}, frontSteps[rho, range]]
+		], range, 0]
 	]
 
 
@@ -400,8 +464,8 @@ VolumeGrowthObservables[g_Graph,
 	OptionsPattern[]
 ] /; vertices === All || ! MemberQ[VertexList[g], vertices] :=
 	With[{dim = OptionValue["Dimension"]},
-		MapThread[growthParams[#1, Prepend[Differences[#2], First[#2]], window, dim] &,
-			{BallVolumes[g, vertices, All, "Measure" -> OptionValue["Measure"]], BallVolumes[g, vertices, All]}]
+		MapThread[growthParams[#1, #2, window, dim] &,
+			{BallVolumes[g, vertices, All, "Measure" -> OptionValue["Measure"]], ShellAreas[g, vertices, All]}]
 	]
 
 VolumeGrowthObservables[g_Graph,
@@ -409,10 +473,8 @@ VolumeGrowthObservables[g_Graph,
 	window : ({_Integer, _Integer} | All | Automatic) : Automatic,
 	OptionsPattern[]
 ] :=
-	With[{full = BallVolumes[g, vertex, All]},
-		growthParams[BallVolumes[g, vertex, All, "Measure" -> OptionValue["Measure"]],
-			Prepend[Differences[full], First[full]], window, OptionValue["Dimension"]]
-	]
+	growthParams[BallVolumes[g, vertex, All, "Measure" -> OptionValue["Measure"]],
+		ShellAreas[g, vertex, All], window, OptionValue["Dimension"]]
 
 (* DimensionCurvatureFit[{{r, q(r)}, ...}]: fit dimension d and scalar curvature R to log-difference
    quotients q(r) (each the discrete d Log f / d Log r at radius r) by Bishop-Gromov regression on
