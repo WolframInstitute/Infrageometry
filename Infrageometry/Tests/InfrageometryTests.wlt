@@ -3109,6 +3109,12 @@ VerificationTest[
 
 VerificationTest[
     InfraSubstrateStyle[],
+    <|"Default" -> {"Default", "Small", "Medium", "Large"}, "Custom" -> {}|>,
+    TestID -> "InfraSubstrateStyle-association"
+]
+
+VerificationTest[
+    InfraSubstrateStyle[All],
     {"Default", "Small", "Medium", "Large"},
     TestID -> "InfraSubstrateStyle-names"
 ]

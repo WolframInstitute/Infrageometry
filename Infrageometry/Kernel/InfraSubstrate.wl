@@ -65,7 +65,12 @@ InfraSubstrateCode[ name_String, size_, opts : OptionsPattern[ { InfraSubstrate,
 (* ===================== InfraSubstrateStyle ===================== *)
 
 
-InfraSubstrateStyle[ ] := { "Default", "Small", "Medium", "Large" }
+InfraSubstrateStyle[ ] := <|
+  "Default" -> { "Default", "Small", "Medium", "Large" },
+  "Custom" -> customSubstrateStyles[ ]
+|>
+
+InfraSubstrateStyle[ All ] := Catenate @ Values @ InfraSubstrateStyle[ ]
 
 InfraSubstrateStyle[ "Default" ] = { };
 
@@ -86,6 +91,15 @@ InfraSubstrateStyle[ "Large" ] = {
 
 (* a custom look for one substrate at one size is one more definition above this fallback *)
 InfraSubstrateStyle[ name_String, size_String ] := InfraSubstrateStyle @ size
+
+customSubstrateStyles[ ] :=
+  Join[
+    Cases[ DownValues[ InfraSubstrateStyle ],
+      HoldPattern[ Verbatim[ HoldPattern ][ InfraSubstrateStyle[ style_String ] ] :> _ ] /;
+        ! MemberQ[ { "Default", "Small", "Medium", "Large" }, style ] :> style ],
+    Cases[ DownValues[ InfraSubstrateStyle ],
+      HoldPattern[ Verbatim[ HoldPattern ][ InfraSubstrateStyle[ name_String, size_String ] ] :> _ ] :> { name, size } ]
+  ]
 
 
 (* ===================== The roster ===================== *)
