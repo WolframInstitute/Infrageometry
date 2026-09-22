@@ -2,9 +2,9 @@
 
 # Infrageometry
 
-Discrete geometry of combinatorial objects — complexes, hypergraphs, Hodge/Dirac calculus, Forman–Ricci curvature, simplicial maps, and differential forms on graphs.
+Discrete geometry of combinatorial objects — complexes and their closures, hypergraphs, Hodge/Dirac calculus, Green and connection matrices, Lefschetz theory, persistence, simplicial sets and maps, meshes, quantum calculus, and Forman–Ricci curvature.
 
-Nothing here needs a distance. The **metric** layer — balls, shells, tubes, volume growth, Ollivier curvature, resistance, coordinatization, displacements, tessellations, `InfraSubstrate` — moved to [SyntheticInfrageometry](https://github.com/WolframInstitute/SyntheticInfrageometry) in **2.0.0** (2026-09-22), where it is the Riemannian branch. The two paclets are independent; neither imports the other.
+Nothing here needs a distance. Everything that does now lives in [SyntheticInfrageometry](https://github.com/WolframInstitute/SyntheticInfrageometry): the **metric** layer — balls, shells, tubes, volume growth, Ollivier curvature, resistance, coordinatization, displacements, tessellations, `InfraSubstrate` — left in **2.0.0**, and the **calculus on complexes** — differential forms and cochains, the ball-intersection complexes and their filtrations — in **3.0.0** (both 2026-09-22). The two paclets are independent; neither imports the other.
 
 ## 🎨 Founding Sketch
 
@@ -31,6 +31,6 @@ Needs["WolframInstitute`Infrageometry`"]
 
 | Notebook | Description | Versions |
 |---|---|---|
-| Forms and cochains | Vertex-anchored forms vs. clique cochains, the ordered and alternating cochain conventions, wedge/cup/cup-1, and the Steenrod primitive on a torus | [LLM](https://www.wolframcloud.com/obj/hajek_pavel/Infrageometry/FormsAndCochains.nb) |
-| Homotopy transfer on graph cochains | A-infinity products, Massey products, and the transfer to cohomology from one Hodge contraction | [LLM](https://www.wolframcloud.com/obj/hajek_pavel/Infrageometry/AInfinityTransfer.nb) |
 | Simplicial sets and face graphs | Simplicial sets and the face graphs of complexes |  |
+
+The forms-and-cochains and homotopy-transfer notebooks describe symbols that moved; they are listed in the [SyntheticInfrageometry](https://github.com/WolframInstitute/SyntheticInfrageometry) README.
